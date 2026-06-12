@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Boutiques</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Boutiques</span>
+      <div class="topbar-right">
+        <button class="btn btn-primary" onclick="openModal('modal-add')">+ Nouvelle boutique</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <!-- Filters -->
+      <div class="filters-bar">
+        <input type="search" id="q" placeholder="Rechercher domaine…" oninput="load(1)" class="filter-input">
+        <select id="f-type" onchange="load(1)" class="filter-select">
+          <option value="">Tous les types</option>
+          <option>shopify</option><option>woocommerce</option><option>prestashop</option><option>autre</option>
+        </select>
+        <select id="f-niche" onchange="load(1)" class="filter-select">
+          <option value="">Toutes les niches</option>
+          <option>lingerie</option><option>bijoux</option><option>beaute</option><option>mode</option>
+          <option>sport</option><option>maison</option><option>enfants</option><option>electronique</option>
+          <option>animaux</option><option>cuisine</option><option>jardinage</option><option>voyages</option>
+          <option>sante</option><option>librairie</option><option>musique</option><option>art</option>
+          <option>auto</option><option>luxe</option>
+        </select>
+        <select id="f-status" onchange="load(1)" class="filter-select">
+          <option value="">Tous statuts</option>
+          <option>pending</option><option>scraped</option><option>orchestrating</option><option>done</option><option>error</option>
+        </select>
+        <select id="f-sort" onchange="load(1)" class="filter-select">
+          <option value="">Tri: récent</option>
+          <option value="score">Tri: score</option>
+          <option value="ca">Tri: CA/mois</option>
+          <option value="traffic">Tri: trafic</option>
+        </select>
+        <span class="text-muted" id="total-label"></span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Domaine</th><th>Type</th><th>Niche</th>
+            <th>Score</th><th>CPC</th><th>Trafic/mois</th><th>CA/mois est.</th>
+            <th>Âge</th><th>Statut</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="pagination"></div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Add modal -->
+<div class="modal" id="modal-add">
+  <div class="modal-box">
+    <div class="modal-header"><span>Nouvelle boutique</span><button class="modal-close" onclick="closeModal('modal-add')">✕</button></div>
+    <div class="modal-body">
+      <label class="form-label">Domaine source *</label>
+      <input id="add-domain" class="form-input" placeholder="example.com">
+      <label class="form-label">Type</label>
+      <select id="add-type" class="form-input">
+        <option>shopify</option><option>woocommerce</option><option>prestashop</option><option>autre</option>
+      </select>
+      <label class="form-label">Niche</label>
+      <input id="add-niche" class="form-input" placeholder="lingerie, bijoux…">
+      <label class="form-label">Trafic estimé</label>
+      <input id="add-traffic" class="form-input" type="number" placeholder="0">
+      <label class="form-label">Commentaire</label>
+      <textarea id="add-comment" class="form-input" rows="2"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add')">Annuler</button>
+      <button class="btn btn-primary" onclick="addBoutique()">Créer</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, apiGet, apiPost, apiDelete, fmt, fmtDate, badge, toast, openModal, closeModal, paginationHtml } from '/assets/platform.js';
+checkAuth(); buildNav();
+window.openModal = openModal; window.closeModal = closeModal;
+
+function esc(s) { const d=document.createElement('div'); d.textContent=String(s||''); return d.innerHTML; }
+// CA mensuel estimé: trafic × taux_conversion × panier_moyen_niche
+const BASKET = { bijoux:85, mode:55, beaute:45, sport:65, maison:75, electronique:120, nutrition:40, animaux:35, sante:50, luxe:200, auto:80, jardin:45, enfant:40 };
+const CONV_RATE = {shopify:0.018, woocommerce:0.014, prestashop:0.012, magento:0.010};
+function caMonth(b) {
+  if (b.ca_monthly) return b.ca_monthly;
+  const basket = BASKET[b.niche] || 50;
+  const conv = CONV_RATE[b.type] || 0.015;
+  return Math.round((b.traffic_monthly || b.traffic || 0) * conv * basket);
+}
+function fmtEur(n) { return n >= 1000 ? `${(n/1000).toFixed(1)}k€` : `${n}€`; }
+function scoreColor(s) { return s>=8?'badge-success':s>=6.5?'badge-info':s>=5?'badge-warn':'badge-err'; }
+
+let _page = 1;
+
+async function load(p = _page) {
+  _page = p;
+  const q = document.getElementById('q').value;
+  const params = { page: p, per: 25 };
+  if (q) params.q = q;
+  const type = document.getElementById('f-type').value; if (type) params.type = type;
+  const niche = document.getElementById('f-niche').value; if (niche) params.niche = niche;
+  const status = document.getElementById('f-status').value; if (status) params.status = status;
+  const sort = document.getElementById('f-sort').value; if (sort) params.sort = sort;
+
+  try {
+    const d = await apiGet('/boutiques', params);
+    document.getElementById('total-label').textContent = `${d.total} boutiques`;
+    const tb = document.getElementById('tbody');
+    if (!d.list?.length) { tb.innerHTML='<tr><td colspan="9" class="text-center text-muted">Aucune boutique</td></tr>'; return; }
+    tb.innerHTML = d.list.map(b=>{
+      const ca = caMonth(b);
+      const traffic = b.traffic_monthly || b.traffic || 0;
+      const score = b.score || 0;
+      return `<tr>
+      <td>
+        <a href="https://${esc(b.domain)}" target="_blank" rel="noopener" class="link" title="Ouvrir ${esc(b.domain)}">${esc(b.domain)} ↗</a>
+        <div class="text-muted text-sm" style="font-size:11px">${esc((b.comment||'').slice(0,50))}</div>
+      </td>
+      <td><span class="badge badge-info">${esc(b.type||'—')}</span></td>
+      <td>${esc(b.niche||'—')}</td>
+      <td><span class="badge ${scoreColor(score)}">${score.toFixed ? score.toFixed(1) : score}</span></td>
+      <td class="text-muted">${b.cpc ? b.cpc.toFixed(2)+'€' : '—'}</td>
+      <td>${traffic ? fmt(traffic)+'/mois' : '—'}</td>
+      <td style="font-weight:600;color:${ca>5000?'#22c55e':ca>1000?'#f59e0b':'inherit'}">${ca ? fmtEur(ca)+'/mois' : '—'}</td>
+      <td class="text-muted">${b.reg_year ? `${b.reg_year} <span style="font-size:10px">(${b.domain_age_years}a)</span>` : '—'}</td>
+      <td>${badge(b.importStatus)}</td>
+      <td class="actions">
+        <a href="/boutique.html?id=${esc(b.id)}" class="btn btn-sm">Fiche</a>
+        <button class="btn btn-sm btn-danger" onclick="del('${esc(b.id)}','${esc(b.domain)}')">✕</button>
+      </td>
+    </tr>`;
+    }).join('');
+    document.getElementById('pagination').innerHTML = paginationHtml(p, d.pages, 'window._load');
+    window._load = load;
+  } catch(e) { toast(e.message,'error'); }
+}
+
+window.addBoutique = async function() {
+  const domain = document.getElementById('add-domain').value.trim();
+  if (!domain) return toast('Domaine requis','error');
+  try {
+    await apiPost('/boutiques', {
+      domain,
+      type: document.getElementById('add-type').value,
+      niche: document.getElementById('add-niche').value,
+      traffic: +document.getElementById('add-traffic').value||0,
+      comment: document.getElementById('add-comment').value,
+    });
+    closeModal('modal-add');
+    toast('Boutique créée','success');
+    load(1);
+  } catch(e) { toast(e.message,'error'); }
+};
+
+window.del = async function(id, domain) {
+  if (!confirm(`Supprimer ${domain} ?`)) return;
+  try {
+    await apiDelete('/boutiques/'+id);
+    toast('Supprimée','success');
+    load(_page);
+  } catch(e) { toast(e.message,'error'); }
+};
+
+window.load = load;
+load(1);
+</script>
+</body>
+</html>

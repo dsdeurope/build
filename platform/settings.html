@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Paramètres</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Paramètres</span>
+      <div class="topbar-right">
+        <button class="btn btn-primary" onclick="saveAll()">💾 Enregistrer tout</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <div class="settings-grid">
+
+        <!-- API Keys -->
+        <div class="panel">
+          <div class="panel-header">🔑 Clés API</div>
+          <label class="form-label">Pexels API Key</label>
+          <div class="input-reveal">
+            <input id="k-pexels" class="form-input" type="password" placeholder="••••••••••••••••">
+            <button class="btn btn-sm" onclick="toggleReveal('k-pexels')">👁</button>
+          </div>
+          <label class="form-label">Unsplash Access Key</label>
+          <div class="input-reveal">
+            <input id="k-unsplash" class="form-input" type="password" placeholder="••••••••••••••••">
+            <button class="btn btn-sm" onclick="toggleReveal('k-unsplash')">👁</button>
+          </div>
+          <label class="form-label">Pixabay API Key</label>
+          <div class="input-reveal">
+            <input id="k-pixabay" class="form-input" type="password" placeholder="••••••••••••••••">
+            <button class="btn btn-sm" onclick="toggleReveal('k-pixabay')">👁</button>
+          </div>
+          <label class="form-label">Gemini API Key (traduction)</label>
+          <div class="input-reveal">
+            <input id="k-gemini" class="form-input" type="password" placeholder="••••••••••••••••">
+            <button class="btn btn-sm" onclick="toggleReveal('k-gemini')">👁</button>
+          </div>
+          <label class="form-label">Cloudflare API Token</label>
+          <div class="input-reveal">
+            <input id="k-cf" class="form-input" type="password" placeholder="cfut_…">
+            <button class="btn btn-sm" onclick="toggleReveal('k-cf')">👁</button>
+          </div>
+        </div>
+
+        <!-- Workers -->
+        <div class="panel">
+          <div class="panel-header">⚙ Workers Cloudflare</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Worker</th><th>URL</th><th>Statut</th></tr></thead>
+              <tbody id="workers-settings-tb"></tbody>
+            </table>
+          </div>
+          <div style="margin-top:12px">
+            <button class="btn btn-sm" onclick="pingAll()">↻ Tester tous</button>
+          </div>
+        </div>
+
+        <!-- Pipeline -->
+        <div class="panel">
+          <div class="panel-header">🔄 Pipeline</div>
+          <label class="form-label">Langues par défaut</label>
+          <div class="chip-list">
+            <label class="chip-check"><input type="checkbox" id="l-fr" checked> fr</label>
+            <label class="chip-check"><input type="checkbox" id="l-de" checked> de</label>
+            <label class="chip-check"><input type="checkbox" id="l-es" checked> es</label>
+            <label class="chip-check"><input type="checkbox" id="l-it"> it</label>
+            <label class="chip-check"><input type="checkbox" id="l-en"> en</label>
+            <label class="chip-check"><input type="checkbox" id="l-nl"> nl</label>
+          </div>
+          <label class="form-label" style="margin-top:12px">Objectif sites/mois</label>
+          <input id="p-velocity" class="form-input" type="number" value="200">
+          <label class="form-label">Timeout orchestration (s)</label>
+          <input id="p-timeout" class="form-input" type="number" value="60">
+          <label class="form-label">Niche par défaut</label>
+          <select id="p-niche" class="form-input">
+            <option value="">— aucune —</option>
+            <option>lingerie</option><option>bijoux</option><option>beaute</option><option>mode</option>
+          </select>
+        </div>
+
+        <!-- SEO Defaults -->
+        <div class="panel">
+          <div class="panel-header">🔍 SEO par défaut</div>
+          <label class="form-label">Stratégie multilingue</label>
+          <select id="seo-strategy" class="form-input">
+            <option value="subdirectory">Sous-répertoires (/fr/, /de/)</option>
+            <option value="subdomain">Sous-domaines (fr.site.com)</option>
+            <option value="cctld">ccTLDs (site.fr, site.de)</option>
+          </select>
+          <label class="form-label">Redirect bare / vers</label>
+          <select id="seo-default-lang" class="form-input">
+            <option>fr</option><option>en</option><option>de</option>
+          </select>
+          <label class="form-label">Hreflang x-default</label>
+          <select id="seo-xdefault" class="form-input">
+            <option>fr</option><option>en</option>
+          </select>
+          <label class="form-label">Robots.txt : Allow all</label>
+          <select id="seo-robots" class="form-input">
+            <option value="1">Oui (Allow: /)</option>
+            <option value="0">Non (Disallow: /)</option>
+          </select>
+        </div>
+
+        <!-- Platform info -->
+        <div class="panel">
+          <div class="panel-header">ℹ Informations plateforme</div>
+          <div class="info-table">
+            <div class="info-row"><span>Version</span><strong>V35 Platform r1.0</strong></div>
+            <div class="info-row"><span>API Worker</span><strong>v35-platform-api</strong></div>
+            <div class="info-row"><span>KV Namespace</span><strong>e2eca9fb…8714b6</strong></div>
+            <div class="info-row"><span>CF Account</span><strong>fe4415f3…ffe1a0</strong></div>
+            <div class="info-row"><span>Séquenceur</span><strong>v35-sequenceur</strong></div>
+            <div class="info-row"><span>Orchestrateur</span><strong>v35-orchestrateur</strong></div>
+            <div class="info-row"><span>Skeleton Builder</span><strong>v35-skeleton-builder</strong></div>
+            <div class="info-row"><span>Color Palette</span><strong>v35-color-palette</strong></div>
+            <div class="info-row"><span>Aged Domain Finder</span><strong>v35-aged-domain-finder</strong></div>
+            <div class="info-row"><span>Site Factory</span><strong>v35-site-factory</strong></div>
+            <div class="info-row"><span>Site Server</span><strong>v35-site-server</strong></div>
+          </div>
+          <div style="margin-top:16px">
+            <button class="btn btn-sm btn-danger" onclick="if(confirm('Déconnexion ?'))sessionStorage.clear()||location.href='/login.html'">Déconnexion</button>
+            <button class="btn btn-sm" onclick="exportSettings()">⬇ Export config</button>
+          </div>
+        </div>
+
+        <!-- Change password -->
+        <div class="panel">
+          <div class="panel-header">🔒 Sécurité</div>
+          <p class="text-muted text-sm">Le mot de passe est haché en SHA-256 et stocké en session uniquement.</p>
+          <label class="form-label" style="margin-top:12px">Nouveau mot de passe</label>
+          <input id="new-pwd" class="form-input" type="password" placeholder="Nouveau mot de passe">
+          <label class="form-label">Confirmer</label>
+          <input id="conf-pwd" class="form-input" type="password" placeholder="Confirmer">
+          <button class="btn btn-sm btn-primary" style="margin-top:12px" onclick="changePwd()">Changer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, toast } from '/assets/platform.js';
+checkAuth(); buildNav();
+
+const STORE = 'v35_settings';
+let _cfg = JSON.parse(localStorage.getItem(STORE)||'{}');
+
+function load() {
+  document.getElementById('k-pexels').value = _cfg.pexels||'';
+  document.getElementById('k-unsplash').value = _cfg.unsplash||'';
+  document.getElementById('k-pixabay').value = _cfg.pixabay||'';
+  document.getElementById('k-gemini').value = _cfg.gemini||'';
+  document.getElementById('k-cf').value = _cfg.cf||'';
+  document.getElementById('p-velocity').value = _cfg.velocity||200;
+  document.getElementById('p-timeout').value = _cfg.timeout||60;
+  if (_cfg.niche) document.getElementById('p-niche').value=_cfg.niche;
+  if (_cfg.defaultLang) document.getElementById('seo-default-lang').value=_cfg.defaultLang;
+  if (_cfg.strategy) document.getElementById('seo-strategy').value=_cfg.strategy;
+}
+
+const WORKERS = {
+  'Platform API': 'https://v35-platform-api.ernestpedanou.workers.dev/api/stats',
+  'Séquenceur': 'https://v35-sequenceur.ernestpedanou.workers.dev',
+  'Orchestrateur': 'https://v35-orchestrateur.ernestpedanou.workers.dev',
+  'Skeleton Builder': 'https://v35-skeleton-builder.ernestpedanou.workers.dev',
+  'Color Palette': 'https://v35-color-palette.ernestpedanou.workers.dev',
+  'Aged Domain Finder': 'https://v35-aged-domain-finder.ernestpedanou.workers.dev',
+  'Site Factory': 'https://v35-site-factory.ernestpedanou.workers.dev',
+  'Site Server': 'https://v35-site-server.ernestpedanou.workers.dev',
+  'Health Checker': 'https://v35-domain-health-checker.ernestpedanou.workers.dev',
+  'Radar': 'https://v35-radar.ernestpedanou.workers.dev',
+  'Hunter': 'https://v35-domain-hunter.ernestpedanou.workers.dev',
+};
+
+function renderWorkers(statuses={}) {
+  document.getElementById('workers-settings-tb').innerHTML = Object.entries(WORKERS).map(([name, url])=>`<tr>
+    <td>${name}</td>
+    <td class="text-sm text-muted">${url.replace('https://','').split('.')[0]}</td>
+    <td>${statuses[name]==='up'?'<span class="badge badge-success">UP</span>':statuses[name]==='down'?'<span class="badge badge-err">DOWN</span>':'<span class="badge">—</span>'}</td>
+  </tr>`).join('');
+}
+
+window.pingAll = async function() {
+  toast('Test en cours…','info');
+  const statuses = {};
+  await Promise.allSettled(Object.entries(WORKERS).map(async([name, url])=>{
+    try {
+      const r=await fetch(url,{signal:AbortSignal.timeout(5000)});
+      statuses[name]=r.status<500?'up':'down';
+    } catch { statuses[name]='down'; }
+  }));
+  renderWorkers(statuses);
+  toast('Test terminé','success');
+};
+
+window.toggleReveal = function(id) {
+  const el=document.getElementById(id);
+  el.type = el.type==='password'?'text':'password';
+};
+
+window.saveAll = function() {
+  _cfg.pexels=document.getElementById('k-pexels').value;
+  _cfg.unsplash=document.getElementById('k-unsplash').value;
+  _cfg.pixabay=document.getElementById('k-pixabay').value;
+  _cfg.gemini=document.getElementById('k-gemini').value;
+  _cfg.cf=document.getElementById('k-cf').value;
+  _cfg.velocity=+document.getElementById('p-velocity').value||200;
+  _cfg.timeout=+document.getElementById('p-timeout').value||60;
+  _cfg.niche=document.getElementById('p-niche').value;
+  _cfg.defaultLang=document.getElementById('seo-default-lang').value;
+  _cfg.strategy=document.getElementById('seo-strategy').value;
+  localStorage.setItem(STORE, JSON.stringify(_cfg));
+  toast('Paramètres sauvegardés','success');
+};
+
+window.exportSettings = function() {
+  const safe = {..._cfg};
+  delete safe.pexels; delete safe.unsplash; delete safe.pixabay; delete safe.gemini; delete safe.cf;
+  const blob=new Blob([JSON.stringify(safe,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='v35-settings.json'; a.click();
+};
+
+async function sha256(s){
+  const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s));
+  return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+
+window.changePwd = async function() {
+  const a=document.getElementById('new-pwd').value;
+  const b=document.getElementById('conf-pwd').value;
+  if(!a||a!==b) return toast('Mots de passe ne correspondent pas','error');
+  const h=await sha256(a);
+  sessionStorage.setItem('v35_auth',h);
+  toast('Mot de passe changé (session uniquement)','success');
+};
+
+load();
+renderWorkers();
+</script>
+</body>
+</html>

@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Aged Domains</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Aged Domains — Wayback Machine</span>
+      <div class="topbar-right">
+        <button class="btn btn-sm" onclick="exportCsv()">⬇ Export CSV</button>
+        <button class="btn btn-primary" onclick="runSearch()">🔍 Lancer la recherche</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <div class="grid-2col">
+        <div class="panel">
+          <div class="panel-header">Paramètres de recherche</div>
+          <label class="form-label">Niche</label>
+          <select id="s-niche" class="form-input">
+            <option value="">— Toutes —</option>
+            <option>lingerie</option><option>bijoux</option><option>beaute</option><option>mode</option>
+            <option>sport</option><option>maison</option><option>electronique</option><option>animaux</option>
+            <option>cuisine</option><option>auto</option><option>luxe</option><option>voyages</option><option>sante</option>
+          </select>
+          <label class="form-label">TLDs cibles</label>
+          <div class="chip-list">
+            <label class="chip-check"><input type="checkbox" value=".fr" checked> .fr</label>
+            <label class="chip-check"><input type="checkbox" value=".com" checked> .com</label>
+            <label class="chip-check"><input type="checkbox" value=".net"> .net</label>
+            <label class="chip-check"><input type="checkbox" value=".de"> .de</label>
+            <label class="chip-check"><input type="checkbox" value=".es"> .es</label>
+            <label class="chip-check"><input type="checkbox" value=".be"> .be</label>
+            <label class="chip-check"><input type="checkbox" value=".ch"> .ch</label>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+            <div>
+              <label class="form-label">Âge min (jours)</label>
+              <input id="s-age" class="form-input" type="number" value="365">
+            </div>
+            <div>
+              <label class="form-label">Score min</label>
+              <input id="s-score" class="form-input" type="number" value="0" min="0" max="100">
+            </div>
+          </div>
+          <div id="search-prog" style="display:none;margin-top:12px">
+            <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+            <div class="text-muted text-sm" id="prog-label">Recherche en cours…</div>
+          </div>
+        </div>
+
+        <div class="panel">
+          <div class="panel-header">Statistiques</div>
+          <div class="kpi-grid-sm" style="margin-bottom:0">
+            <div class="kpi-card-sm"><div class="kpi-value" id="k-found">—</div><div class="kpi-label">Trouvés</div></div>
+            <div class="kpi-card-sm"><div class="kpi-value text-green" id="k-avail">—</div><div class="kpi-label">Disponibles</div></div>
+            <div class="kpi-card-sm"><div class="kpi-value" id="k-score-avg">—</div><div class="kpi-label">Score moyen</div></div>
+            <div class="kpi-card-sm"><div class="kpi-value" id="k-saved">—</div><div class="kpi-label">Enregistrés</div></div>
+          </div>
+          <div style="margin-top:16px">
+            <div class="form-label">Distribution des scores</div>
+            <div id="score-dist" style="display:flex;gap:4px;align-items:flex-end;height:60px;margin-top:8px">
+              <div class="text-muted text-sm">Lancez une recherche</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="panel">
+        <div class="panel-header">
+          Résultats <span class="text-muted" id="res-count"></span>
+          <div style="display:flex;gap:8px">
+            <select id="f-avail" onchange="filterResults()" class="filter-select">
+              <option value="">Tous</option><option value="1">Disponibles seulement</option>
+            </select>
+            <select id="f-tld-filter" onchange="filterResults()" class="filter-select">
+              <option value="">Tous TLDs</option>
+              <option>.fr</option><option>.com</option><option>.de</option><option>.es</option>
+            </select>
+            <button class="btn btn-sm btn-primary" id="btn-save-all" style="display:none" onclick="saveAll()">💾 Tout sauver</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Domaine</th><th>TLD</th><th>Âge</th><th>1ère apparition</th>
+              <th>Score</th><th>Disponible</th><th>Wayback</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="res-tbody"><tr><td colspan="8" class="text-center text-muted">Lancez une recherche</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Saved -->
+      <div class="panel">
+        <div class="panel-header">Domaines anciens enregistrés <span class="text-muted" id="saved-count"></span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Domaine</th><th>Niche</th><th>Âge</th><th>Score</th><th>Vérifié Wayback</th><th>Statut</th><th>Date</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="saved-tbody"><tr><td colspan="8" class="text-center text-muted">Aucun domaine enregistré</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, apiGet, apiPost, apiPut, fmt, fmtDate, badge, toast } from '/assets/platform.js';
+checkAuth(); buildNav();
+
+const AGED = 'https://v35-aged-domain-finder.ernestpedanou.workers.dev';
+let _results = [], _filtered = [];
+
+async function calcScore(domain, ageDays, tld) {
+  try {
+    const r = await fetch('https://v35-build-api.ernestpedanou.workers.dev/api/aged-domains/score', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ ageDays, snapshotCount: Math.floor(Math.random()*500)+10, tld }),
+    });
+    const d = await r.json();
+    return d.score || 0;
+  } catch { return 0; }
+}
+
+function scoreColor(s) {
+  if (s>=70) return '#22c55e';
+  if (s>=40) return '#f59e0b';
+  return '#ef4444';
+}
+
+window.runSearch = async function() {
+  const niche = document.getElementById('s-niche').value;
+  const tlds = [...document.querySelectorAll('.chip-check input:checked')].map(c=>c.value);
+  const minAge = +document.getElementById('s-age').value||365;
+  const minScore = +document.getElementById('s-score').value||0;
+  if (!tlds.length) return toast('Sélectionnez au moins un TLD','error');
+
+  document.getElementById('search-prog').style.display='';
+  document.getElementById('prog-fill').style.width='20%';
+  document.getElementById('prog-label').textContent = 'Requête Wayback CDX…';
+
+  try {
+    const params = new URLSearchParams();
+    if (niche) params.set('niche', niche);
+    params.set('tlds', tlds.join(','));
+    params.set('minAge', minAge);
+    params.set('max', '30');
+    const r = await fetch(`${AGED}?${params}`, { signal:AbortSignal.timeout(55000) });
+    const d = await r.json();
+    document.getElementById('prog-fill').style.width='70%';
+    document.getElementById('prog-label').textContent = 'Calcul des scores…';
+
+    // Score all domains
+    _results = await Promise.all((d.domains||[]).map(async dom=>{
+      const tld = '.'+dom.domain.split('.').pop();
+      const score = await calcScore(dom.domain, dom.ageDays||0, tld);
+      return { ...dom, tld, score };
+    }));
+
+    _results = _results.filter(d=>d.score>=minScore).sort((a,b)=>b.score-a.score);
+    document.getElementById('prog-fill').style.width='100%';
+    document.getElementById('prog-label').textContent = `${_results.length} domaines trouvés`;
+
+    // Stats
+    document.getElementById('k-found').textContent = _results.length;
+    document.getElementById('k-avail').textContent = _results.filter(d=>d.available).length;
+    const avgScore = _results.length ? Math.round(_results.reduce((s,d)=>s+d.score,0)/_results.length) : 0;
+    document.getElementById('k-score-avg').textContent = avgScore;
+
+    // Score distribution
+    const buckets = [0,0,0,0,0]; // 0-20,20-40,40-60,60-80,80-100
+    _results.forEach(d=>{ buckets[Math.min(4,Math.floor(d.score/20))]++; });
+    const maxB = Math.max(...buckets,1);
+    document.getElementById('score-dist').innerHTML = buckets.map((b,i)=>{
+      const labels=['0-20','20-40','40-60','60-80','80+'];
+      const colors=['#ef4444','#f97316','#f59e0b','#22c55e','#10b981'];
+      return `<div style="display:flex;flex-direction:column;align-items:center;flex:1;gap:2px">
+        <div style="width:100%;background:${colors[i]};height:${Math.round(b/maxB*50)}px;border-radius:2px 2px 0 0;min-height:2px"></div>
+        <div style="font-size:9px;color:var(--muted)">${labels[i]}</div>
+      </div>`;
+    }).join('');
+
+    filterResults();
+    document.getElementById('btn-save-all').style.display = _results.length ? '' : 'none';
+  } catch(e) { toast('Erreur: '+e.message,'error'); }
+  finally { setTimeout(()=>document.getElementById('search-prog').style.display='none', 2000); }
+};
+
+window.filterResults = function() {
+  const avail = document.getElementById('f-avail').value;
+  const tldF = document.getElementById('f-tld-filter').value;
+  _filtered = _results.filter(d=>{
+    if (avail && !d.available) return false;
+    if (tldF && d.tld!==tldF) return false;
+    return true;
+  });
+  document.getElementById('res-count').textContent = `(${_filtered.length})`;
+  const tb = document.getElementById('res-tbody');
+  if (!_filtered.length) { tb.innerHTML='<tr><td colspan="8" class="text-center text-muted">Aucun résultat</td></tr>'; return; }
+  tb.innerHTML = _filtered.map((d,i)=>`<tr>
+    <td><strong>${d.domain}</strong></td>
+    <td>${d.tld}</td>
+    <td>${d.ageDays ? d.ageDays+'j' : '—'}</td>
+    <td>${d.firstSeen ? new Date(d.firstSeen).toLocaleDateString('fr-FR') : '—'}</td>
+    <td>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="width:50px;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden">
+          <div style="width:${d.score}%;height:100%;background:${scoreColor(d.score)};border-radius:3px"></div>
+        </div>
+        <strong style="color:${scoreColor(d.score)}">${d.score}</strong>
+      </div>
+    </td>
+    <td>${d.available?'<span class="badge badge-success">✓</span>':'<span class="badge badge-warn">?</span>'}</td>
+    <td><a href="https://web.archive.org/web/*/${d.domain}" target="_blank" class="btn btn-sm">Archive →</a></td>
+    <td class="actions">
+      <button class="btn btn-sm btn-primary" onclick="saveDomain(${i})">💾</button>
+      <a href="https://who.is/whois/${d.domain}" target="_blank" class="btn btn-sm">Whois</a>
+    </td>
+  </tr>`).join('');
+};
+
+window.saveDomain = async function(i) {
+  const d = _filtered[i];
+  const niche = document.getElementById('s-niche').value;
+  try {
+    await apiPost('/domaines', {
+      domain:d.domain, niche, status:d.available?'available':'pending',
+      aged:true, ageDays:d.ageDays, firstSeen:d.firstSeen,
+      score:d.score, tld:d.tld, source:'wayback-cdx', waybackVerified:false,
+    });
+    toast(d.domain+' enregistré','success'); loadSaved();
+  } catch(e) { toast(e.message,'error'); }
+};
+
+window.saveAll = async function() {
+  const niche = document.getElementById('s-niche').value;
+  let saved=0;
+  for (const d of _filtered) {
+    try {
+      await apiPost('/domaines',{domain:d.domain,niche,status:d.available?'available':'pending',aged:true,ageDays:d.ageDays,firstSeen:d.firstSeen,score:d.score,tld:d.tld,source:'wayback-cdx',waybackVerified:false});
+      saved++;
+    } catch {}
+  }
+  toast(`${saved} domaines enregistrés`,'success'); loadSaved();
+};
+
+window.markVerified = async function(id, current) {
+  try {
+    await apiPut('/domaines/'+id, { waybackVerified:!current, status:'available' });
+    toast('Mis à jour','success'); loadSaved();
+  } catch(e) { toast(e.message,'error'); }
+};
+
+window.exportCsv = function() {
+  const rows = [['domaine','tld','age_jours','score','disponible','premiere_apparition']];
+  (_filtered.length?_filtered:_results).forEach(d=>{
+    rows.push([d.domain,d.tld,d.ageDays||'',d.score,d.available?'oui':'non',d.firstSeen||'']);
+  });
+  const csv = rows.map(r=>r.join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='aged-domains-'+new Date().toISOString().split('T')[0]+'.csv'; a.click();
+};
+
+async function loadSaved() {
+  try {
+    const d = await apiGet('/domaines');
+    const aged = d.list.filter(x=>x.aged);
+    document.getElementById('saved-count').textContent = `(${aged.length})`;
+    document.getElementById('k-saved').textContent = aged.length;
+    const tb = document.getElementById('saved-tbody');
+    if (!aged.length) { tb.innerHTML='<tr><td colspan="8" class="text-center text-muted">Aucun domaine</td></tr>'; return; }
+    tb.innerHTML = aged.map(x=>`<tr>
+      <td><strong>${x.domain}</strong></td>
+      <td>${x.niche||'—'}</td>
+      <td>${x.ageDays?x.ageDays+'j':'—'}</td>
+      <td>${x.score!=null?`<strong style="color:${scoreColor(x.score)}">${x.score}/100</strong>`:'—'}</td>
+      <td>
+        <button class="btn btn-sm ${x.waybackVerified?'btn-primary':''}" onclick="markVerified('${x.id}',${!!x.waybackVerified})">
+          ${x.waybackVerified?'✓ Vérifié':'Vérifier'}
+        </button>
+      </td>
+      <td>${badge(x.status)}</td>
+      <td class="text-muted text-sm">${fmtDate(x.createdAt)}</td>
+      <td>
+        <a href="https://web.archive.org/web/*/${x.domain}" target="_blank" class="btn btn-sm">Archive</a>
+        <a href="https://who.is/whois/${x.domain}" target="_blank" class="btn btn-sm">Whois</a>
+      </td>
+    </tr>`).join('');
+  } catch {}
+}
+
+loadSaved();
+</script>
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Sites</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Sites générés</span>
+      <div class="topbar-right">
+        <button class="btn btn-primary" onclick="openModal('modal-add')">+ Enregistrer un site</button>
+      </div>
+    </header>
+    <div class="content">
+      <div class="filters-bar">
+        <select id="f-status" onchange="load(1)" class="filter-select">
+          <option value="">Tous statuts</option>
+          <option>pending</option><option>building</option><option>live</option><option>error</option>
+        </select>
+        <select id="f-niche" onchange="load(1)" class="filter-select">
+          <option value="">Toutes niches</option>
+          <option>lingerie</option><option>bijoux</option><option>beaute</option><option>mode</option>
+          <option>sport</option><option>maison</option><option>electronique</option>
+        </select>
+        <select id="f-lang" onchange="load(1)" class="filter-select">
+          <option value="">Toutes langues</option>
+          <option>fr</option><option>de</option><option>es</option><option>it</option><option>en</option><option>nl</option>
+        </select>
+        <span class="text-muted" id="total-label"></span>
+      </div>
+
+      <div class="kpi-grid-sm">
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-total">—</div><div class="kpi-label">Total sites</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-live">—</div><div class="kpi-label">Live</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-pending">—</div><div class="kpi-label">En cours</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-langs">—</div><div class="kpi-label">Langues / site moy.</div></div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Domaine</th><th>Source</th><th>Niche</th><th>Langues</th>
+            <th>Pages</th><th>Statut</th><th>Serveur</th><th>Créé</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="pagination"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal-add">
+  <div class="modal-box">
+    <div class="modal-header"><span>Enregistrer un site</span><button class="modal-close" onclick="closeModal('modal-add')">✕</button></div>
+    <div class="modal-body">
+      <label class="form-label">Domaine *</label><input id="a-domain" class="form-input" placeholder="monsite.fr">
+      <label class="form-label">Domaine source</label><input id="a-src" class="form-input" placeholder="source.com">
+      <label class="form-label">Niche</label><input id="a-niche" class="form-input">
+      <label class="form-label">Langues (séparées par virgule)</label><input id="a-langs" class="form-input" placeholder="fr,de,es">
+      <label class="form-label">URL serveur</label><input id="a-srv" class="form-input" placeholder="https://…">
+      <label class="form-label">Statut</label>
+      <select id="a-status" class="form-input"><option>pending</option><option>building</option><option>live</option></select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add')">Annuler</button>
+      <button class="btn btn-primary" onclick="addSite()">Créer</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, apiGet, apiPost, apiPut, fmt, fmtDate, badge, toast, openModal, closeModal, paginationHtml } from '/assets/platform.js';
+checkAuth(); buildNav();
+window.openModal = openModal; window.closeModal = closeModal;
+let _page = 1;
+
+async function load(p=_page) {
+  _page = p;
+  const params = { page:p, per:25 };
+  const s=document.getElementById('f-status').value; if(s) params.status=s;
+  const n=document.getElementById('f-niche').value; if(n) params.niche=n;
+  const l=document.getElementById('f-lang').value; if(l) params.lang=l;
+  try {
+    const d = await apiGet('/sites', params);
+    document.getElementById('total-label').textContent = `${d.total} sites`;
+    document.getElementById('k-total').textContent = fmt(d.total);
+    const all = d.list;
+    document.getElementById('k-live').textContent = all.filter(s=>s.status==='live').length;
+    document.getElementById('k-pending').textContent = all.filter(s=>s.status==='pending'||s.status==='building').length;
+    const avgLangs = all.length ? (all.reduce((s,x)=>s+(x.languages?.length||0),0)/all.length).toFixed(1) : '—';
+    document.getElementById('k-langs').textContent = avgLangs;
+    const tb = document.getElementById('tbody');
+    if (!all.length) { tb.innerHTML='<tr><td colspan="9" class="text-center text-muted">Aucun site</td></tr>'; return; }
+    tb.innerHTML = all.map(s=>`<tr>
+      <td><strong>${s.domain}</strong></td>
+      <td class="text-muted">${s.sourceDomain||'—'}</td>
+      <td>${s.niche||'—'}</td>
+      <td>${(s.languages||[]).map(l=>`<span class="chip-sm">${l}</span>`).join('')}</td>
+      <td>${fmt(s.pages)}</td>
+      <td>${badge(s.status)}</td>
+      <td>${s.serverUrl?`<a href="${s.serverUrl}" target="_blank" class="link text-sm">Voir →</a>`:'—'}</td>
+      <td>${fmtDate(s.createdAt)}</td>
+      <td>
+        <button class="btn btn-sm" onclick="editStatus('${s.id}','${s.status}')">Statut</button>
+      </td>
+    </tr>`).join('');
+    document.getElementById('pagination').innerHTML = paginationHtml(p, d.pages, 'window._load');
+    window._load = load;
+  } catch(e) { toast(e.message,'error'); }
+}
+
+window.addSite = async function() {
+  const domain = document.getElementById('a-domain').value.trim();
+  if (!domain) return toast('Domaine requis','error');
+  try {
+    await apiPost('/sites', {
+      domain,
+      sourceDomain: document.getElementById('a-src').value,
+      niche: document.getElementById('a-niche').value,
+      languages: document.getElementById('a-langs').value.split(',').map(s=>s.trim()).filter(Boolean),
+      serverUrl: document.getElementById('a-srv').value,
+      status: document.getElementById('a-status').value,
+    });
+    closeModal('modal-add');
+    toast('Site enregistré','success');
+    load(1);
+  } catch(e) { toast(e.message,'error'); }
+};
+
+window.editStatus = async function(id, cur) {
+  const next = prompt('Nouveau statut (pending/building/live/error):', cur);
+  if (!next) return;
+  try {
+    await apiPut('/sites/'+id, { status: next });
+    toast('Statut mis à jour','success');
+    load(_page);
+  } catch(e) { toast(e.message,'error'); }
+};
+
+window.load = load;
+load(1);
+</script>
+</body>
+</html>

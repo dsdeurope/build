@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Contenu</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Contenu & Traductions</span>
+      <div class="topbar-right">
+        <button class="btn btn-primary" onclick="openModal('modal-add')">+ Nouveau job</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <div class="kpi-grid-sm">
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-total">—</div><div class="kpi-label">Jobs total</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-done">—</div><div class="kpi-label">Terminés</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-pending">—</div><div class="kpi-label">En attente</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-score">—</div><div class="kpi-label">Score moyen</div></div>
+      </div>
+
+      <div class="filters-bar">
+        <select id="f-type" onchange="load(1)" class="filter-select">
+          <option value="">Tous types</option>
+          <option>collection_intro</option><option>collection_long</option><option>blog</option><option>titles</option>
+        </select>
+        <select id="f-status" onchange="load(1)" class="filter-select">
+          <option value="">Tous statuts</option>
+          <option>pending</option><option>running</option><option>done</option><option>error</option>
+        </select>
+        <input id="f-site" class="filter-input" placeholder="Filtrer par site…" oninput="load(1)">
+        <span class="text-muted" id="total-label"></span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Type</th><th>Prompt #</th><th>Langue</th><th>Pays</th><th>Site</th>
+            <th>Statut</th><th>Score</th><th>Date</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="pagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Add job modal -->
+<div class="modal" id="modal-add">
+  <div class="modal-box">
+    <div class="modal-header"><span>Nouveau job de contenu</span><button class="modal-close" onclick="closeModal('modal-add')">✕</button></div>
+    <div class="modal-body">
+      <label class="form-label">Type</label>
+      <select id="a-type" class="form-input">
+        <option>collection_intro</option><option>collection_long</option><option>blog</option><option>titles</option>
+      </select>
+      <label class="form-label">Prompt #</label>
+      <input id="a-num" class="form-input" placeholder="7500">
+      <label class="form-label">Langue</label>
+      <select id="a-lang" class="form-input">
+        <option>fr</option><option>de</option><option>es</option><option>it</option><option>en</option><option>nl</option>
+      </select>
+      <label class="form-label">Pays</label>
+      <input id="a-pays" class="form-input" placeholder="FR">
+      <label class="form-label">Site</label>
+      <input id="a-site" class="form-input" placeholder="monsite.fr">
+      <label class="form-label">Prompt</label>
+      <textarea id="a-prompt" class="form-input" rows="4"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add')">Annuler</button>
+      <button class="btn btn-primary" onclick="addJob()">Créer</button>
+    </div>
+  </div>
+</div>
+
+<!-- View response modal -->
+<div class="modal" id="modal-view">
+  <div class="modal-box modal-lg">
+    <div class="modal-header"><span id="view-title">Réponse</span><button class="modal-close" onclick="closeModal('modal-view')">✕</button></div>
+    <div class="modal-body">
+      <pre id="view-response" class="code-pre" style="max-height:400px;overflow:auto"></pre>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, apiGet, apiPost, apiPut, fmt, fmtDate, badge, toast, openModal, closeModal, paginationHtml } from '/assets/platform.js';
+checkAuth(); buildNav();
+window.openModal = openModal; window.closeModal = closeModal;
+let _page = 1;
+
+async function load(p=_page) {
+  _page = p;
+  const params = { page:p };
+  const t=document.getElementById('f-type').value; if(t) params.type=t;
+  const s=document.getElementById('f-status').value; if(s) params.status=s;
+  const site=document.getElementById('f-site').value.trim(); if(site) params.site=site;
+  try {
+    const d = await apiGet('/jobs', params);
+    document.getElementById('total-label').textContent = `${d.total} jobs`;
+    document.getElementById('k-total').textContent = fmt(d.total);
+    document.getElementById('k-done').textContent = d.list.filter(j=>j.status==='done').length;
+    document.getElementById('k-pending').textContent = d.list.filter(j=>j.status==='pending').length;
+    const scored = d.list.filter(j=>j.score!=null);
+    document.getElementById('k-score').textContent = scored.length
+      ? (scored.reduce((s,j)=>s+j.score,0)/scored.length).toFixed(1) : '—';
+    const tb = document.getElementById('tbody');
+    if (!d.list.length) { tb.innerHTML='<tr><td colspan="9" class="text-center text-muted">Aucun job</td></tr>'; return; }
+    tb.innerHTML = d.list.map(j=>`<tr>
+      <td><span class="badge badge-info">${j.type}</span></td>
+      <td>${j.promptNumero||'—'}</td>
+      <td>${j.langue||'—'}</td>
+      <td>${j.pays||'—'}</td>
+      <td class="text-sm">${j.site||'—'}</td>
+      <td>${badge(j.status)}</td>
+      <td>${j.score!=null?`<span class="score-pill ${j.score>=7?'score-good':j.score>=4?'score-mid':'score-bad'}">${j.score}</span>`:'—'}</td>
+      <td>${fmtDate(j.createdAt)}</td>
+      <td class="actions">
+        ${j.response?`<button class="btn btn-sm" onclick="viewResponse('${j.id}','${j.type}')">Voir</button>`:''}
+        <button class="btn btn-sm" onclick="markDone('${j.id}','${j.status}')">✓</button>
+      </td>
+    </tr>`).join('');
+    document.getElementById('pagination').innerHTML = paginationHtml(p, d.pages, 'window._load');
+    window._load = load;
+  } catch(e) { toast(e.message,'error'); }
+}
+
+const _jobCache = {};
+window.viewResponse = async function(id, type) {
+  if (!_jobCache[id]) {
+    // job is in list
+  }
+  const d = await apiGet('/jobs');
+  const j = d.list.find(x=>x.id===id);
+  if (!j) return;
+  document.getElementById('view-title').textContent = type + ' — ' + j.site;
+  document.getElementById('view-response').textContent = j.response || '(vide)';
+  openModal('modal-view');
+};
+
+window.markDone = async function(id, cur) {
+  const next = cur === 'done' ? 'pending' : 'done';
+  try {
+    await apiPut('/jobs/'+id, { status: next });
+    toast('Statut mis à jour','success');
+    load(_page);
+  } catch(e) { toast(e.message,'error'); }
+};
+
+window.addJob = async function() {
+  try {
+    await apiPost('/jobs', {
+      type: document.getElementById('a-type').value,
+      promptNumero: document.getElementById('a-num').value,
+      langue: document.getElementById('a-lang').value,
+      pays: document.getElementById('a-pays').value||'FR',
+      site: document.getElementById('a-site').value,
+      prompt: document.getElementById('a-prompt').value,
+    });
+    closeModal('modal-add');
+    toast('Job créé','success');
+    load(1);
+  } catch(e) { toast(e.message,'error'); }
+};
+
+window.load = load;
+load(1);
+</script>
+</body>
+</html>

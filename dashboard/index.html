@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>V35 Dashboard — shop.zenitlab.net</title>
+  <style>
+    :root {
+      --bg: #0d0d0d; --surface: #1a1a1a; --border: #2a2a2a;
+      --green: #00ff88; --yellow: #ffd700; --red: #ff4444; --blue: #4488ff;
+      --text: #e0e0e0; --muted: #666;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Courier New', monospace; }
+    header { padding: 1rem 2rem; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 1rem; }
+    .logo { color: var(--green); font-size: 1.2rem; font-weight: bold; }
+    .status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--green); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; padding: 1.5rem 2rem; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.2rem; }
+    .card-title { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 0.8rem; }
+    .metric { font-size: 2rem; font-weight: bold; }
+    .metric.green { color: var(--green); }
+    .metric.yellow { color: var(--yellow); }
+    .metric.red { color: var(--red); }
+    .sub { font-size: 0.8rem; color: var(--muted); margin-top: 0.3rem; }
+    .agents { padding: 0 2rem 1.5rem; }
+    .agent-row { display: flex; align-items: center; gap: 1rem; padding: 0.7rem 1rem;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 0.5rem; }
+    .agent-name { width: 180px; font-size: 0.9rem; }
+    .badge { padding: 2px 8px; border-radius: 12px; font-size: 0.7rem; font-weight: bold; }
+    .badge.ok { background: #00ff8822; color: var(--green); border: 1px solid var(--green); }
+    .badge.warn { background: #ffd70022; color: var(--yellow); border: 1px solid var(--yellow); }
+    .badge.err { background: #ff444422; color: var(--red); border: 1px solid var(--red); }
+    .badge.pause { background: #44444422; color: var(--muted); border: 1px solid var(--muted); }
+    .log-area { padding: 0 2rem 2rem; }
+    .log-box { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 1rem; height: 220px; overflow-y: auto; font-size: 0.78rem; line-height: 1.6; }
+    .log-line.error { color: var(--red); }
+    .log-line.info { color: var(--text); }
+    .log-line.warn { color: var(--yellow); }
+    .silo-chart { display: flex; gap: 0.5rem; align-items: flex-end; height: 80px; margin-top: 0.5rem; }
+    .bar { flex: 1; background: var(--blue); border-radius: 3px 3px 0 0; opacity: 0.8;
+      display: flex; align-items: flex-end; justify-content: center; padding-bottom: 4px;
+      font-size: 0.6rem; color: white; transition: height 0.5s; }
+    section-title { display: block; padding: 0 2rem 0.5rem; font-size: 0.75rem;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 2px; }
+  </style>
+</head>
+<body>
+  <header>
+    <span class="logo">⬡ V35 — shop.zenitlab.net</span>
+    <div class="status-dot" id="globalDot"></div>
+    <span id="globalStatus" style="font-size:0.8rem;color:var(--muted)">Chargement...</span>
+    <span style="margin-left:auto;font-size:0.75rem;color:var(--muted)" id="lastUpdate"></span>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-title">Domaines Découverts</div>
+      <div class="metric green" id="metricDomains">—</div>
+      <div class="sub" id="subDomains">Radar actif</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Backlinks Qualifiés</div>
+      <div class="metric green" id="metricBacklinks">—</div>
+      <div class="sub">DoFollow uniquement</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Score Santé Moyen</div>
+      <div class="metric yellow" id="metricHealth">—</div>
+      <div class="sub">Sur 100 points</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Taux d'Erreur</div>
+      <div class="metric" id="metricError" style="color:var(--green)">—</div>
+      <div class="sub">Seuil auto-pause: 10%</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Répartition Silos</div>
+      <div class="silo-chart" id="siloChart"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">File d'attente</div>
+      <div class="metric blue" id="metricQueue" style="color:var(--blue)">—</div>
+      <div class="sub">Domaines en attente</div>
+    </div>
+  </div>
+
+  <!-- Navigation détail -->
+  <div style="padding:0 2rem 1.5rem;display:flex;gap:1rem;flex-wrap:wrap;">
+    <a href="/domaines.html" style="display:inline-flex;align-items:center;gap:.5rem;padding:.6rem 1.4rem;
+      background:#111520;border:1px solid #ff8c00;border-radius:8px;color:#ff8c00;
+      text-decoration:none;font-size:.83rem;font-weight:700;font-family:inherit;transition:background .2s;"
+      onmouseover="this.style.background='rgba(255,140,0,.12)'" onmouseout="this.style.background='#111520'">
+      🎯 Voir les détails — Domaines
+    </a>
+    <a href="/spots.html" style="display:inline-flex;align-items:center;gap:.5rem;padding:.6rem 1.4rem;
+      background:#111520;border:1px solid #4488ff;border-radius:8px;color:#4488ff;
+      text-decoration:none;font-size:.83rem;font-weight:700;font-family:inherit;transition:background .2s;"
+      onmouseover="this.style.background='rgba(68,136,255,.12)'" onmouseout="this.style.background='#111520'">
+      🔗 Voir les détails — Spots
+    </a>
+    <a href="/audit-domaines.html" style="display:inline-flex;align-items:center;gap:.5rem;padding:.6rem 1.4rem;
+      background:#111520;border:1px solid #a855f7;border-radius:8px;color:#a855f7;
+      text-decoration:none;font-size:.83rem;font-weight:700;font-family:inherit;transition:background .2s;"
+      onmouseover="this.style.background='rgba(168,85,247,.12)'" onmouseout="this.style.background='#111520'">
+      🔍 Audit — Prospection / Acquisition
+    </a>
+    <a href="/calendrier.html" style="display:inline-flex;align-items:center;gap:.5rem;padding:.6rem 1.4rem;
+      background:#111520;border:1px solid #00ff88;border-radius:8px;color:#00ff88;
+      text-decoration:none;font-size:.83rem;font-weight:700;font-family:inherit;transition:background .2s;"
+      onmouseover="this.style.background='rgba(0,255,136,.1)'" onmouseout="this.style.background='#111520'">
+      📅 Calendrier Backlinks
+    </a>
+  </div>
+
+  <!-- Calendrier Backlinks résumé -->
+  <section-title style="display:block;padding:0 2rem 0.5rem;">Calendrier Backlinks</section-title>
+  <div style="padding:0 2rem 1.5rem;" id="calSummary">
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.8rem;margin-bottom:1rem" id="calStats"></div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#1e2535;border-radius:8px;overflow:hidden" id="calWeek"></div>
+  </div>
+
+  <section-title>Agents & Workers</section-title>
+  <div class="agents" id="agentsContainer">
+    <!-- Rempli dynamiquement -->
+  </div>
+
+  <section-title style="display:block;padding:0 2rem 0.5rem;">Logs Temps Réel</section-title>
+  <div class="log-area">
+    <div class="log-box" id="logBox">
+      <div class="log-line info">Connexion au dashboard...</div>
+    </div>
+  </div>
+
+  <script>
+    if(sessionStorage.getItem('v35_auth')!=='c0e1ef644e74252419e56e7818885cbeaf7bd35bec04b0dfda954678e4f16354')location.replace('/login.html?r='+encodeURIComponent(location.pathname));
+    const AGENTS = [
+      { id: 'radar', name: 'Worker: Radar', type: 'worker' },
+      { id: 'backlink-hunter', name: 'Worker: BacklinkHunter', type: 'worker' },
+      { id: 'domain-health', name: 'Worker: DomainHealthChecker', type: 'worker' },
+      { id: 'sentinelle', name: 'Agent: Sentinelle', type: 'agent' },
+      { id: 'optimiseur', name: 'Agent: Optimiseur', type: 'agent' },
+      { id: 'sequenceur', name: 'Agent: Séquenceur', type: 'agent' },
+    ];
+
+    const SILO_COLORS = {
+      ecommerce: '#4488ff', marketing: '#00ff88', tech: '#ffd700',
+      local: '#ff8844', other: '#888',
+    };
+
+    async function fetchDashboardData() {
+      try {
+        const resp = await fetch('https://v35-dashboard-api.ernestpedanou.workers.dev/api/dashboard');
+        return resp.ok ? resp.json() : null;
+      } catch { return null; }
+    }
+
+    function renderAgents(statuses = {}) {
+      const container = document.getElementById('agentsContainer');
+      container.innerHTML = AGENTS.map(a => {
+        const s = statuses[a.id] || 'ok';
+        return `<div class="agent-row">
+          <span class="agent-name">${a.name}</span>
+          <span class="badge ${s}">${s.toUpperCase()}</span>
+          <span style="margin-left:auto;font-size:0.75rem;color:var(--muted)" id="agent-stat-${a.id}">—</span>
+        </div>`;
+      }).join('');
+    }
+
+    function renderSilos(silos = {}) {
+      const chart = document.getElementById('siloChart');
+      const max = Math.max(...Object.values(silos), 1);
+      chart.innerHTML = Object.entries(silos).map(([k, v]) => {
+        const h = Math.max(8, (v / max) * 70);
+        return `<div class="bar" style="height:${h}px;background:${SILO_COLORS[k]||'#888'}" title="${k}: ${v}">${k.slice(0,3)}</div>`;
+      }).join('');
+    }
+
+    function addLog(msg, level = 'info') {
+      const box = document.getElementById('logBox');
+      const line = document.createElement('div');
+      line.className = `log-line ${level}`;
+      line.textContent = `[${new Date().toLocaleTimeString('fr-FR')}] ${msg}`;
+      box.appendChild(line);
+      box.scrollTop = box.scrollHeight;
+      if (box.children.length > 200) box.removeChild(box.firstChild);
+    }
+
+    async function refresh() {
+      const data = await fetchDashboardData();
+      const now = new Date().toLocaleTimeString('fr-FR');
+      document.getElementById('lastUpdate').textContent = `Mis à jour: ${now}`;
+
+      if (!data) {
+        document.getElementById('globalStatus').textContent = 'Hors ligne';
+        document.getElementById('globalDot').style.background = 'var(--red)';
+        addLog('Impossible de joindre l\'API dashboard', 'error');
+        return;
+      }
+
+      document.getElementById('globalStatus').textContent = 'Opérationnel';
+      document.getElementById('globalDot').style.background = 'var(--green)';
+      document.getElementById('metricDomains').textContent = data.domainsDiscovered ?? '—';
+      document.getElementById('metricBacklinks').textContent = data.backlinksFound ?? '—';
+      document.getElementById('metricHealth').textContent =
+        data.avgHealthScore != null ? `${data.avgHealthScore}/100` : '—';
+
+      const errRate = data.errorRate ?? 0;
+      const errEl = document.getElementById('metricError');
+      errEl.textContent = `${(errRate * 100).toFixed(1)}%`;
+      errEl.style.color = errRate > 0.1 ? 'var(--red)' : errRate > 0.05 ? 'var(--yellow)' : 'var(--green)';
+
+      document.getElementById('metricQueue').textContent = data.queueSize ?? '—';
+
+      renderAgents(data.agentStatuses);
+      if (data.silos) renderSilos(data.silos);
+      if (data.recentLogs) {
+        data.recentLogs.slice(-5).forEach(l => addLog(l.message, l.level));
+      }
+    }
+
+    // ── Calendrier Backlinks ──
+    function renderCalendar() {
+      const schedule = JSON.parse(localStorage.getItem('bl_schedule') || 'null')?.spots;
+      if (!schedule) { document.getElementById('calSummary').innerHTML='<p style="color:var(--muted);font-size:.8rem;padding:.5rem 0">Aucun calendrier — <a href="/calendrier.html" style="color:var(--green)">générer →</a></p>'; return; }
+      const today = new Date(); today.setHours(0,0,0,0);
+      const todayStr = today.toISOString().slice(0,10);
+      const dow = today.getDay(), mon = new Date(today); mon.setDate(today.getDate()-(dow===0?6:dow-1));
+      const days = Array.from({length:7},(_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return d;});
+      const weekStrs = days.map(d=>d.toISOString().slice(0,10));
+      const ok = schedule.filter(s=>s.status==='OK').length;
+      const wait = schedule.filter(s=>s.status==='EN ATTENTE').length;
+      const wkTotal = schedule.filter(s=>weekStrs.includes(s.date)).length;
+      const wkDone = schedule.filter(s=>weekStrs.includes(s.date)&&s.status==='OK').length;
+      const todayN = schedule.filter(s=>s.date===todayStr).length;
+      const pct = schedule.length ? Math.round(ok/schedule.length*100) : 0;
+      document.getElementById('calStats').innerHTML = [
+        ['📅','Aujourd\'hui',`${todayN} spot${todayN!==1?'s':''}`, '#ffd700'],
+        ['📊','Cette semaine',`${wkDone}/${wkTotal}`,'#ff8c00'],
+        ['✅','Soumis',ok,'#00ff88'],
+        ['⏳','En attente',wait,'#64748b'],
+        ['🔥','Progression',`${pct}%`,'#4488ff'],
+      ].map(([ic,lb,val,col])=>`<div style="background:#1a1a1a;border:1px solid #2a2a2a;border-radius:8px;padding:.8rem 1rem">
+        <div style="font-size:1.1rem;margin-bottom:.2rem">${ic}</div>
+        <div style="font-size:1.3rem;font-weight:700;color:${col}">${val}</div>
+        <div style="font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:2px">${lb}</div>
+      </div>`).join('');
+      const DNAME=['L','M','M','J','V','S','D'];
+      document.getElementById('calWeek').innerHTML = days.map((d,i)=>{
+        const ds=d.toISOString().slice(0,10),isToday=ds===todayStr,isWE=i>=5;
+        const sp=schedule.filter(s=>s.date===ds),done=sp.filter(s=>s.status==='OK').length;
+        return`<div style="background:${isToday?'#111a2a':'#1a1a1a'};padding:.5rem .4rem;text-align:center;${isWE?'opacity:.4':''}">
+          <div style="font-size:.6rem;color:${isToday?'#ff8c00':'#64748b'};text-transform:uppercase;margin-bottom:2px">${DNAME[i]}</div>
+          <div style="font-size:.75rem;font-weight:700;color:${isToday?'#ff8c00':'#e2e8f0'}">${d.getDate()}</div>
+          ${sp.length?`<div style="margin-top:3px;font-size:.62rem;color:${done===sp.length?'#00ff88':'#ffd700'}">${done}/${sp.length}</div>`:'<div style="margin-top:3px;font-size:.62rem;color:#1e2535">—</div>'}
+        </div>`;
+      }).join('');
+    }
+
+    renderAgents();
+    renderCalendar();
+    refresh();
+    setInterval(refresh, 30000);
+  </script>
+</body>
+</html>

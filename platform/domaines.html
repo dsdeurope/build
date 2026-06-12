@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Domaines</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Domaines</span>
+      <div class="topbar-right">
+        <button class="btn btn-primary" onclick="openModal('modal-add')">+ Ajouter</button>
+      </div>
+    </header>
+    <div class="content">
+      <div class="filters-bar">
+        <select id="f-status" onchange="load()" class="filter-select">
+          <option value="">Tous statuts</option>
+          <option>available</option><option>taken</option><option>registered</option><option>in-use</option>
+        </select>
+        <select id="f-niche" onchange="load()" class="filter-select">
+          <option value="">Toutes niches</option>
+          <option>lingerie</option><option>bijoux</option><option>beaute</option><option>mode</option>
+          <option>sport</option><option>maison</option><option>electronique</option><option>auto</option>
+        </select>
+        <span class="text-muted" id="total-label"></span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Domaine</th><th>Niche</th><th>TLD</th><th>Statut</th>
+            <th>Registrar</th><th>Expiration</th><th>Prix</th><th>Notes</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal-add">
+  <div class="modal-box">
+    <div class="modal-header"><span>Ajouter un domaine</span><button class="modal-close" onclick="closeModal('modal-add')">✕</button></div>
+    <div class="modal-body">
+      <label class="form-label">Domaine *</label><input id="a-domain" class="form-input" placeholder="mondomaine.fr">
+      <label class="form-label">Niche</label><input id="a-niche" class="form-input">
+      <label class="form-label">Statut</label>
+      <select id="a-status" class="form-input">
+        <option>available</option><option>registered</option><option>in-use</option><option>taken</option>
+      </select>
+      <label class="form-label">Registrar</label><input id="a-reg" class="form-input" placeholder="OVH, Namecheap…">
+      <label class="form-label">Expiration</label><input id="a-exp" class="form-input" type="date">
+      <label class="form-label">Prix/an (€)</label><input id="a-price" class="form-input" type="number" placeholder="10">
+      <label class="form-label">Notes</label><textarea id="a-notes" class="form-input" rows="2"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add')">Annuler</button>
+      <button class="btn btn-primary" onclick="addDomaine()">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, apiGet, apiPost, fmt, fmtDate, badge, toast, openModal, closeModal } from '/assets/platform.js';
+checkAuth(); buildNav();
+window.openModal = openModal; window.closeModal = closeModal;
+
+async function load() {
+  const params = {};
+  const s=document.getElementById('f-status').value; if(s) params.status=s;
+  const n=document.getElementById('f-niche').value; if(n) params.niche=n;
+  try {
+    const d = await apiGet('/domaines', params);
+    document.getElementById('total-label').textContent = `${d.total} domaines`;
+    const tb = document.getElementById('tbody');
+    if (!d.list.length) { tb.innerHTML='<tr><td colspan="9" class="text-center text-muted">Aucun domaine</td></tr>'; return; }
+    tb.innerHTML = d.list.map(x=>`<tr>
+      <td><strong>${x.domain||x.name||'—'}</strong></td>
+      <td>${x.niche||'—'}</td>
+      <td>${(x.domain||'').split('.').pop()||'—'}</td>
+      <td>${badge(x.status)}</td>
+      <td>${x.registrar||'—'}</td>
+      <td>${x.expiration?new Date(x.expiration).toLocaleDateString('fr-FR'):'—'}</td>
+      <td>${x.price?x.price+'€/an':'—'}</td>
+      <td class="text-sm text-muted">${(x.notes||'').slice(0,40)||'—'}</td>
+      <td>
+        <a href="https://${x.domain||x.name}" target="_blank" class="btn btn-sm">↗</a>
+      </td>
+    </tr>`).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+window.addDomaine = async function() {
+  const domain = document.getElementById('a-domain').value.trim();
+  if (!domain) return toast('Domaine requis','error');
+  try {
+    await apiPost('/domaines', {
+      domain,
+      niche: document.getElementById('a-niche').value,
+      status: document.getElementById('a-status').value,
+      registrar: document.getElementById('a-reg').value,
+      expiration: document.getElementById('a-exp').value,
+      price: +document.getElementById('a-price').value||0,
+      notes: document.getElementById('a-notes').value,
+    });
+    closeModal('modal-add');
+    toast('Domaine ajouté','success');
+    load();
+  } catch(e) { toast(e.message,'error'); }
+};
+
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Monitoring</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Monitoring Workers</span>
+      <div class="topbar-right">
+        <span class="text-muted text-sm" id="last-check">—</span>
+        <button class="btn btn-sm" onclick="refresh()">↻ Rafraîchir</button>
+        <span class="badge" id="global-badge">—</span>
+      </div>
+    </header>
+    <div class="content">
+
+      <div class="kpi-grid-sm">
+        <div class="kpi-card-sm"><div class="kpi-value text-green" id="k-up">—</div><div class="kpi-label">Workers UP</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value text-red" id="k-down">—</div><div class="kpi-label">Workers DOWN</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-health">—</div><div class="kpi-label">Santé globale</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-latency">—</div><div class="kpi-label">Latence moy.</div></div>
+      </div>
+
+      <!-- Workers grid detailed -->
+      <div class="panel">
+        <div class="panel-header">État des workers</div>
+        <div id="workers-detail" class="workers-detail-grid">
+          <div class="empty-state">Chargement…</div>
+        </div>
+      </div>
+
+      <!-- Latency chart -->
+      <div class="panel">
+        <div class="panel-header">Latences (ms)</div>
+        <div id="latency-chart" class="chart-bar-wrap"></div>
+      </div>
+
+      <!-- Pipeline routes -->
+      <div class="panel">
+        <div class="panel-header">Routes du pipeline</div>
+        <div class="pipeline-diagram">
+          <div class="pipe-step pipe-step-src">Boutique source</div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-step" id="ps-seq">Séquenceur</div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-step" id="ps-pal">Palette</div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-step" id="ps-skel">Skeleton</div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-step" id="ps-orch">Orchestrateur</div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-step" id="ps-factory">Factory</div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-step pipe-step-dst">Site live</div>
+        </div>
+        <div class="pipeline-diagram" style="margin-top:8px">
+          <div class="pipe-step pipe-step-src">SEO</div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-step" id="ps-aged">Aged Domains</div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-step" id="ps-hunter">Hunter</div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-step" id="ps-health">Health Checker</div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-step" id="ps-radar">Radar</div>
+          <div class="pipe-arrow">→</div>
+          <div class="pipe-step" id="ps-server">Server</div>
+        </div>
+      </div>
+
+      <!-- Live logs -->
+      <div class="panel">
+        <div class="panel-header">Journal de monitoring <button class="btn btn-sm" onclick="clearLogs()">Vider</button></div>
+        <div id="logs" class="log-panel">
+          <div class="log-entry log-info">● Monitoring démarré — vérification toutes les 60s</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, apiGet, toast, fmt } from '/assets/platform.js';
+checkAuth(); buildNav();
+
+const WORKER_PIPE = {
+  SEQ: 'ps-seq', PALETTE: 'ps-pal', SKELETON: 'ps-skel', ORCH: 'ps-orch',
+  FACTORY: 'ps-factory', AGED: 'ps-aged', HUNTER: 'ps-hunter',
+  HEALTH: 'ps-health', RADAR: 'ps-radar', SERVER: 'ps-server',
+};
+
+function log(msg, type='info') {
+  const logs = document.getElementById('logs');
+  const entry = document.createElement('div');
+  entry.className = `log-entry log-${type}`;
+  entry.textContent = `[${new Date().toLocaleTimeString('fr-FR')}] ${msg}`;
+  logs.insertBefore(entry, logs.firstChild);
+  if (logs.children.length > 100) logs.lastChild.remove();
+}
+
+window.clearLogs = () => { document.getElementById('logs').innerHTML=''; };
+
+async function refresh() {
+  log('Vérification workers…', 'info');
+  try {
+    const d = await apiGet('/monitoring');
+    const workers = d.workers || [];
+    const up = workers.filter(w=>w.status==='up').length;
+    const down = workers.length - up;
+    const avgLatency = up ? Math.round(workers.filter(w=>w.status==='up').reduce((s,w)=>s+w.latency,0)/up) : 0;
+
+    document.getElementById('k-up').textContent = up;
+    document.getElementById('k-down').textContent = down;
+    document.getElementById('k-health').textContent = Math.round(up/workers.length*100)+'%';
+    document.getElementById('k-latency').textContent = avgLatency+'ms';
+    document.getElementById('last-check').textContent = 'Mis à jour: '+new Date().toLocaleTimeString('fr-FR');
+
+    const badge = document.getElementById('global-badge');
+    if (down===0) { badge.textContent='● Tout opérationnel'; badge.className='badge badge-success'; }
+    else if (up/workers.length>=0.7) { badge.textContent=`⚠ ${down} worker(s) en panne`; badge.className='badge badge-warn'; }
+    else { badge.textContent=`✕ Système dégradé`; badge.className='badge badge-err'; }
+
+    // Detailed cards
+    document.getElementById('workers-detail').innerHTML = workers.map(w=>`
+      <div class="worker-detail-card ${w.status==='up'?'wdc-up':'wdc-down'}">
+        <div class="wdc-header">
+          <span class="wdc-name">${w.name}</span>
+          <span class="wdc-dot ${w.status==='up'?'dot-green':'dot-red'}"></span>
+        </div>
+        <div class="wdc-latency">${w.status==='up'?w.latency+'ms':'DOWN'}</div>
+        <div class="wdc-status ${w.status==='up'?'text-green':'text-red'}">${w.status.toUpperCase()}</div>
+        ${w.error?`<div class="wdc-err">${w.error}</div>`:''}
+        <a href="${w.url}" target="_blank" class="btn btn-sm" style="margin-top:8px;font-size:11px">Tester →</a>
+      </div>`).join('');
+
+    // Latency chart
+    const maxLat = Math.max(...workers.map(w=>w.latency||0), 1);
+    document.getElementById('latency-chart').innerHTML = workers.map(w=>`
+      <div class="chart-col">
+        <div class="chart-bar-item">
+          <div class="chart-bar-fill ${w.status==='up'?'bar-ok':'bar-err'}" style="height:${Math.round((w.latency||0)/maxLat*120)}px"></div>
+        </div>
+        <div class="chart-label">${w.name}</div>
+        <div class="chart-val">${w.latency||0}ms</div>
+      </div>`).join('');
+
+    // Pipeline step coloring
+    Object.entries(WORKER_PIPE).forEach(([name, elId])=>{
+      const w = workers.find(x=>x.name===name);
+      const el = document.getElementById(elId);
+      if (el && w) {
+        el.style.background = w.status==='up' ? 'rgba(34,197,94,.15)' : 'rgba(239,68,68,.15)';
+        el.style.borderColor = w.status==='up' ? '#22c55e' : '#ef4444';
+      }
+    });
+
+    // Log
+    workers.filter(w=>w.status!=='up').forEach(w=>log(`✕ ${w.name} DOWN — ${w.error||'timeout'}`, 'error'));
+    if (down===0) log(`✓ Tous les workers opérationnels (${avgLatency}ms moy.)`, 'success');
+    else log(`⚠ ${up}/${workers.length} workers up`, 'warn');
+  } catch(e) {
+    toast(e.message,'error');
+    log('Erreur monitoring: '+e.message, 'error');
+  }
+}
+
+refresh();
+setInterval(refresh, 60000);
+</script>
+</body>
+</html>

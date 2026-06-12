@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>V35 — Accès sécurisé</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:#0d0d0d;color:#e2e8f0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+      min-height:100vh;display:flex;align-items:center;justify-content:center;}
+    .box{background:#111520;border:1px solid #1e2535;border-radius:16px;padding:2.5rem 2rem;width:min(380px,92vw);
+      box-shadow:0 0 60px rgba(0,0,0,.6);}
+    .logo{text-align:center;font-size:1.1rem;font-weight:700;margin-bottom:.4rem;letter-spacing:.05em;}
+    .logo span{color:#ff8c00;}
+    .sub{text-align:center;font-size:.75rem;color:#64748b;margin-bottom:2rem;}
+    label{display:block;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin-bottom:.5rem;}
+    .input-wrap{position:relative;}
+    input[type="password"],input[type="text"]{width:100%;background:#0d0d0d;border:1px solid #1e2535;
+      color:#e2e8f0;padding:.75rem 2.8rem .75rem 1rem;border-radius:8px;font-size:.9rem;outline:none;
+      transition:border-color .2s;}
+    input:focus{border-color:#ff8c00;}
+    .toggle{position:absolute;right:.7rem;top:50%;transform:translateY(-50%);background:none;border:none;
+      cursor:pointer;color:#64748b;font-size:.9rem;padding:2px;}
+    .toggle:hover{color:#e2e8f0;}
+    button[type="submit"]{width:100%;margin-top:1.2rem;padding:.8rem;border:none;border-radius:8px;
+      background:#ff8c00;color:#000;font-size:.9rem;font-weight:700;cursor:pointer;
+      letter-spacing:.04em;transition:opacity .2s;}
+    button[type="submit"]:hover{opacity:.88;}
+    button[type="submit"]:disabled{opacity:.4;cursor:not-allowed;}
+    .err{margin-top:1rem;text-align:center;font-size:.78rem;color:#ff4444;min-height:1.2em;}
+    .lock{text-align:center;font-size:2rem;margin-bottom:1.2rem;}
+    .spinner{display:none;width:16px;height:16px;border:2px solid rgba(0,0,0,.3);border-top-color:#000;
+      border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-left:.5rem;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    button[type="submit"].loading .spinner{display:inline-block;}
+    button[type="submit"].loading .label{display:none;}
+  </style>
+</head>
+<body>
+<div class="box">
+  <div class="lock">🔐</div>
+  <div class="logo">Zenith<span>lab</span> V35</div>
+  <div class="sub">Accès restreint — authentification requise</div>
+  <form id="form" onsubmit="handleLogin(event)">
+    <label for="pw">Mot de passe</label>
+    <div class="input-wrap">
+      <input type="password" id="pw" autocomplete="current-password" autofocus placeholder="••••••••••••">
+      <button type="button" class="toggle" onclick="toggleVis()" title="Afficher/masquer">👁</button>
+    </div>
+    <button type="submit" id="btn"><span class="label">Accéder</span><span class="spinner"></span></button>
+    <div class="err" id="err"></div>
+  </form>
+</div>
+<div id="calWidget" style="margin-top:1.2rem;width:min(380px,92vw);display:none;">
+  <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.6rem" id="lcCards"></div>
+  <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:#1e2535;border-radius:8px;overflow:hidden" id="lcWeek"></div>
+</div>
+<script>
+const HASH = 'c0e1ef644e74252419e56e7818885cbeaf7bd35bec04b0dfda954678e4f16354';
+const DEST = new URLSearchParams(location.search).get('r') || '/audit-domaines.html';
+const KEY  = 'v35_auth';
+
+if (sessionStorage.getItem(KEY) === HASH) location.replace(DEST);
+
+(function(){
+  const sc=JSON.parse(localStorage.getItem('bl_schedule')||'null')?.spots;
+  if(!sc)return;
+  document.getElementById('calWidget').style.display='block';
+  const todayStr=new Date().toISOString().slice(0,10);
+  const today=new Date();today.setHours(0,0,0,0);
+  const dow=today.getDay(),mon=new Date(today);mon.setDate(today.getDate()-(dow===0?6:dow-1));
+  const days=Array.from({length:7},(_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return d;});
+  const wStrs=days.map(d=>d.toISOString().slice(0,10));
+  const ok=sc.filter(s=>s.status==='OK').length,wait=sc.filter(s=>s.status==='EN ATTENTE').length;
+  const wkT=sc.filter(s=>wStrs.includes(s.date)).length,wkD=sc.filter(s=>wStrs.includes(s.date)&&s.status==='OK').length;
+  const todN=sc.filter(s=>s.date===todayStr).length;
+  document.getElementById('lcCards').innerHTML=[
+    [todN+' auj.','#ffd700'],[wkD+'/'+wkT+' sem.','#ff8c00'],[ok+' OK','#00ff88'],[wait+' en att.','#64748b'],
+  ].map(([v,c])=>`<span style="padding:2px 9px;border-radius:8px;font-size:.7rem;font-weight:700;color:${c};background:${c}18;border:1px solid ${c}44">${v}</span>`).join('');
+  const DN=['L','M','M','J','V','S','D'];
+  document.getElementById('lcWeek').innerHTML=days.map((d,i)=>{
+    const ds=d.toISOString().slice(0,10),isT=ds===todayStr,isWE=i>=5;
+    const sp=sc.filter(s=>s.date===ds),done=sp.filter(s=>s.status==='OK').length;
+    return`<div style="background:${isT?'#111a2a':'#111520'};padding:.4rem .3rem;text-align:center;${isWE?'opacity:.4':''}">
+      <div style="font-size:.57rem;color:${isT?'#ff8c00':'#64748b'};text-transform:uppercase">${DN[i]}</div>
+      <div style="font-size:.72rem;font-weight:700;color:${isT?'#ff8c00':'#e2e8f0'}">${d.getDate()}</div>
+      ${sp.length?`<div style="font-size:.58rem;color:${done===sp.length?'#00ff88':'#ffd700'};margin-top:1px">${done}/${sp.length}</div>`:'<div style="font-size:.58rem;color:#1e2535">·</div>'}
+    </div>`;
+  }).join('');
+})();
+
+function toggleVis() {
+  const el = document.getElementById('pw');
+  el.type = el.type === 'password' ? 'text' : 'password';
+}
+
+async function sha256(str) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('btn');
+  const err = document.getElementById('err');
+  const val = document.getElementById('pw').value;
+  if (!val) { err.textContent = 'Entrez le mot de passe.'; return; }
+  btn.classList.add('loading'); btn.disabled = true; err.textContent = '';
+  const h = await sha256(val);
+  if (h === HASH) {
+    sessionStorage.setItem(KEY, HASH);
+    location.replace(DEST);
+  } else {
+    err.textContent = 'Mot de passe incorrect.';
+    btn.classList.remove('loading'); btn.disabled = false;
+    document.getElementById('pw').value = '';
+    document.getElementById('pw').focus();
+  }
+}
+</script>
+</body>
+</html>

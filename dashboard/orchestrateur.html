@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 — Orchestrateur</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#060811;--surface:#0d1117;--border:#1e2433;--text:#e2e8f0;--muted:#6b7a99;--green:#00ff88;--blue:#3b82f6;--yellow:#f59e0b;--red:#ef4444;--purple:#a855f7;--teal:#14b8a6;--accent:#6366f1}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+a{color:var(--blue);text-decoration:none}
+.nav{background:#0a0d16;border-bottom:1px solid var(--border);padding:.75rem 1.5rem;display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap}
+.nav-brand{font-weight:800;font-size:1.05rem;color:var(--accent)}
+.nav a{font-size:.82rem;color:var(--muted);transition:color .2s}.nav a:hover{color:var(--text)}
+.container{max-width:1200px;margin:0 auto;padding:2rem 1.5rem}
+h1{font-size:1.6rem;font-weight:800;margin-bottom:.3rem}
+.subtitle{color:var(--muted);font-size:.9rem;margin-bottom:2rem}
+
+/* Form */
+.orch-form{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.75rem;margin-bottom:2rem}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+@media(max-width:640px){.form-grid{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:.35rem}
+.field label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.field input,.field select{background:#0a0d16;border:1px solid var(--border);color:var(--text);padding:.6rem .9rem;border-radius:8px;font-size:.9rem;transition:border-color .2s}
+.field input:focus,.field select:focus{outline:none;border-color:var(--accent)}
+.field-full{grid-column:1/-1}
+.lang-picks{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.25rem}
+.lang-chip{padding:.3rem .75rem;border-radius:20px;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:.78rem;cursor:pointer;transition:all .2s}
+.lang-chip.active{background:rgba(99,102,241,.15);border-color:var(--accent);color:var(--accent)}
+.btn-run{width:100%;padding:.85rem;background:linear-gradient(135deg,var(--accent),#8b5cf6);color:#fff;border:none;border-radius:8px;font-size:1rem;font-weight:700;cursor:pointer;margin-top:1rem;transition:opacity .2s}
+.btn-run:hover{opacity:.9}
+.btn-run:disabled{opacity:.4;cursor:not-allowed}
+
+/* Pipeline */
+.pipeline{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.75rem;margin-bottom:2rem;display:none}
+.pipeline.visible{display:block}
+.pipeline-title{font-size:1rem;font-weight:700;margin-bottom:1.25rem;display:flex;align-items:center;gap:.75rem}
+.job-id{font-family:monospace;font-size:.75rem;color:var(--muted);background:#0a0d16;padding:.2rem .6rem;border-radius:4px}
+.steps{display:flex;flex-direction:column;gap:.75rem}
+.step{display:flex;align-items:flex-start;gap:1rem;padding:.9rem 1rem;background:#0a0d16;border-radius:8px;border-left:3px solid var(--border)}
+.step.done{border-left-color:var(--green)}
+.step.running{border-left-color:var(--yellow);animation:pulse 1s ease-in-out infinite}
+.step.error{border-left-color:var(--red)}
+.step.pending{opacity:.5}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.65}}
+.step-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0;margin-top:.1rem}
+.step.done .step-icon{background:rgba(0,255,136,.12);color:var(--green)}
+.step.running .step-icon{background:rgba(245,158,11,.12);color:var(--yellow)}
+.step.error .step-icon{background:rgba(239,68,68,.12);color:var(--red)}
+.step.pending .step-icon{background:rgba(107,122,153,.1);color:var(--muted)}
+.step-body{flex:1;min-width:0}
+.step-name{font-size:.88rem;font-weight:600;margin-bottom:.2rem}
+.step-detail{font-size:.78rem;color:var(--muted);line-height:1.5}
+.step-duration{font-size:.7rem;color:var(--muted);margin-top:.25rem}
+
+/* Results */
+.results{display:none;margin-top:2rem}
+.results.visible{display:block}
+.result-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1rem;margin-bottom:1.5rem}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1.25rem}
+.stat-n{font-size:2rem;font-weight:800;margin-bottom:.25rem}
+.stat-l{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.section{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.5rem;margin-bottom:1.25rem}
+.section h3{font-size:.9rem;font-weight:700;margin-bottom:1rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em}
+.code-block{background:#0a0d16;border:1px solid var(--border);border-radius:8px;padding:1rem;font-family:monospace;font-size:.78rem;white-space:pre-wrap;line-height:1.7;overflow-x:auto;max-height:260px;overflow-y:auto}
+.table{width:100%;border-collapse:collapse;font-size:.82rem}
+.table th{padding:.5rem .75rem;text-align:left;color:var(--muted);font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border)}
+.table td{padding:.5rem .75rem;border-bottom:1px solid #12151e}
+.table tr:last-child td{border-bottom:none}
+.pill{display:inline-block;padding:.15rem .55rem;border-radius:20px;font-size:.7rem;font-weight:600}
+.pill-green{background:rgba(0,255,136,.1);color:var(--green)}
+.pill-yellow{background:rgba(245,158,11,.1);color:var(--yellow)}
+.pill-red{background:rgba(239,68,68,.1);color:var(--red)}
+.pill-blue{background:rgba(59,130,246,.1);color:var(--blue)}
+.pill-purple{background:rgba(168,85,247,.1);color:var(--purple)}
+.tag-list{display:flex;flex-wrap:wrap;gap:.4rem}
+.tag{padding:.2rem .6rem;border-radius:4px;font-size:.72rem;font-weight:600;background:rgba(99,102,241,.1);color:var(--accent)}
+
+/* Jobs history */
+.history-list{display:flex;flex-direction:column;gap:.5rem;margin-top:1rem}
+.history-item{display:flex;align-items:center;gap:1rem;padding:.75rem 1rem;background:#0a0d16;border:1px solid var(--border);border-radius:8px;cursor:pointer;transition:border-color .2s}
+.history-item:hover{border-color:var(--accent)}
+.history-domain{font-weight:600;font-size:.88rem;flex:1}
+.history-meta{font-size:.75rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<script>if(sessionStorage.getItem('v35_auth')!=='c0e1ef644e74252419e56e7818885cbeaf7bd35bec04b0dfda954678e4f16354')location.replace('/login.html?r='+encodeURIComponent(location.pathname));</script>
+
+<nav class="nav">
+  <span class="nav-brand">V35</span>
+  <a href="/index.html">Dashboard</a>
+  <a href="/domaines.html">Domaines</a>
+  <a href="/audit-domaines.html">Audit</a>
+  <a href="/spots.html">Spots</a>
+  <a href="/calendrier.html">Calendrier</a>
+  <a href="/orchestrateur.html" style="color:var(--accent)">Orchestrateur</a>
+</nav>
+
+<div class="container">
+  <h1>🤖 Orchestrateur</h1>
+  <p class="subtitle">Pipeline automatisé : détection → scraping → images → domaine ancien → contenu multilingue → squelette</p>
+
+  <!-- Form -->
+  <div class="orch-form">
+    <div class="form-grid">
+      <div class="field">
+        <label>Domaine source (à scraper)</label>
+        <input id="sourceDomain" type="text" placeholder="elia-lingerie.com">
+      </div>
+      <div class="field">
+        <label>Domaine cible (ton domaine)</label>
+        <input id="targetDomain" type="text" placeholder="ma-boutique-lingerie.fr">
+      </div>
+      <div class="field">
+        <label>Niche</label>
+        <select id="niche">
+          <option value="lingerie">Lingerie & Bain</option>
+          <option value="luminaires">Luminaires & Éclairage</option>
+          <option value="sport">Sport & Outdoor</option>
+          <option value="bijoux">Bijoux & Accessoires</option>
+          <option value="deco">Décoration Intérieure</option>
+          <option value="mode" selected>Mode & Vêtements</option>
+          <option value="enfants">Enfants & Jouets</option>
+          <option value="jardin">Jardin & Extérieur</option>
+          <option value="cuisine">Cuisine & Arts de Table</option>
+          <option value="beaute">Beauté & Cosmétiques</option>
+          <option value="electronique">Électronique & High-Tech</option>
+          <option value="maison">Maison & Linge</option>
+          <option value="animaux">Animaux & Accessoires</option>
+          <option value="sante">Santé & Bien-être</option>
+          <option value="auto">Auto & Moto</option>
+          <option value="voyage">Voyage & Bagages</option>
+          <option value="gastronomie">Gastronomie</option>
+          <option value="maroquinerie">Maroquinerie</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Domaine ancien (chercher automatiquement ?)</label>
+        <select id="findAged">
+          <option value="1">Oui — chercher via Wayback Machine</option>
+          <option value="0">Non</option>
+        </select>
+      </div>
+      <div class="field field-full">
+        <label>Langues (sous-répertoires : /fr/ /de/ /es/ ...)</label>
+        <div class="lang-picks" id="langPicks">
+          <button class="lang-chip active" data-lang="fr">🇫🇷 FR</button>
+          <button class="lang-chip active" data-lang="de">🇩🇪 DE</button>
+          <button class="lang-chip active" data-lang="es">🇪🇸 ES</button>
+          <button class="lang-chip" data-lang="it">🇮🇹 IT</button>
+          <button class="lang-chip" data-lang="nl">🇳🇱 NL</button>
+          <button class="lang-chip" data-lang="pt">🇵🇹 PT</button>
+          <button class="lang-chip" data-lang="pl">🇵🇱 PL</button>
+          <button class="lang-chip" data-lang="sv">🇸🇪 SV</button>
+          <button class="lang-chip" data-lang="en">🇬🇧 EN</button>
+          <button class="lang-chip" data-lang="da">🇩🇰 DA</button>
+          <button class="lang-chip" data-lang="ro">🇷🇴 RO</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Pexels API Key (images gratuites)</label>
+        <input id="pexelsKey" type="password" placeholder="optionnel — pexels.com/api">
+      </div>
+      <div class="field">
+        <label>Unsplash API Key (images gratuites)</label>
+        <input id="unsplashKey" type="password" placeholder="optionnel — unsplash.com/developers">
+      </div>
+    </div>
+    <button class="btn-run" id="btnRun" onclick="runOrchestrate()">🚀 Lancer le pipeline</button>
+  </div>
+
+  <!-- Pipeline progress -->
+  <div class="pipeline" id="pipeline">
+    <div class="pipeline-title">
+      Pipeline en cours <span class="job-id" id="jobIdDisplay"></span>
+    </div>
+    <div class="steps" id="stepsContainer"></div>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results"></div>
+
+  <!-- History -->
+  <div class="section" id="historySection" style="display:none">
+    <h3>Derniers pipelines</h3>
+    <div class="history-list" id="historyList"></div>
+  </div>
+</div>
+
+<script>
+const API = 'https://v35-orchestrateur.ernestpedanou.workers.dev';
+
+const STEP_META = {
+  scrape:       { icon:'🔍', label:'Scraping des collections' },
+  images:       { icon:'🖼', label:'Recherche d\'images libres' },
+  aged_domain:  { icon:'🏛', label:'Recherche domaine ancien (Wayback)' },
+  content_jobs: { icon:'✍️', label:'Génération des jobs de contenu' },
+  i18n:         { icon:'🌍', label:'Configuration multilingue (hreflang)' },
+  skeleton:     { icon:'🎨', label:'Génération du squelette PHP' },
+};
+
+// Lang chip toggle
+document.querySelectorAll('.lang-chip').forEach(btn => {
+  btn.addEventListener('click', () => btn.classList.toggle('active'));
+});
+
+function selectedLangs() {
+  return [...document.querySelectorAll('.lang-chip.active')].map(b => b.dataset.lang);
+}
+
+let _pollInterval = null;
+let _currentJobId = null;
+
+async function runOrchestrate() {
+  const src = document.getElementById('sourceDomain').value.trim();
+  const tgt = document.getElementById('targetDomain').value.trim();
+  const niche = document.getElementById('niche').value;
+  const langs = selectedLangs();
+  const findAged = document.getElementById('findAged').value === '1';
+  const pexelsKey = document.getElementById('pexelsKey').value.trim();
+  const unsplashKey = document.getElementById('unsplashKey').value.trim();
+
+  if (!src || !tgt) return alert('Domaine source et cible requis');
+  if (!langs.length) return alert('Sélectionner au moins une langue');
+
+  document.getElementById('btnRun').disabled = true;
+  document.getElementById('pipeline').classList.add('visible');
+  document.getElementById('results').classList.remove('visible');
+  document.getElementById('stepsContainer').innerHTML = renderSteps([]);
+
+  try {
+    const r = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sourceDomain: src, targetDomain: tgt, niche, languages: langs, findAgedDomain: findAged, pexelsKey, unsplashKey }),
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+
+    _currentJobId = d.jobId;
+    document.getElementById('jobIdDisplay').textContent = d.jobId;
+
+    // Poll for status
+    _pollInterval = setInterval(() => pollStatus(d.jobId), 2500);
+
+  } catch (e) {
+    document.getElementById('stepsContainer').innerHTML = `<div style="color:var(--red);padding:1rem">❌ ${e.message}</div>`;
+    document.getElementById('btnRun').disabled = false;
+  }
+}
+
+async function pollStatus(jobId) {
+  try {
+    const r = await fetch(`${API}/status/${jobId}`);
+    const job = await r.json();
+    document.getElementById('stepsContainer').innerHTML = renderSteps(job.steps || []);
+
+    if (job.status === 'done' || job.status === 'partial') {
+      clearInterval(_pollInterval);
+      document.getElementById('btnRun').disabled = false;
+      renderResults(job);
+      loadHistory();
+    }
+  } catch {}
+}
+
+function renderSteps(steps) {
+  const allSteps = Object.keys(STEP_META);
+  return allSteps.map(key => {
+    const step = steps.find(s => s.name === key) || { name: key, status: 'pending' };
+    const meta = STEP_META[key];
+    const statusIcon = { done: '✅', running: '⏳', error: '❌', pending: '○' }[step.status] || '○';
+    const detail = step.status === 'done'
+      ? formatStepDetail(key, step.result)
+      : step.status === 'error' ? `<span style="color:var(--red)">${step.error}</span>` : '';
+    const dur = step.duration ? `<div class="step-duration">${(step.duration/1000).toFixed(1)}s</div>` : '';
+    return `<div class="step ${step.status}">
+      <div class="step-icon">${statusIcon}</div>
+      <div class="step-body">
+        <div class="step-name">${meta.icon} ${meta.label}</div>
+        ${detail ? `<div class="step-detail">${detail}</div>` : ''}
+        ${dur}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function formatStepDetail(key, result) {
+  if (!result) return '';
+  switch (key) {
+    case 'scrape': return `${result.totalCollections} collections · niche: ${(result.niches||[]).join(', ')}`;
+    case 'images': return `${result.count} images (${result.free_images?.length||0} libres + ${result.scraped_images?.length||0} scrapées)`;
+    case 'aged_domain': return result.skipped ? 'Ignoré' : `${result.count} domaines trouvés · âge min: ${result.min_age_days}j`;
+    case 'content_jobs': return `${result.count} jobs (${result.types?.join(', ')})`;
+    case 'i18n': return `Stratégie: ${result.strategy} · ${result.url_structure?.length||0} langues`;
+    case 'skeleton': return `${result.file_count} fichiers · palette: <span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${result.palette?.primary};vertical-align:middle"></span> ${result.palette?.primary}`;
+    default: return JSON.stringify(result).slice(0,120);
+  }
+}
+
+function renderResults(job) {
+  const s = job.summary || {};
+  const el = document.getElementById('results');
+  el.classList.add('visible');
+
+  const steps = job.steps || [];
+  const imagesStep = steps.find(s => s.name === 'images')?.result || {};
+  const i18nStep = steps.find(s => s.name === 'i18n')?.result || {};
+  const agedStep = steps.find(s => s.name === 'aged_domain')?.result || {};
+  const contentStep = steps.find(s => s.name === 'content_jobs')?.result || {};
+  const skelStep = steps.find(s => s.name === 'skeleton')?.result || {};
+
+  el.innerHTML = `
+    <div class="result-grid">
+      <div class="stat-card"><div class="stat-n" style="color:var(--blue)">${s.collections||0}</div><div class="stat-l">Collections scrapées</div></div>
+      <div class="stat-card"><div class="stat-n" style="color:var(--green)">${s.images||0}</div><div class="stat-l">Images libres trouvées</div></div>
+      <div class="stat-card"><div class="stat-n" style="color:var(--purple)">${s.contentJobs||0}</div><div class="stat-l">Jobs de contenu</div></div>
+      <div class="stat-card"><div class="stat-n" style="color:var(--yellow)">${s.aged_domains_found||0}</div><div class="stat-l">Domaines anciens</div></div>
+      <div class="stat-card"><div class="stat-n" style="color:var(--teal)">${s.skeleton_files||0}</div><div class="stat-l">Fichiers squelette</div></div>
+      <div class="stat-card"><div class="stat-n" style="color:var(--accent)">${s.languages?.length||0}</div><div class="stat-l">Langues (sous-répertoires)</div></div>
+    </div>
+
+    <!-- i18n config -->
+    <div class="section">
+      <h3>🌍 Architecture multilingue — ${i18nStep.strategy||'subdirectories'}</h3>
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:1rem">${i18nStep.rationale||''}</p>
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem">
+        ${(i18nStep.url_structure||[]).map(u => `<div style="background:#0a0d16;border:1px solid var(--border);border-radius:6px;padding:.4rem .8rem;font-size:.78rem"><span style="color:var(--accent)">${u.lang}</span> <a href="${u.url}" target="_blank" style="color:var(--muted)">${u.url}</a></div>`).join('')}
+      </div>
+      <div class="code-block">${(i18nStep.hreflang||[]).map(h => h.tag).join('\n')}</div>
+      ${i18nStep.htaccess ? `<p style="font-size:.72rem;color:var(--muted);margin:.75rem 0 .35rem">.htaccess routing</p><div class="code-block">${i18nStep.htaccess}</div>` : ''}
+    </div>
+
+    <!-- Images -->
+    <div class="section">
+      <h3>🖼 Images libres de droits</h3>
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem">Dédupliquées via : renommage MD5 + WebP + suppression EXIF + redimensionnement 800px</p>
+      <div style="display:flex;gap:1rem;flex-wrap:wrap;margin-bottom:1rem">
+        ${(imagesStep.free_sources||[]).map(s => `<div style="background:#0a0d16;border:1px solid var(--border);border-radius:6px;padding:.5rem .85rem;font-size:.78rem"><strong style="color:var(--green)">${s.name}</strong><br><span style="color:var(--muted)">${s.limit}</span></div>`).join('')}
+      </div>
+      ${imagesStep.dedup_instructions?.php_snippet ? `<div class="code-block">${imagesStep.dedup_instructions.php_snippet}</div>` : ''}
+      ${(imagesStep.free_images||[]).length ? `
+      <div style="display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.75rem">
+        ${(imagesStep.free_images||[]).slice(0,8).map(img => `
+          <div style="background:#0a0d16;border:1px solid var(--border);border-radius:6px;padding:.5rem;font-size:.72rem;max-width:200px">
+            <div style="color:var(--muted)">${img.source} — ${img.photographer||''}</div>
+            <div style="color:var(--accent);word-break:break-all">${img.filename}</div>
+            <a href="${img.src}" target="_blank" style="color:var(--blue)">Voir →</a>
+          </div>`).join('')}
+      </div>` : ''}
+    </div>
+
+    <!-- Content jobs -->
+    <div class="section">
+      <h3>✍️ Jobs de contenu (traduction service)</h3>
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:.75rem">À envoyer via <code style="background:#0a0d16;padding:.1rem .4rem;border-radius:3px">POST http://localhost:8000/api/jobs/upload</code></p>
+      <table class="table">
+        <thead><tr><th>Type</th><th>ID</th><th>Langues</th><th>Aperçu prompt</th></tr></thead>
+        <tbody>
+          ${(contentStep.jobs||[]).map(j => `<tr>
+            <td><span class="pill pill-${j.type==='blog'?'green':j.type==='titles'?'yellow':'blue'}">${j.type}</span></td>
+            <td style="font-family:monospace;font-size:.72rem;color:var(--muted)">${j.prompt_numero}</td>
+            <td>${j.langue?.substring(0,30)||''}</td>
+            <td style="color:var(--muted);max-width:300px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${j.prompt?.substring(0,80)||''}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <button onclick="dlContentJobs()" style="margin-top:1rem;padding:.5rem 1.25rem;background:rgba(99,102,241,.15);border:1px solid var(--accent);color:var(--accent);border-radius:6px;cursor:pointer;font-size:.85rem">⬇ Télécharger jobs JSON</button>
+    </div>
+
+    <!-- Aged domains -->
+    ${!agedStep.skipped && (agedStep.domains||[]).length ? `
+    <div class="section">
+      <h3>🏛 Domaines anciens trouvés (Wayback)</h3>
+      <table class="table">
+        <thead><tr><th>Domaine</th><th>Âge (jours)</th><th>1ère archive</th><th>Dispo</th></tr></thead>
+        <tbody>
+          ${(agedStep.domains||[]).slice(0,10).map(d => `<tr>
+            <td style="font-family:monospace">${d.domain}</td>
+            <td>${d.ageDays||'?'}</td>
+            <td style="color:var(--muted)">${d.firstSeen||'?'}</td>
+            <td>${d.available===true?'<span class="pill pill-green">✅ Libre</span>':d.available===null?'<span class="pill pill-yellow">?</span>':'<span class="pill pill-red">Pris</span>'}</td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>` : ''}
+
+    <!-- Download -->
+    <div style="display:flex;gap:.75rem;flex-wrap:wrap;margin-top:.5rem">
+      <button onclick="dlFullReport()" style="padding:.65rem 1.5rem;background:rgba(0,255,136,.1);border:1px solid var(--green);color:var(--green);border-radius:8px;cursor:pointer;font-weight:600">⬇ Rapport complet JSON</button>
+      <button onclick="pollStatus(_currentJobId||'')" style="padding:.65rem 1.5rem;background:rgba(59,130,246,.1);border:1px solid var(--blue);color:var(--blue);border-radius:8px;cursor:pointer">↻ Rafraîchir</button>
+    </div>
+  `;
+
+  window._lastJob = job;
+}
+
+function dlContentJobs() {
+  const job = window._lastJob;
+  if (!job) return;
+  const jobs = job.steps?.find(s => s.name === 'content_jobs')?.result?.jobs || [];
+  dl(jobs, `content-jobs-${job.targetDomain||'site'}.json`);
+}
+function dlFullReport() {
+  if (!window._lastJob) return;
+  dl(window._lastJob, `orchestrateur-${window._lastJob.id}.json`);
+}
+function dl(data, name) {
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })),
+    download: name,
+  });
+  a.click(); URL.revokeObjectURL(a.href);
+}
+
+async function loadHistory() {
+  try {
+    const r = await fetch(`${API}/jobs`);
+    const list = await r.json();
+    if (!list.length) return;
+    document.getElementById('historySection').style.display = 'block';
+    document.getElementById('historyList').innerHTML = list.slice(0,8).map(item => `
+      <div class="history-item" onclick="loadJob('${item.jobId}')">
+        <div class="history-domain">${item.sourceDomain} → ${item.targetDomain}</div>
+        <div class="history-meta"><span class="pill pill-blue">${item.niche}</span></div>
+        <div class="history-meta">${new Date(item.createdAt).toLocaleDateString('fr')}</div>
+      </div>`).join('');
+  } catch {}
+}
+
+async function loadJob(jobId) {
+  const r = await fetch(`${API}/status/${jobId}`);
+  const job = await r.json();
+  _currentJobId = jobId;
+  document.getElementById('jobIdDisplay').textContent = jobId;
+  document.getElementById('pipeline').classList.add('visible');
+  document.getElementById('stepsContainer').innerHTML = renderSteps(job.steps || []);
+  if (job.status === 'done' || job.status === 'partial') renderResults(job);
+}
+
+loadHistory();
+</script>
+</body>
+</html>

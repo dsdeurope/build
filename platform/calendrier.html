@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Calendrier</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Calendrier éditorial & backlinks</span>
+      <div class="topbar-right">
+        <button class="btn" onclick="prevMonth()">‹</button>
+        <span id="month-label" style="font-weight:600;min-width:140px;text-align:center"></span>
+        <button class="btn" onclick="nextMonth()">›</button>
+        <button class="btn btn-primary" onclick="openModal('modal-add')">+ Planifier</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <div class="kpi-grid-sm">
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-ce-mois">—</div><div class="kpi-label">Tâches ce mois</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-done">—</div><div class="kpi-label">Terminées</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-blog">—</div><div class="kpi-label">Articles blog</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-backlinks">—</div><div class="kpi-label">Backlinks planifiés</div></div>
+      </div>
+
+      <!-- Calendar grid -->
+      <div class="panel">
+        <div class="calendar-grid" id="cal-grid">
+          <div class="cal-day-header">Lun</div>
+          <div class="cal-day-header">Mar</div>
+          <div class="cal-day-header">Mer</div>
+          <div class="cal-day-header">Jeu</div>
+          <div class="cal-day-header">Ven</div>
+          <div class="cal-day-header">Sam</div>
+          <div class="cal-day-header">Dim</div>
+        </div>
+      </div>
+
+      <!-- Upcoming -->
+      <div class="panel">
+        <div class="panel-header">Prochaines tâches</div>
+        <div id="upcoming-list" class="activity-list">
+          <div class="empty-state">Aucune tâche planifiée</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal-add">
+  <div class="modal-box">
+    <div class="modal-header"><span>Planifier une tâche</span><button class="modal-close" onclick="closeModal('modal-add')">✕</button></div>
+    <div class="modal-body">
+      <label class="form-label">Date *</label>
+      <input id="a-date" class="form-input" type="date">
+      <label class="form-label">Type</label>
+      <select id="a-type" class="form-input">
+        <option value="blog">Article blog</option>
+        <option value="backlink">Backlink</option>
+        <option value="launch">Lancement site</option>
+        <option value="audit">Audit SEO</option>
+        <option value="content">Contenu collection</option>
+        <option value="social">Réseaux sociaux</option>
+      </select>
+      <label class="form-label">Titre</label>
+      <input id="a-title" class="form-input" placeholder="Ex: Article blog lingerie FR">
+      <label class="form-label">Site</label>
+      <input id="a-site" class="form-input" placeholder="monsite.fr">
+      <label class="form-label">Priorité</label>
+      <select id="a-prio" class="form-input">
+        <option value="high">Haute</option>
+        <option value="medium" selected>Moyenne</option>
+        <option value="low">Basse</option>
+      </select>
+      <label class="form-label">Notes</label>
+      <textarea id="a-notes" class="form-input" rows="2"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add')">Annuler</button>
+      <button class="btn btn-primary" onclick="addTask()">Planifier</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, toast, openModal, closeModal } from '/assets/platform.js';
+checkAuth(); buildNav();
+window.openModal = openModal; window.closeModal = closeModal;
+
+const STORE_KEY = 'v35_calendar';
+let _tasks = JSON.parse(localStorage.getItem(STORE_KEY)||'[]');
+let _cur = new Date(); _cur.setDate(1);
+
+const TYPES = {
+  blog:{label:'Article blog',color:'#6366f1'},
+  backlink:{label:'Backlink',color:'#f59e0b'},
+  launch:{label:'Lancement',color:'#22c55e'},
+  audit:{label:'Audit SEO',color:'#06b6d4'},
+  content:{label:'Contenu',color:'#a78bfa'},
+  social:{label:'Social',color:'#ec4899'},
+};
+
+function save() { localStorage.setItem(STORE_KEY, JSON.stringify(_tasks)); }
+
+function renderMonth() {
+  const y = _cur.getFullYear(), m = _cur.getMonth();
+  document.getElementById('month-label').textContent =
+    new Date(y,m,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+
+  const firstDow = (new Date(y,m,1).getDay()+6)%7; // Mon=0
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  const grid = document.getElementById('cal-grid');
+  // Keep headers
+  const headers = [...grid.querySelectorAll('.cal-day-header')];
+  grid.innerHTML = '';
+  headers.forEach(h=>grid.appendChild(h));
+
+  // Empty cells
+  for(let i=0;i<firstDow;i++){
+    const cell=document.createElement('div');
+    cell.className='cal-cell cal-empty';
+    grid.appendChild(cell);
+  }
+
+  // Days
+  for(let d=1;d<=daysInMonth;d++){
+    const date=new Date(y,m,d);
+    const dateStr=date.toISOString().split('T')[0];
+    const dayTasks=_tasks.filter(t=>t.date===dateStr);
+    const isToday=date.getTime()===today.getTime();
+    const cell=document.createElement('div');
+    cell.className='cal-cell'+(isToday?' cal-today':'');
+    cell.innerHTML=`<div class="cal-num">${d}</div>`+
+      dayTasks.slice(0,3).map(t=>`
+        <div class="cal-event" style="background:${TYPES[t.type]?.color||'#6366f1'}22;border-left:3px solid ${TYPES[t.type]?.color||'#6366f1'};color:${TYPES[t.type]?.color||'#6366f1'}">${t.title?.slice(0,20)||TYPES[t.type]?.label}</div>
+      `).join('')+
+      (dayTasks.length>3?`<div class="cal-more">+${dayTasks.length-3}</div>`:'');
+    cell.addEventListener('click',()=>showDay(dateStr));
+    grid.appendChild(cell);
+  }
+
+  // Stats
+  const monthStr = `${y}-${String(m+1).padStart(2,'0')}`;
+  const monthTasks = _tasks.filter(t=>t.date?.startsWith(monthStr));
+  document.getElementById('k-ce-mois').textContent = monthTasks.length;
+  document.getElementById('k-done').textContent = monthTasks.filter(t=>t.done).length;
+  document.getElementById('k-blog').textContent = monthTasks.filter(t=>t.type==='blog').length;
+  document.getElementById('k-backlinks').textContent = monthTasks.filter(t=>t.type==='backlink').length;
+
+  // Upcoming
+  const now = new Date().toISOString().split('T')[0];
+  const upcoming = _tasks.filter(t=>t.date>=now&&!t.done).sort((a,b)=>a.date.localeCompare(b.date)).slice(0,10);
+  const ul = document.getElementById('upcoming-list');
+  if(!upcoming.length){ul.innerHTML='<div class="empty-state">Aucune tâche à venir</div>';return;}
+  ul.innerHTML=upcoming.map(t=>`
+    <div class="activity-item">
+      <span class="activity-icon" style="color:${TYPES[t.type]?.color||'#6366f1'}">◉</span>
+      <div class="activity-body">
+        <div class="activity-title">${t.title||TYPES[t.type]?.label}</div>
+        <div class="activity-sub">${t.site||'—'} · ${new Date(t.date+'T12:00:00').toLocaleDateString('fr-FR')}</div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span class="chip-sm" style="background:${TYPES[t.type]?.color||'#6366f1'}22;color:${TYPES[t.type]?.color||'#6366f1'}">${TYPES[t.type]?.label||t.type}</span>
+        <button class="btn btn-sm" onclick="markDone('${t.id}')">✓</button>
+      </div>
+    </div>`).join('');
+}
+
+function showDay(dateStr) {
+  const tasks = _tasks.filter(t=>t.date===dateStr);
+  if(!tasks.length){
+    document.getElementById('a-date').value=dateStr;
+    openModal('modal-add');
+    return;
+  }
+  alert(tasks.map(t=>`[${TYPES[t.type]?.label||t.type}] ${t.title||''}${t.site?' ('+t.site+')':''}`).join('\n'));
+}
+
+window.markDone = function(id) {
+  const t = _tasks.find(x=>x.id===id);
+  if(t){ t.done=!t.done; save(); renderMonth(); }
+};
+
+window.addTask = function() {
+  const date = document.getElementById('a-date').value;
+  const title = document.getElementById('a-title').value.trim();
+  if(!date||!title) return toast('Date et titre requis','error');
+  _tasks.push({
+    id: Date.now().toString(36),
+    date, title,
+    type: document.getElementById('a-type').value,
+    site: document.getElementById('a-site').value,
+    priority: document.getElementById('a-prio').value,
+    notes: document.getElementById('a-notes').value,
+    done: false, createdAt: Date.now(),
+  });
+  save(); closeModal('modal-add'); toast('Tâche planifiée','success'); renderMonth();
+};
+
+window.prevMonth = function() { _cur.setMonth(_cur.getMonth()-1); renderMonth(); };
+window.nextMonth = function() { _cur.setMonth(_cur.getMonth()+1); renderMonth(); };
+
+// Set today's date as default
+document.getElementById('a-date').valueAsDate = new Date();
+renderMonth();
+</script>
+</body>
+</html>

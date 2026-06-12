@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Squelettes</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Générateur de squelettes PHP</span>
+      <div class="topbar-right">
+        <button class="btn btn-primary" onclick="openModal('modal-gen')">⚡ Générer un squelette</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <div class="panel" style="background:linear-gradient(135deg,#0d1320,#111827);border:1px solid #6366f1">
+        <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+          <div>
+            <div style="font-size:32px">⟐</div>
+            <div style="font-size:18px;font-weight:700;margin:4px 0">Skeleton Builder</div>
+            <div class="text-muted text-sm">21 fichiers PHP/CSS/JS générés en &lt;2s · 18 niches · 11 langues</div>
+          </div>
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <div class="kpi-card-sm"><div class="kpi-value">21</div><div class="kpi-label">Fichiers</div></div>
+            <div class="kpi-card-sm"><div class="kpi-value">18</div><div class="kpi-label">Niches</div></div>
+            <div class="kpi-card-sm"><div class="kpi-value">11</div><div class="kpi-label">Langues</div></div>
+            <div class="kpi-card-sm"><div class="kpi-value">i18n</div><div class="kpi-label">Multilingue</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2col">
+        <!-- Generator form -->
+        <div class="panel">
+          <div class="panel-header">Configuration rapide</div>
+          <label class="form-label">Domaine source (boutique à copier)</label>
+          <input id="g-domain" class="form-input" placeholder="example.com">
+          <label class="form-label">Niche</label>
+          <select id="g-niche" class="form-input">
+            <option value="">— auto-detect —</option>
+            <option>lingerie</option><option>bijoux</option><option>beaute</option><option>mode</option>
+            <option>sport</option><option>maison</option><option>electronique</option><option>animaux</option>
+            <option>cuisine</option><option>jardinage</option><option>voyages</option><option>sante</option>
+            <option>librairie</option><option>musique</option><option>art</option><option>auto</option><option>luxe</option>
+          </select>
+          <label class="form-label">Langues</label>
+          <div class="chip-list">
+            <label class="chip-check"><input type="checkbox" value="fr" checked> fr</label>
+            <label class="chip-check"><input type="checkbox" value="de" checked> de</label>
+            <label class="chip-check"><input type="checkbox" value="es" checked> es</label>
+            <label class="chip-check"><input type="checkbox" value="it"> it</label>
+            <label class="chip-check"><input type="checkbox" value="en"> en</label>
+            <label class="chip-check"><input type="checkbox" value="nl"> nl</label>
+          </div>
+          <div style="margin-top:16px;display:flex;gap:8px">
+            <button class="btn btn-primary" onclick="generate()" id="btn-gen">⚡ Générer</button>
+            <button class="btn" onclick="preview()" id="btn-preview">👁 Aperçu palette</button>
+          </div>
+        </div>
+
+        <!-- Palette preview -->
+        <div class="panel">
+          <div class="panel-header">Aperçu palette</div>
+          <div id="palette-preview" class="palette-preview">
+            <div class="empty-state">Choisissez une niche</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Result -->
+      <div class="panel" id="result-panel" style="display:none">
+        <div class="panel-header">
+          Squelette généré
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm btn-primary" id="btn-dl">⬇ Télécharger JSON</button>
+          </div>
+        </div>
+        <div class="files-grid" id="files-grid"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal-gen">
+  <div class="modal-box">
+    <div class="modal-header"><span>Générer via pipeline complet</span><button class="modal-close" onclick="closeModal('modal-gen')">✕</button></div>
+    <div class="modal-body">
+      <p class="text-muted text-sm">Lance le pipeline orchestrateur complet (scrape → skeleton → i18n → jobs).</p>
+      <label class="form-label">Domaine source *</label>
+      <input id="m-src" class="form-input" placeholder="boutique.com">
+      <label class="form-label">Domaine cible *</label>
+      <input id="m-tgt" class="form-input" placeholder="monsite.fr">
+      <label class="form-label">Niche</label>
+      <input id="m-niche" class="form-input" placeholder="lingerie">
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-gen')">Annuler</button>
+      <button class="btn btn-primary" onclick="pipeline()">Lancer le pipeline</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, toast, openModal, closeModal } from '/assets/platform.js';
+checkAuth(); buildNav();
+window.openModal = openModal; window.closeModal = closeModal;
+
+const SKEL_API = 'https://v35-skeleton-builder.ernestpedanou.workers.dev';
+const ORCH_API = 'https://v35-orchestrateur.ernestpedanou.workers.dev';
+let _lastResult = null;
+
+window.preview = async function() {
+  const niche = document.getElementById('g-niche').value || 'mode';
+  try {
+    const r = await fetch(`https://v35-color-palette.ernestpedanou.workers.dev?niche=${niche}`);
+    const d = await r.json();
+    const p = d.palette || d;
+    document.getElementById('palette-preview').innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px">
+        ${Object.entries(p).filter(([k])=>k.endsWith('Hex')).map(([k,v])=>`
+          <div style="background:${v};height:48px;border-radius:6px;position:relative">
+            <div style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:10px;color:#fff;text-shadow:0 1px 2px #000">${k.replace('Hex','')}</div>
+          </div>`).join('')}
+      </div>
+      <div class="text-muted text-xs">Niche: ${niche} · Primaire: ${p.primaryHex} · Accent: ${p.accentHex}</div>`;
+  } catch(e) { toast('Erreur palette: '+e.message,'error'); }
+};
+
+window.generate = async function() {
+  const domain = document.getElementById('g-domain').value.trim();
+  if (!domain) return toast('Domaine requis','error');
+  const niche = document.getElementById('g-niche').value;
+  const langs = [...document.querySelectorAll('.chip-check input:checked')].map(c=>c.value);
+  const btn = document.getElementById('btn-gen');
+  btn.disabled = true; btn.textContent = '⏳ Génération…';
+  try {
+    const r = await fetch(SKEL_API, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ domain, niche: niche||undefined, languages: langs }),
+      signal: AbortSignal.timeout(30000),
+    });
+    const d = await r.json();
+    _lastResult = d;
+    document.getElementById('result-panel').style.display='';
+    const files = d.files || {};
+    document.getElementById('files-grid').innerHTML = Object.entries(files).map(([name, content])=>`
+      <div class="file-card">
+        <div class="file-name">${name}</div>
+        <div class="file-size">${(content?.length||0).toLocaleString()} chars</div>
+        <button class="btn btn-sm" onclick="copyFile('${name}')">Copier</button>
+      </div>`).join('');
+    document.getElementById('btn-dl').onclick = ()=>{
+      const blob = new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `skeleton-${domain}.json`;
+      a.click();
+    };
+    toast(`${d.file_count||Object.keys(files).length} fichiers générés`,'success');
+    preview();
+  } catch(e) { toast(e.message,'error'); }
+  finally { btn.disabled=false; btn.textContent='⚡ Générer'; }
+};
+
+window.copyFile = function(name) {
+  const content = _lastResult?.files?.[name] || '';
+  navigator.clipboard.writeText(content);
+  toast(name+' copié','success');
+};
+
+window.pipeline = async function() {
+  const src = document.getElementById('m-src').value.trim();
+  const tgt = document.getElementById('m-tgt').value.trim();
+  if (!src||!tgt) return toast('Domaines requis','error');
+  closeModal('modal-gen');
+  toast('Pipeline lancé…','info');
+  try {
+    const r = await fetch(ORCH_API, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        sourceDomain:src, targetDomain:tgt,
+        niche: document.getElementById('m-niche').value,
+        languages:['fr','de','es'], findAgedDomain:true,
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+    const d = await r.json();
+    toast('Job lancé: '+d.jobId,'success');
+  } catch(e) { toast(e.message,'error'); }
+};
+
+document.getElementById('g-niche').addEventListener('change', preview);
+</script>
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Images</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Bibliothèque d'images</span>
+      <div class="topbar-right">
+        <button class="btn btn-primary" onclick="openModal('modal-add')">+ Ajouter une image</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <div class="kpi-grid-sm">
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-total">—</div><div class="kpi-label">Images totales</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-niches">—</div><div class="kpi-label">Niches couvertes</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-pexels">—</div><div class="kpi-label">Pexels</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-unsplash">—</div><div class="kpi-label">Unsplash</div></div>
+      </div>
+
+      <div class="filters-bar">
+        <select id="f-niche" onchange="load()" class="filter-select">
+          <option value="">Toutes niches</option>
+          <option>lingerie</option><option>bijoux</option><option>beaute</option><option>mode</option>
+          <option>sport</option><option>maison</option><option>electronique</option>
+        </select>
+        <select id="f-source" onchange="load()" class="filter-select">
+          <option value="">Toutes sources</option>
+          <option>pexels</option><option>unsplash</option><option>pixabay</option><option>upload</option>
+        </select>
+        <input id="f-q" class="filter-input" placeholder="Rechercher alt text…" oninput="load()">
+        <span class="text-muted" id="total-label"></span>
+      </div>
+
+      <!-- Image grid -->
+      <div class="image-grid" id="image-grid">
+        <div class="empty-state">Chargement…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="modal-add">
+  <div class="modal-box">
+    <div class="modal-header"><span>Ajouter une image</span><button class="modal-close" onclick="closeModal('modal-add')">✕</button></div>
+    <div class="modal-body">
+      <label class="form-label">URL de l'image *</label>
+      <input id="a-url" class="form-input" placeholder="https://…">
+      <label class="form-label">Alt text (fr)</label>
+      <input id="a-alt-fr" class="form-input" placeholder="Description en français">
+      <label class="form-label">Alt text (de)</label>
+      <input id="a-alt-de" class="form-input">
+      <label class="form-label">Alt text (es)</label>
+      <input id="a-alt-es" class="form-input">
+      <label class="form-label">Niche</label>
+      <input id="a-niche" class="form-input">
+      <label class="form-label">Source</label>
+      <select id="a-source" class="form-input">
+        <option>pexels</option><option>unsplash</option><option>pixabay</option><option>upload</option>
+      </select>
+      <label class="form-label">Hash MD5 (anti-duplicate)</label>
+      <input id="a-hash" class="form-input" placeholder="md5…">
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add')">Annuler</button>
+      <button class="btn btn-primary" onclick="addImage()">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<!-- Image detail modal -->
+<div class="modal" id="modal-img">
+  <div class="modal-box modal-lg">
+    <div class="modal-header"><span id="img-title">Image</span><button class="modal-close" onclick="closeModal('modal-img')">✕</button></div>
+    <div class="modal-body" style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <img id="img-preview" src="" style="width:100%;border-radius:8px;object-fit:cover;max-height:300px">
+      <div>
+        <div class="form-label">Alt FR</div><div id="img-alt-fr" class="text-sm"></div>
+        <div class="form-label" style="margin-top:10px">Alt DE</div><div id="img-alt-de" class="text-sm"></div>
+        <div class="form-label" style="margin-top:10px">Alt ES</div><div id="img-alt-es" class="text-sm"></div>
+        <div class="form-label" style="margin-top:10px">Source</div><div id="img-source" class="text-sm"></div>
+        <div class="form-label" style="margin-top:10px">Niche</div><div id="img-niche" class="text-sm"></div>
+        <div class="form-label" style="margin-top:10px">URL</div><div id="img-url" class="text-sm text-muted" style="word-break:break-all"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, apiGet, apiPost, toast, openModal, closeModal } from '/assets/platform.js';
+checkAuth(); buildNav();
+window.openModal = openModal; window.closeModal = closeModal;
+let _all = [];
+
+async function load() {
+  const niche = document.getElementById('f-niche').value;
+  const source = document.getElementById('f-source').value;
+  const q = document.getElementById('f-q').value.toLowerCase();
+  try {
+    const d = await apiGet('/images');
+    _all = d.list || [];
+    let list = _all;
+    if (niche) list = list.filter(i=>i.niche===niche);
+    if (source) list = list.filter(i=>i.source===source);
+    if (q) list = list.filter(i=>(i.altFr||i.alt||'').toLowerCase().includes(q));
+
+    document.getElementById('total-label').textContent = `${list.length} images`;
+    document.getElementById('k-total').textContent = _all.length;
+    const niches = new Set(_all.map(i=>i.niche).filter(Boolean));
+    document.getElementById('k-niches').textContent = niches.size;
+    document.getElementById('k-pexels').textContent = _all.filter(i=>i.source==='pexels').length;
+    document.getElementById('k-unsplash').textContent = _all.filter(i=>i.source==='unsplash').length;
+
+    const grid = document.getElementById('image-grid');
+    if (!list.length) { grid.innerHTML='<div class="empty-state">Aucune image</div>'; return; }
+    grid.innerHTML = list.map((img,i)=>`
+      <div class="img-card" onclick="viewImg(${_all.indexOf(img)})">
+        <img src="${img.url||img.src}" loading="lazy" alt="${img.altFr||img.alt||''}" onerror="this.src='data:image/svg+xml,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'100\\' height=\\'80\\'><rect width=\\'100\\' height=\\'80\\' fill=\\'%231e2a3a\\'/></svg>'">
+        <div class="img-card-footer">
+          <span class="chip-sm">${img.source||'?'}</span>
+          <span class="text-muted text-xs">${img.niche||'—'}</span>
+        </div>
+      </div>`).join('');
+  } catch(e) { toast(e.message,'error'); }
+}
+
+window.viewImg = function(i) {
+  const img = _all[i];
+  document.getElementById('img-preview').src = img.url||img.src;
+  document.getElementById('img-title').textContent = img.niche||'Image';
+  document.getElementById('img-alt-fr').textContent = img.altFr||img.alt||'—';
+  document.getElementById('img-alt-de').textContent = img.altDe||'—';
+  document.getElementById('img-alt-es').textContent = img.altEs||'—';
+  document.getElementById('img-source').textContent = img.source||'—';
+  document.getElementById('img-niche').textContent = img.niche||'—';
+  document.getElementById('img-url').textContent = img.url||img.src||'—';
+  openModal('modal-img');
+};
+
+window.addImage = async function() {
+  const url = document.getElementById('a-url').value.trim();
+  if (!url) return toast('URL requise','error');
+  try {
+    await apiPost('/images', {
+      url, src: url,
+      altFr: document.getElementById('a-alt-fr').value,
+      altDe: document.getElementById('a-alt-de').value,
+      altEs: document.getElementById('a-alt-es').value,
+      niche: document.getElementById('a-niche').value,
+      source: document.getElementById('a-source').value,
+      hash: document.getElementById('a-hash').value,
+    });
+    closeModal('modal-add');
+    toast('Image ajoutée','success');
+    load();
+  } catch(e) { toast(e.message,'error'); }
+};
+
+load();
+</script>
+</body>
+</html>

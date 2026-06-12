@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Dorks</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Google Dorks — Base de données</span>
+      <div class="topbar-right">
+        <button class="btn btn-sm" onclick="copyAll()">⬇ Copier tous</button>
+        <button class="btn btn-primary" onclick="openGoogleSearch()">🔍 Google Search</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <div class="kpi-grid-sm">
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-total">—</div><div class="kpi-label">Total dorks</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value text-blue" id="k-cms">—</div><div class="kpi-label">Types CMS</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value text-green" id="k-selected">0</div><div class="kpi-label">Sélectionnés</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-custom">0</div><div class="kpi-label">Personnalisés</div></div>
+      </div>
+
+      <div class="filters-bar">
+        <input type="search" id="q" placeholder="Filtrer…" oninput="render()" class="filter-input">
+        <select id="f-cms" onchange="render()" class="filter-select">
+          <option value="">Tous CMS</option>
+        </select>
+        <select id="f-op" onchange="render()" class="filter-select">
+          <option value="">Tous opérateurs</option>
+          <option>intitle</option><option>inurl</option><option>intext</option><option>site</option>
+        </select>
+        <input id="niche-custom" class="filter-input" placeholder="Niche (ex: lingerie)" oninput="render()">
+        <input id="tld-custom" class="filter-input" style="max-width:100px" placeholder="TLD (.fr)" oninput="render()">
+      </div>
+
+      <div id="dorks-grid" class="dorks-grid"></div>
+
+      <div class="panel" id="panel-builder" style="margin-top:16px">
+        <div class="panel-header">Constructeur de requête</div>
+        <div style="padding:16px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <textarea id="query-box" class="form-input" rows="3" style="flex:1;min-width:300px;font-family:monospace;font-size:12px" placeholder="Sélectionnez des dorks ci-dessus pour les ajouter ici…"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-sm" onclick="clearQuery()">Effacer</button>
+            <button class="btn btn-sm" onclick="copyQuery()">Copier</button>
+            <button class="btn btn-primary" id="btn-google" onclick="openGoogleSearch()">🔍 Ouvrir dans Google</button>
+            <button class="btn btn-sm" onclick="openBingSearch()">🔍 Bing</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.dorks-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px;padding:4px}
+.dork-section{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.dork-section-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border)}
+.dork-section-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+.dork-list{padding:8px 10px}
+.dork-item{display:flex;align-items:center;gap:8px;padding:5px 4px;border-radius:4px;cursor:pointer;font-size:11px;font-family:monospace;line-height:1.4}
+.dork-item:hover{background:var(--surface2)}
+.dork-item.selected{background:rgba(99,102,241,.15);outline:1px solid rgba(99,102,241,.4)}
+.dork-cb{width:14px;height:14px;accent-color:#6366f1;flex-shrink:0}
+.dork-text{flex:1;word-break:break-all}
+.dork-op{padding:2px 5px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase;flex-shrink:0}
+.op-intitle{background:rgba(99,102,241,.2);color:#818cf8}
+.op-inurl{background:rgba(34,197,94,.2);color:#22c55e}
+.op-intext{background:rgba(245,158,11,.2);color:#f59e0b}
+.op-site{background:rgba(239,68,68,.2);color:#ef4444}
+.op-filetype{background:rgba(168,85,247,.2);color:#a855f7}
+.dork-copy-btn{padding:2px 6px;border-radius:3px;font-size:9px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;opacity:0;transition:.1s}
+.dork-item:hover .dork-copy-btn{opacity:1}
+</style>
+
+<script type="module">
+import { checkAuth, buildNav, toast, openModal, closeModal } from '/assets/platform.js';
+checkAuth(); buildNav();
+
+const SCRAPER = 'https://v35-build-scraper.ernestpedanou.workers.dev';
+let _dorks = {}, _selected = new Set();
+
+async function loadDorks() {
+  try {
+    const r = await fetch(SCRAPER+'/api/dorks', { signal:AbortSignal.timeout(8000) });
+    const d = await r.json();
+    _dorks = d.dorks || {};
+  } catch(e) {
+    // fallback inline
+    _dorks = FALLBACK_DORKS;
+  }
+  const cms = Object.keys(_dorks);
+  const sel = document.getElementById('f-cms');
+  cms.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+  document.getElementById('k-total').textContent = Object.values(_dorks).flat().length;
+  document.getElementById('k-cms').textContent = cms.length;
+  render();
+}
+
+window.render = function() {
+  const q = document.getElementById('q').value.toLowerCase();
+  const fCms = document.getElementById('f-cms').value;
+  const fOp = document.getElementById('f-op').value;
+  const niche = document.getElementById('niche-custom').value.trim();
+  const tld = document.getElementById('tld-custom').value.trim();
+  const grid = document.getElementById('dorks-grid');
+  let html = '';
+  const CMS_ICONS = { shopify:'🛍', woocommerce:'🔌', prestashop:'🔷', wix:'🟦', webflow:'🌊', squarespace:'◼', bigcommerce:'🛒', magento:'🟠', opencart:'🟡', jimdo:'⬡', weebly:'🟩', godaddy:'🐙', drupal:'💧', joomla:'🟤', generic:'🌐' };
+  Object.entries(_dorks).forEach(([cms, dorks]) => {
+    if (fCms && cms !== fCms) return;
+    const filtered = dorks.filter(d => {
+      const text = typeof d === 'string' ? d : d.query || '';
+      const op = typeof d === 'object' ? d.op : '';
+      if (q && !text.toLowerCase().includes(q)) return false;
+      if (fOp && !text.startsWith(fOp)) return false;
+      return true;
+    });
+    if (!filtered.length) return;
+    // Inject niche/tld substitutions
+    const adapted = filtered.map(d => {
+      let text = typeof d === 'string' ? d : d.query || '';
+      if (niche) text = text.replace(/\{niche\}/g, niche).replace(/NICHE/g, niche);
+      if (tld) text = text.replace(/\{tld\}/g, tld).replace(/\.fr\b/g, tld);
+      return { text, op: extractOp(text) };
+    });
+    html += `<div class="dork-section">
+      <div class="dork-section-header">
+        <div class="dork-section-title">${CMS_ICONS[cms]||'◦'} ${cms} <span class="badge badge-info">${adapted.length}</span></div>
+        <button class="btn btn-sm" onclick="selectAll('${cms}')">Tout sélectionner</button>
+      </div>
+      <div class="dork-list">
+        ${adapted.map((d,i) => {
+          const key = `${cms}::${i}::${d.text}`;
+          const sel = _selected.has(key) ? 'selected' : '';
+          return `<div class="dork-item ${sel}" onclick="toggleDork('${css(key)}','${css(d.text)}')">
+            <input type="checkbox" class="dork-cb" ${sel?'checked':''} onclick="event.stopPropagation()">
+            <span class="dork-op op-${d.op}">${d.op}</span>
+            <span class="dork-text">${esc(d.text)}</span>
+            <button class="dork-copy-btn" onclick="event.stopPropagation();copyDork('${css(d.text)}')">copy</button>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  });
+  grid.innerHTML = html || '<div class="empty-state">Aucun dork trouvé</div>';
+  document.getElementById('k-selected').textContent = _selected.size;
+};
+
+function extractOp(text) {
+  if (text.startsWith('intitle:')) return 'intitle';
+  if (text.startsWith('inurl:')) return 'inurl';
+  if (text.startsWith('intext:')) return 'intext';
+  if (text.startsWith('site:')) return 'site';
+  if (text.startsWith('filetype:')) return 'filetype';
+  return 'generic';
+}
+function esc(s) { return s.replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function css(s) { return s.replace(/'/g,"\\'"); }
+
+window.toggleDork = function(key, text) {
+  if (_selected.has(key)) { _selected.delete(key); }
+  else { _selected.add(key); }
+  document.getElementById('k-selected').textContent = _selected.size;
+  updateQueryBox();
+  render();
+};
+
+window.selectAll = function(cms) {
+  const dorks = _dorks[cms] || [];
+  dorks.forEach((d, i) => {
+    const text = typeof d === 'string' ? d : d.query || '';
+    const key = `${cms}::${i}::${text}`;
+    _selected.add(key);
+  });
+  updateQueryBox();
+  render();
+};
+
+window.copyDork = function(text) {
+  navigator.clipboard.writeText(text);
+  toast('Copié !', 'success');
+};
+
+function updateQueryBox() {
+  const parts = [..._selected].map(k => k.split('::').slice(2).join('::'));
+  document.getElementById('query-box').value = parts.join(' OR\n');
+}
+
+window.clearQuery = function() {
+  _selected.clear();
+  document.getElementById('query-box').value = '';
+  document.getElementById('k-selected').textContent = 0;
+  render();
+};
+
+window.copyQuery = function() {
+  navigator.clipboard.writeText(document.getElementById('query-box').value);
+  toast('Requête copiée !', 'success');
+};
+
+window.openGoogleSearch = function() {
+  const q = document.getElementById('query-box').value.trim();
+  if (!q) return toast('Sélectionnez des dorks d\'abord', 'error');
+  window.open('https://www.google.com/search?q='+encodeURIComponent(q.replace(/\n/g,' ')), '_blank');
+};
+
+window.openBingSearch = function() {
+  const q = document.getElementById('query-box').value.trim();
+  if (!q) return toast('Sélectionnez des dorks d\'abord', 'error');
+  window.open('https://www.bing.com/search?q='+encodeURIComponent(q.replace(/\n/g,' ')), '_blank');
+};
+
+window.copyAll = function() {
+  const all = Object.values(_dorks).flat().map(d => typeof d === 'string' ? d : d.query || '');
+  navigator.clipboard.writeText(all.join('\n'));
+  toast(`${all.length} dorks copiés !`, 'success');
+};
+
+const FALLBACK_DORKS = {
+  shopify: ['intitle:"Powered by Shopify"','inurl:"/collections/" intitle:"Collections"','intext:"cdn.shopify.com" inurl:"/products/"','intitle:"Just added to your cart" site:.fr','inurl:myshopify.com intitle:"collections"','intext:"shopify.com/s/files" filetype:html','intitle:"collections" inurl:".myshopify.com"','intitle:"produits" inurl:"/collections/" site:.fr','intitle:"lingerie" inurl:"/collections/" intext:"shopify"','intitle:"bijoux" inurl:"/collections/" intext:"cdn.shopify"','intitle:"mode femme" inurl:"/products/" intext:"shopify"','intitle:"boutique en ligne" intext:"powered by shopify"'],
+  woocommerce: ['inurl:"/shop/" intext:"Add to cart" intext:"woocommerce"','intitle:"Boutique" inurl:"?add-to-cart=" site:.fr','intext:"woocommerce" inurl:"/product-category/"','intext:"wp-content/plugins/woocommerce" intitle:"shop"','intitle:"produit" inurl:"/product/" intext:"woocommerce"','inurl:"/wp-content/plugins/woo" site:.fr','intitle:"collections" inurl:"/product-category/" site:.fr'],
+  prestashop: ['intitle:"Powered by PrestaShop" site:.fr','inurl:"/index.php?id_category=" intext:"prestashop"','intext:"prestashop" inurl:"/module/blockcart/"','intitle:"boutique" inurl:"/categorie/" intext:"prestashop"','intext:"/modules/ps_shoppingcart/" intitle:"panier"'],
+  wix: ['inurl:"wixsite.com" intitle:"boutique"','intext:"wix.com" intitle:"shop" site:.fr','inurl:".wixsite.com/shop"','intext:"Wix.com" intitle:"produits en ligne"'],
+  generic: ['intitle:"livraison gratuite" inurl:"/collections/" site:.fr','intitle:"boutique en ligne" inurl:"/produits/" site:.fr','intitle:"vente en ligne" inurl:"/categories/"','intitle:"collections" intext:"ajouter au panier" site:.fr','intitle:"shop" intext:"free shipping" inurl:"/collections/"','intitle:"lingerie" inurl:"/collections/" site:.fr','intitle:"bijoux" intext:"livraison" inurl:"/shop/" site:.fr'],
+};
+
+loadDorks();
+</script>
+</body>
+</html>
