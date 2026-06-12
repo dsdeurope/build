@@ -49,6 +49,7 @@
     <header class="topbar">
       <span id="topbar-title">Scrapping universel</span>
       <div class="topbar-right">
+        <button class="btn" onclick="toggleImgPanel()">🖼 Images modifiées</button>
         <button class="btn" id="btn-refresh" onclick="load()">↻ Actualiser</button>
         <button class="btn btn-primary" id="btn-run" onclick="showRunInstructions()">▶ Lancer le scrapping</button>
       </div>
@@ -104,6 +105,39 @@
 
       <!-- Cards grid -->
       <div class="scrape-grid" id="cards"></div>
+
+      <!-- Image modification info panel -->
+      <div id="img-panel" style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:14px;display:none">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <strong style="font-size:13px">🖼 Images modifiées — Anti-duplicate Google</strong>
+          <button class="btn btn-sm" onclick="document.getElementById('img-panel').style.display='none'">✕</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;font-size:12px">
+          <div>
+            <div style="color:var(--muted);margin-bottom:6px">Techniques appliquées sur chaque image:</div>
+            <ul style="margin:0 0 0 14px;line-height:1.9;color:var(--text)">
+              <li>Resize sub-pixel + recadrage <span style="color:var(--green)">(casse le hash perceptuel)</span></li>
+              <li>Micro-ajustement luminosité ±3% <span style="color:var(--green)">(invisible à l'œil)</span></li>
+              <li>Micro-ajustement contraste/saturation ±2-4%</li>
+              <li>Recompression JPEG qualité 82-89% <span style="color:var(--green)">(élimine artefacts DCT)</span></li>
+              <li>Strip total EXIF/metadata</li>
+            </ul>
+          </div>
+          <div>
+            <div style="color:var(--muted);margin-bottom:6px">Stockage:</div>
+            <div style="line-height:1.9">
+              <div>📁 Local: <code style="font-size:10px">/tmp/v35_images/{domain}/</code></div>
+              <div>🌐 GitHub CDN: <code style="font-size:10px">cdn.jsdelivr.net/gh/dsdeurope/build@images/</code></div>
+            </div>
+            <div style="margin-top:8px;color:var(--muted)">Pour uploader sur GitHub:</div>
+            <div style="background:var(--surface-2);padding:6px 8px;border-radius:4px;font-family:monospace;font-size:10px">
+              export GITHUB_TOKEN=ghp_...<br>
+              python3 /tmp/push_images_github.py
+            </div>
+          </div>
+        </div>
+        <div id="img-gallery" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px"></div>
+      </div>
 
       <!-- Instructions modal -->
       <div class="modal" id="modal-run">
@@ -276,6 +310,30 @@ async function load() {
     document.getElementById('btn-refresh').textContent = '↻ Actualiser';
   }
 }
+
+window.toggleImgPanel = function() {
+  const panel = document.getElementById('img-panel');
+  const isHidden = panel.style.display === 'none';
+  panel.style.display = isHidden ? 'block' : 'none';
+  if (isHidden) {
+    // Load preview images from CDN
+    const CDN = 'https://cdn.jsdelivr.net/gh/dsdeurope/build@images/';
+    const done = boutiques.filter(b => (scrapeStatus[b.id]||{}).scrape_status === 'done');
+    const gallery = document.getElementById('img-gallery');
+    if (done.length) {
+      gallery.innerHTML = done.slice(0,12).map(b => {
+        const dom = b.domain.replace(/\./g, '-');
+        return `<div style="text-align:center">
+          <img src="${CDN}${dom}/index-0.jpg" style="width:80px;height:60px;object-fit:cover;border-radius:4px;background:var(--surface-2)"
+               onerror="this.parentElement.style.opacity='.3'" loading="lazy">
+          <div style="font-size:9px;color:var(--muted);margin-top:2px">${b.domain}</div>
+        </div>`;
+      }).join('');
+    } else {
+      gallery.innerHTML = '<span style="color:var(--muted);font-size:12px">Aucun site scrapé. Lancez d\'abord le scrapper.</span>';
+    }
+  }
+};
 
 window.showScrapCmd = function(id, domain, type) {
   const supportsApi = ['shopify','woocommerce'].includes(type);
