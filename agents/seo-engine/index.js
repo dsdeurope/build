@@ -22,8 +22,20 @@ const HREFLANG_MAP = { fr:'fr-FR', de:'de-DE', es:'es-ES', it:'it-IT', en:'en-GB
 
 function slugify(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); }
 
-// Generate <link rel="alternate" hreflang> tags
-function hreflangTags(baseUrl, path, langs) {
+// Subdomain-based hreflang: de.boutique.fr, www.boutique.fr
+function subdomainUrl(domain, lang, path, defaultLang='fr') {
+  const sub = lang === defaultLang ? 'www' : lang;
+  return `https://${sub}.${domain}${path}`;
+}
+
+function hreflangTags(baseUrl, path, langs, domain='') {
+  if (domain) {
+    // Subdomain mode
+    return langs.map(l =>
+      `<link rel="alternate" hreflang="${HREFLANG_MAP[l]||l}" href="${subdomainUrl(domain,l,path)}">`
+    ).join('\n') + `\n<link rel="alternate" hreflang="x-default" href="${subdomainUrl(domain,langs[0],path)}">`;
+  }
+  // Path-prefix fallback (legacy)
   return langs.map(l =>
     `<link rel="alternate" hreflang="${HREFLANG_MAP[l]||l}" href="${baseUrl}/${l}${path}">`
   ).join('\n') + `\n<link rel="alternate" hreflang="x-default" href="${baseUrl}/${langs[0]}${path}">`;
@@ -44,7 +56,7 @@ function productSchema({ name, description, price, currency='EUR', image, domain
       price: price || '0',
       priceCurrency: currency,
       availability: 'https://schema.org/InStock',
-      url: `https://${domain}/fr/produit/${slugify(name)}`,
+      url: `https://www.${domain}/produit/${slugify(name)}`,
     },
     ...(collection ? { category: collection } : {}),
   }, null, 2);
@@ -57,13 +69,13 @@ function collectionSchema({ name, description, domain, lang='fr', products=[] })
     '@type': 'CollectionPage',
     name,
     description,
-    url: `https://${domain}/${lang}/collection/${slugify(name)}`,
+    url: `https://${lang === 'fr' ? 'www' : lang}.${domain}/collection/${slugify(name)}`,
     ...(products.length ? {
       mainEntity: {
         '@type': 'ItemList',
         itemListElement: products.slice(0,10).map((p,i) => ({
           '@type': 'ListItem', position: i+1,
-          item: { '@type':'Product', name:p.name||p, url:`https://${domain}/${lang}/produit/${slugify(p.name||p)}` }
+          item: { '@type':'Product', name:p.name||p, url:`https://${lang === 'fr' ? 'www' : lang}.${domain}/produit/${slugify(p.name||p)}` }
         }))
       }
     } : {}),
@@ -92,14 +104,14 @@ function orgSchema({ domain, name, niche, lang='fr' }) {
         publisher: { '@id': `${baseUrl}/#org` },
         potentialAction: {
           '@type': 'SearchAction',
-          target: { '@type':'EntryPoint', urlTemplate:`${baseUrl}/${lang}/recherche?q={search_term_string}` },
+          target: { '@type':'EntryPoint', urlTemplate:`https://${lang === 'fr' ? 'www' : lang}.${domain}/recherche?q={search_term_string}` },
           'query-input': 'required name=search_term_string',
         },
       },
       {
         '@type': 'WebPage',
-        '@id': `${baseUrl}/${lang}/#webpage`,
-        url: `${baseUrl}/${lang}/`,
+        '@id': `https://${lang === 'fr' ? 'www' : lang}.${domain}/#webpage`,
+        url: `https://${lang === 'fr' ? 'www' : lang}.${domain}/`,
         name: `${name || domain} — ${niche}`,
         isPartOf: { '@id': `${baseUrl}/#website` },
         about: { '@id': `${baseUrl}/#org` },
@@ -109,21 +121,25 @@ function orgSchema({ domain, name, niche, lang='fr' }) {
   }, null, 2);
 }
 
-// Generate sitemap.xml
-function generateSitemap(baseUrl, langs, collections, products=[]) {
+// Generate sitemap.xml — subdomain architecture
+// domain: boutique.fr → www.boutique.fr (FR), de.boutique.fr (DE), etc.
+function getLangBase(domain, lang, defaultLang='fr') {
+  const sub = lang === defaultLang ? 'www' : lang;
+  return `https://${sub}.${domain}`;
+}
+
+function generateSitemap(domain, langs, collections, products=[]) {
   const urls = [];
   const now = new Date().toISOString().split('T')[0];
 
   langs.forEach(lang => {
-    // Homepage
-    urls.push({ loc:`${baseUrl}/${lang}/`, priority:'1.0', freq:'weekly', lastmod:now });
-    // Collections
+    const base = getLangBase(domain, lang);
+    urls.push({ loc:`${base}/`, priority:'1.0', freq:'weekly', lastmod:now, lang });
     collections.forEach(col => {
-      urls.push({ loc:`${baseUrl}/${lang}/collection/${slugify(col.name||col)}`, priority:'0.8', freq:'weekly', lastmod:now });
+      urls.push({ loc:`${base}/collection/${slugify(col.name||col)}`, priority:'0.8', freq:'weekly', lastmod:now, lang, path:`/collection/${slugify(col.name||col)}` });
     });
-    // Products (first 1000 max)
     products.slice(0,1000).forEach(p => {
-      urls.push({ loc:`${baseUrl}/${lang}/produit/${slugify(p.name||p)}`, priority:'0.6', freq:'monthly', lastmod:now });
+      urls.push({ loc:`${base}/produit/${slugify(p.name||p)}`, priority:'0.6', freq:'monthly', lastmod:now, lang, path:`/produit/${slugify(p.name||p)}` });
     });
   });
 
@@ -135,20 +151,20 @@ ${urls.map(u => `  <url>
     <lastmod>${u.lastmod}</lastmod>
     <changefreq>${u.freq}</changefreq>
     <priority>${u.priority}</priority>
-    ${langs.map(l=>`<xhtml:link rel="alternate" hreflang="${HREFLANG_MAP[l]||l}" href="${baseUrl}/${l}${u.loc.replace(baseUrl+'/'+u.loc.split('/')[3],'')}" />`).join('\n    ')}
+    ${u.path ? langs.map(l=>`<xhtml:link rel="alternate" hreflang="${HREFLANG_MAP[l]||l}" href="${getLangBase(domain,l)}${u.path}" />`).join('\n    ') : ''}
   </url>`).join('\n')}
 </urlset>`;
   return xml;
 }
 
 // robots.txt
-function generateRobots(baseUrl, langs) {
+function generateRobots(domain, langs) {
   return `User-agent: *
 Allow: /
 
 # Sitemaps
-Sitemap: ${baseUrl}/sitemap.xml
-${langs.map(l=>`Sitemap: ${baseUrl}/${l}/sitemap.xml`).join('\n')}
+Sitemap: https://www.${domain}/sitemap.xml
+${langs.map(l=>`Sitemap: https://${l}.${domain}/sitemap.xml`).join('\n')}
 
 # Block admin/dev paths
 Disallow: /admin/
@@ -200,7 +216,7 @@ export default {
     if (resource === 'sitemap') {
       const { domain, langs=LANGS, collections=[], products=[] } = body;
       if (!domain) return err('domain required');
-      const xml = generateSitemap(`https://${domain}`, langs, collections, products);
+      const xml = generateSitemap(domain, langs, collections, products);
       return ok(xml, 'application/xml');
     }
 
@@ -208,7 +224,7 @@ export default {
     if (resource === 'robots') {
       const { domain, langs=LANGS } = body;
       if (!domain) return err('domain required');
-      return ok(generateRobots(`https://${domain}`, langs), 'text/plain');
+      return ok(generateRobots(domain, langs), 'text/plain');
     }
 
     // ── /api/head ────────────────────────────────────────────────────────────
@@ -240,7 +256,7 @@ export default {
       const { domain, niche='mode', langs=LANGS.slice(0,3), collections=[], products=[], meta={} } = body;
       if (!domain) return err('domain required');
       const baseUrl = `https://${domain}`;
-      const sitemap = generateSitemap(baseUrl, langs, collections, products);
+      const sitemap = generateSitemap(domain, langs, collections, products);
       const robots = generateRobots(baseUrl, langs);
       const orgSchemaJson = orgSchema({ domain, niche, lang:langs[0]||'fr' });
 
