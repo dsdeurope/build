@@ -19,8 +19,14 @@ export function logout() {
 
 // ── API ──────────────────────────────────────────────────────────────────────
 export async function apiFetch(path, opts = {}) {
+  const token = sessionStorage.getItem(AUTH_KEY) || '';
+  const isWrite = opts.method && opts.method !== 'GET';
   const res = await fetch(API + path, {
-    headers: { 'Content-Type': 'application/json', ...opts.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(isWrite ? { 'Authorization': `Bearer ${token}` } : {}),
+      ...opts.headers,
+    },
     ...opts,
   });
   const data = await res.json();
@@ -72,6 +78,8 @@ const NAV_ITEMS = [
   { href: '/index.html',                 icon: '◈', label: 'Dashboard' },
   { href: '/pipeline.html',              icon: '⚡', label: 'Pipeline' },
   { href: '/boutiques.html',             icon: '◉', label: 'Boutiques' },
+  { href: '/cloner.html',               icon: '🚀', label: 'À cloner' },
+  { href: '/scrapping.html',            icon: '🕷', label: 'Scrapping' },
   { href: '/domaines-footprints.html',   icon: '◎', label: 'Footprints' },
   { href: '/dorks.html',                 icon: '🔍', label: 'Dorks' },
   { href: '/sites.html',                 icon: '✦', label: 'Sites' },

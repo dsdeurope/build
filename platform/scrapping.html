@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Scrapping</title>
+<link rel="stylesheet" href="/assets/platform.css">
+<style>
+.scrape-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:14px}
+.scrape-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;position:relative;cursor:pointer;transition:border-color .2s}
+.scrape-card:hover{border-color:var(--blue)}
+.scrape-card.done{border-color:var(--green)}
+.scrape-card.error{border-color:var(--red)}
+.scrape-domain{font-weight:700;font-size:13px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.scrape-domain a{color:var(--text);text-decoration:none}
+.scrape-domain a:hover{color:var(--blue)}
+.scrape-meta{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.progress-bar{height:5px;background:var(--border);border-radius:3px;margin:8px 0;overflow:hidden}
+.progress-fill{height:100%;background:var(--blue);border-radius:3px;transition:width .4s}
+.progress-fill.done{background:var(--green)}
+.stat-row{display:flex;gap:14px;font-size:11px;color:var(--muted)}
+.stat-val{font-weight:600;color:var(--text)}
+.priority-badge{font-size:9px;padding:2px 5px;border-radius:3px;font-weight:600}
+.prio-high{background:rgba(239,68,68,.15);color:#ef4444}
+.prio-med{background:rgba(245,158,11,.15);color:#f59e0b}
+.overview-bar{display:flex;gap:20px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 18px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.ov-stat{text-align:center;min-width:80px}
+.ov-val{font-size:22px;font-weight:700;display:block;line-height:1.2}
+.ov-label{font-size:10px;color:var(--muted);text-transform:uppercase}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.toolbar-sep{width:1px;height:24px;background:var(--border)}
+.thumb-row{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.thumb{width:40px;height:40px;object-fit:cover;border-radius:3px;background:var(--surface-2)}
+.thumb-ph{width:40px;height:40px;border-radius:3px;background:var(--surface-2);display:flex;align-items:center;justify-content:center;font-size:18px}
+/* Modal products */
+.modal-lg .modal-box{max-width:900px;width:90vw;max-height:85vh;display:flex;flex-direction:column}
+.modal-lg .modal-body{overflow-y:auto;flex:1}
+.prod-table{width:100%;border-collapse:collapse;font-size:12px}
+.prod-table th{background:var(--surface-2);padding:6px 8px;text-align:left;font-size:11px;position:sticky;top:0}
+.prod-table td{padding:5px 8px;border-bottom:1px solid var(--border)}
+.prod-img{width:36px;height:36px;object-fit:cover;border-radius:3px;background:var(--surface-2)}
+.export-row{display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
+</style>
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Scrapping universel</span>
+      <div class="topbar-right">
+        <button class="btn" id="btn-refresh" onclick="load()">↻ Actualiser</button>
+        <button class="btn btn-primary" id="btn-run" onclick="showRunInstructions()">▶ Lancer le scrapping</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <!-- License warning -->
+      <div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px">
+        <strong>⚠️ Scrapping manuel uniquement</strong> — Ne scrappez que les sites pour lesquels vous avez une autorisation ou des droits. Les sites de grandes marques protégés (CGU, ToS) doivent être supprimés de votre base avant tout scrapping. Utilisez le bouton "✕ Supprimer" dans la liste Boutiques pour retirer les sites non autorisés.
+      </div>
+
+      <!-- Overview stats -->
+      <div class="overview-bar">
+        <div class="ov-stat"><span class="ov-val" id="ov-total">—</span><span class="ov-label">Sites</span></div>
+        <div class="ov-stat"><span class="ov-val" id="ov-done" style="color:var(--green)">—</span><span class="ov-label">Scrapés</span></div>
+        <div class="ov-stat"><span class="ov-val" id="ov-prods">—</span><span class="ov-label">Produits</span></div>
+        <div class="ov-stat"><span class="ov-val" id="ov-imgs">—</span><span class="ov-label">Images</span></div>
+        <div class="ov-stat"><span class="ov-val" id="ov-cols" style="color:var(--green)">—</span><span class="ov-label">Collections rentables</span></div>
+        <div class="ov-stat"><span class="ov-val" id="ov-shopify">—</span><span class="ov-label">Shopify (prio)</span></div>
+        <div style="flex:1"></div>
+        <div>
+          <div class="progress-bar" style="width:180px">
+            <div class="progress-fill" id="global-bar" style="width:0%"></div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);text-align:right" id="ov-pct">0%</div>
+        </div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <input type="search" id="q" placeholder="Rechercher domaine…" oninput="render()" class="filter-input" style="width:180px">
+        <select id="f-type" onchange="render()" class="filter-select">
+          <option value="">Tous les CMS</option>
+          <option value="shopify">Shopify</option>
+          <option value="woocommerce">WooCommerce</option>
+          <option value="prestashop">PrestaShop</option>
+          <option value="magento">Magento</option>
+        </select>
+        <select id="f-status" onchange="render()" class="filter-select">
+          <option value="">Tous statuts</option>
+          <option value="done">Scrapés</option>
+          <option value="pending">En attente</option>
+        </select>
+        <select id="f-sort" onchange="render()" class="filter-select">
+          <option value="score">Tri: score</option>
+          <option value="products">Tri: produits</option>
+          <option value="images">Tri: images</option>
+        </select>
+        <div class="toolbar-sep"></div>
+        <button class="btn" onclick="exportAllCSV()">⬇ Export CSV global</button>
+        <span class="text-muted" id="count-label" style="font-size:12px"></span>
+      </div>
+
+      <!-- Cards grid -->
+      <div class="scrape-grid" id="cards"></div>
+
+      <!-- Instructions modal -->
+      <div class="modal" id="modal-run">
+        <div class="modal-box">
+          <div class="modal-header"><span>Lancer le scrapping</span><button class="modal-close" onclick="closeModal('modal-run')">✕</button></div>
+          <div class="modal-body">
+            <p style="color:var(--muted);font-size:13px">Le scrapper capture: titres, descriptions, prix, variantes, URLs images pour tous les sites Shopify et WooCommerce.</p>
+            <div style="background:var(--surface-2);border-radius:6px;padding:12px;margin:12px 0;font-family:monospace;font-size:12px">
+              <div style="color:var(--muted);margin-bottom:6px"># Depuis le serveur:</div>
+              <div style="color:var(--green)">python3 /tmp/deep_scrape.py</div>
+            </div>
+            <div style="font-size:12px;color:var(--muted)">
+              <strong>Priorité automatique:</strong>
+              <ol style="margin:6px 0 0 16px;line-height:1.8">
+                <li>Shopify (API JSON officielle — Google-safe)</li>
+                <li>WooCommerce (API REST publique)</li>
+                <li>PrestaShop / Magento → ignorés (pas d'API publique)</li>
+              </ol>
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-top:10px">
+              <strong>Protection Google:</strong> délais 1.5-3s • rotation User-Agent • vérification robots.txt • API officielles uniquement
+            </div>
+            <div id="priority-list" style="margin-top:12px"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn" onclick="closeModal('modal-run')">Fermer</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Products modal -->
+      <div class="modal modal-lg" id="modal-products">
+        <div class="modal-box">
+          <div class="modal-header">
+            <span id="modal-domain-title">Produits</span>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-sm" id="btn-export-csv" onclick="exportDomainCSV()">⬇ CSV</button>
+              <button class="modal-close" onclick="closeModal('modal-products')">✕</button>
+            </div>
+          </div>
+          <div class="modal-body">
+            <div class="export-row" id="modal-stats"></div>
+            <div id="modal-products-content"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, apiGet, toast, openModal, closeModal } from '/assets/platform.js';
+checkAuth(); buildNav();
+window.openModal = openModal; window.closeModal = closeModal;
+
+function esc(s) { const d=document.createElement('div'); d.textContent=String(s||''); return d.innerHTML; }
+function fmt(n) { return (n||0).toLocaleString('fr-FR'); }
+
+const CMS_P = {shopify:1,woocommerce:2,prestashop:3,magento:4};
+const CLONE_D = {shopify:'1j ⚡',woocommerce:'2j',prestashop:'4j',magento:'7j'};
+
+let boutiques = [], scrapeStatus = {}, currentDomain = '';
+
+function priorityLabel(b) {
+  if (b.type === 'shopify' && (b.score||0) >= 7) return {l:'PRIO HAUTE',c:'prio-high'};
+  if (b.type === 'shopify') return {l:'PRIO MED',c:'prio-med'};
+  if (b.type === 'woocommerce') return {l:'WOO',c:'prio-med'};
+  return null;
+}
+
+function renderCard(b) {
+  const st = scrapeStatus[b.id] || {};
+  const done = st.scrape_status === 'done';
+  const nProds = st.products_scraped || b.products || 0;
+  const nImgs = st.images_cataloged || 0;
+  const nCols = (b.profitable_collections||[]).length;
+  const p = priorityLabel(b);
+  // First 3 product images from profitable collections (if available)
+  const thumbs = (b.profitable_collections||[]).slice(0,3).map(() => '');
+  return `<div class="scrape-card ${done?'done':''}" onclick="openProducts('${esc(b.id)}','${esc(b.domain)}')">
+    <div class="scrape-domain">
+      <a href="https://${esc(b.domain)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(b.domain)} ↗</a>
+      ${p ? `<span class="priority-badge ${p.c}">${p.l}</span>` : ''}
+      ${done ? '<span style="color:var(--green);font-size:11px">✓ scrapé</span>' : ''}
+    </div>
+    <div class="scrape-meta">
+      <span class="badge badge-info">${esc(b.type||'—')}</span>
+      <span class="badge badge-warn">${esc(b.niche||'—')}</span>
+      <span class="badge badge-warn">⭐ ${(b.score||0).toFixed?b.score.toFixed(1):b.score}</span>
+      ${CLONE_D[b.type] ? `<span class="badge badge-success">${CLONE_D[b.type]}</span>` : ''}
+    </div>
+    <div class="progress-bar"><div class="progress-fill ${done?'done':''}" style="width:${done?100:0}%"></div></div>
+    <div class="stat-row">
+      <span>Produits: <span class="stat-val">${fmt(nProds)}</span></span>
+      <span>Collections: <span class="stat-val">${fmt(b.collections||0)}</span></span>
+      <span>Images: <span class="stat-val">${fmt(nImgs||b.products||0)}</span></span>
+      ${nCols > 0 ? `<span style="color:var(--green)">✦ ${nCols} rentables</span>` : ''}
+    </div>
+    <div style="display:flex;gap:6px;margin-top:8px" onclick="event.stopPropagation()">
+      <button class="btn btn-sm" onclick="showScrapCmd('${esc(b.id)}','${esc(b.domain)}','${esc(b.type||'')}')">🕷 Scrapper</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteBoutique('${esc(b.id)}','${esc(b.domain)}')">✕ Supprimer</button>
+    </div>
+  </div>`;
+}
+
+function updateOverview(list) {
+  const done = list.filter(b => (scrapeStatus[b.id]||{}).scrape_status === 'done');
+  const totalProds = list.reduce((s,b) => s + (scrapeStatus[b.id]?.products_scraped || b.products || 0), 0);
+  const totalImgs = list.reduce((s,b) => s + ((scrapeStatus[b.id]||{}).images_cataloged||0), 0);
+  const totalProfit = list.reduce((s,b) => s + (b.profitable_collections||[]).length, 0);
+  const shopify = boutiques.filter(b=>b.type==='shopify').length;
+  const pct = list.length ? Math.round(done.length/list.length*100) : 0;
+
+  document.getElementById('ov-total').textContent = fmt(list.length);
+  document.getElementById('ov-done').textContent = fmt(done.length);
+  document.getElementById('ov-prods').textContent = fmt(totalProds);
+  document.getElementById('ov-imgs').textContent = totalImgs ? fmt(totalImgs) : fmt(totalProds);
+  document.getElementById('ov-cols').textContent = fmt(totalProfit);
+  document.getElementById('ov-shopify').textContent = fmt(shopify);
+  document.getElementById('global-bar').style.width = pct + '%';
+  document.getElementById('global-bar').className = 'progress-fill' + (pct===100?' done':'');
+  document.getElementById('ov-pct').textContent = pct + '%';
+}
+
+function render() {
+  const q = document.getElementById('q').value.toLowerCase();
+  const ft = document.getElementById('f-type').value;
+  const fs = document.getElementById('f-status').value;
+  const sort = document.getElementById('f-sort').value;
+
+  let list = boutiques.filter(b => {
+    if (q && !b.domain.toLowerCase().includes(q)) return false;
+    if (ft && b.type !== ft) return false;
+    if (fs === 'done' && (scrapeStatus[b.id]||{}).scrape_status !== 'done') return false;
+    if (fs === 'pending' && (scrapeStatus[b.id]||{}).scrape_status === 'done') return false;
+    return true;
+  });
+
+  // Sort: scraped first, then by key
+  if (sort === 'score') list.sort((a,b) => (b.score||0)-(a.score||0));
+  if (sort === 'products') list.sort((a,b) => (b.products||0)-(a.products||0));
+  if (sort === 'images') list.sort((a,b) => ((scrapeStatus[b.id]||{}).images_cataloged||0) - ((scrapeStatus[a.id]||{}).images_cataloged||0));
+
+  const done = list.filter(b => (scrapeStatus[b.id]||{}).scrape_status==='done');
+  const pending = list.filter(b => (scrapeStatus[b.id]||{}).scrape_status!=='done');
+  // Shopify pending first
+  pending.sort((a,b) => (CMS_P[a.type]||5)-(CMS_P[b.type]||5) || (b.score||0)-(a.score||0));
+  const sorted = [...done, ...pending];
+
+  document.getElementById('cards').innerHTML = sorted.map(renderCard).join('');
+  document.getElementById('count-label').textContent = `${sorted.length} sites`;
+  updateOverview(sorted);
+}
+
+async function load() {
+  try {
+    document.getElementById('btn-refresh').textContent = '↻ …';
+    const [d, ss] = await Promise.all([
+      apiGet('/boutiques', {per:300}),
+      apiGet('/scrape/status').catch(() => ({list:[]}))
+    ]);
+    boutiques = d.list || [];
+    scrapeStatus = {};
+    (ss.list||[]).forEach(s => { scrapeStatus[s.id] = s; });
+    document.getElementById('r2-banner').style.display = 'block';
+    render();
+    document.getElementById('btn-refresh').textContent = '↻ Actualiser';
+  } catch(e) {
+    toast(e.message, 'error');
+    document.getElementById('btn-refresh').textContent = '↻ Actualiser';
+  }
+}
+
+window.showScrapCmd = function(id, domain, type) {
+  const supportsApi = ['shopify','woocommerce'].includes(type);
+  if (!supportsApi) {
+    toast(`${type || 'Ce CMS'} n'a pas d'API publique — scrapping HTML non supporté pour le moment`, 'error');
+    return;
+  }
+  // Show the exact command to run for this specific domain
+  const cmd = `python3 /tmp/deep_scrape.py --domain ${domain}`;
+  // Create a small floating tooltip / modal
+  const note = `Pour scrapper uniquement ${domain}, modifiez temporairement main() dans /tmp/deep_scrape.py\nou filtrez avec:\n\npython3 -c "\nimport subprocess\n# Lance le scrapper sur ${domain} uniquement\n"`;
+  openModal('modal-run');
+  document.getElementById('priority-list').innerHTML = `
+    <div style="background:var(--surface-2);border-radius:6px;padding:12px;font-family:monospace;font-size:12px">
+      <div style="color:var(--muted);margin-bottom:4px"># Scrapper uniquement: ${esc(domain)}</div>
+      <div style="color:var(--green)">python3 /tmp/deep_scrape.py</div>
+      <div style="color:var(--muted);margin-top:8px;font-family:sans-serif;font-size:11px">
+        Le scrapper traitera tous les sites en queue. Pour cibler un seul site, supprimez les autres de la liste, scrapez, puis re-importez.</div>
+    </div>
+    <div style="margin-top:10px;font-size:12px;color:var(--muted)">
+      <strong>Site:</strong> <a href="https://${esc(domain)}" target="_blank" class="link">${esc(domain)}</a> |
+      <strong>CMS:</strong> ${esc(type)} |
+      <strong>API:</strong> ${type==='shopify'?'✓ Shopify JSON API':'✓ WooCommerce REST'}
+    </div>`;
+};
+
+window.deleteBoutique = async function(id, domain) {
+  if (!confirm(`Supprimer "${domain}" de toutes les pages ?\nCette action est irréversible.`)) return;
+  try {
+    const { apiDelete } = await import('/assets/platform.js');
+    await apiDelete('/boutiques/' + id);
+    boutiques = boutiques.filter(b => b.id !== id);
+    delete scrapeStatus[id];
+    render();
+    toast(`${domain} supprimé`, 'success');
+  } catch(e) { toast(e.message, 'error'); }
+};
+
+window.showRunInstructions = function() {
+  const prio = boutiques
+    .filter(b => b.type === 'shopify' && (scrapeStatus[b.id]||{}).scrape_status !== 'done')
+    .sort((a,b) => (b.score||0)-(a.score||0)).slice(0,10);
+  const el = document.getElementById('priority-list');
+  if (prio.length) {
+    el.innerHTML = `<div style="font-size:12px"><strong>Top 10 priorités Shopify non scrapés:</strong><ul style="margin:6px 0 0 16px;line-height:1.8">
+      ${prio.map(b=>`<li><a href="https://${esc(b.domain)}" target="_blank" class="link">${esc(b.domain)}</a> — score ${b.score?.toFixed(1)||'?'} | ${fmt(b.products||0)} produits connus</li>`).join('')}
+    </ul></div>`;
+  } else {
+    el.innerHTML = '<div style="color:var(--green);font-size:12px">✓ Tous les sites Shopify ont été scrapés!</div>';
+  }
+  openModal('modal-run');
+};
+
+window.openProducts = async function(id, domain) {
+  currentDomain = domain;
+  document.getElementById('modal-domain-title').textContent = domain;
+  document.getElementById('modal-stats').innerHTML = '<span style="color:var(--muted)">Chargement…</span>';
+  document.getElementById('modal-products-content').innerHTML = '';
+  openModal('modal-products');
+
+  try {
+    const d = await apiGet(`/scrape/${id}/products`);
+    const prods = d.products || [];
+    document.getElementById('modal-stats').innerHTML = `
+      <span class="badge badge-success">${fmt(prods.length)} produits</span>
+      <span class="badge badge-info">${fmt(prods.reduce((s,p)=>s+(p.image_count||0),0))} images</span>
+      <span class="badge badge-warn">${fmt(new Set(prods.map(p=>p.vendor).filter(Boolean)).size)} marques</span>
+      <button class="btn btn-sm" onclick="exportDomainCSV('${esc(id)}')">⬇ Export CSV</button>
+    `;
+    if (!prods.length) {
+      document.getElementById('modal-products-content').innerHTML = `
+        <div style="padding:24px;text-align:center;color:var(--muted)">
+          <div style="font-size:32px">🕷</div>
+          <p>Ce site n'a pas encore été scrapé en profondeur.</p>
+          <code style="font-size:12px">python3 /tmp/deep_scrape.py</code>
+        </div>`;
+      return;
+    }
+    const rows = prods.slice(0, 200).map(p => {
+      const img = p.images?.[0]?.src || '';
+      return `<tr>
+        <td>${img ? `<img src="${esc(img)}" class="prod-img" loading="lazy" onerror="this.style.display='none'">` : '<div class="prod-img" style="display:flex;align-items:center;justify-content:center;color:var(--muted)">?</div>'}</td>
+        <td><a href="https://${esc(domain)}/products/${esc(p.handle||'')}" target="_blank" class="link" style="font-size:12px">${esc(p.title||'')}</a></td>
+        <td style="color:var(--muted)">${esc(p.product_type||p.vendor||'')}</td>
+        <td style="font-weight:600">${p.price_min ? p.price_min.toFixed(2)+'€' : '—'}</td>
+        <td style="color:var(--muted)">${p.variants_count||1}</td>
+        <td style="color:var(--muted)">${p.image_count||0}</td>
+        <td style="font-size:10px;color:var(--muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc((p.description||'').slice(0,80))}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('modal-products-content').innerHTML = `
+      <table class="prod-table">
+        <thead><tr><th>Image</th><th>Titre</th><th>Type</th><th>Prix</th><th>Variantes</th><th>Images</th><th>Description</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      ${prods.length > 200 ? `<p style="text-align:center;color:var(--muted);padding:12px;font-size:12px">Affichage: 200/${prods.length} produits — Export CSV pour tout voir</p>` : ''}`;
+  } catch(e) {
+    document.getElementById('modal-products-content').innerHTML = `<div style="padding:16px;color:var(--muted)">${esc(e.message)}</div>`;
+  }
+};
+
+window.exportDomainCSV = async function(id) {
+  const bid = id || boutiques.find(b=>b.domain===currentDomain)?.id;
+  if (!bid) return;
+  window.open(`${window.location.origin.replace('build.zenithlab.net','v35-build-api.ernestpedanou.workers.dev')}/api/scrape/${bid}/export.csv`, '_blank');
+};
+
+window.exportAllCSV = function() {
+  const done = boutiques.filter(b => (scrapeStatus[b.id]||{}).scrape_status==='done');
+  if (!done.length) { toast('Aucun site scrapé pour le moment','error'); return; }
+  toast(`${done.length} sites disponibles. Utilisez l'export par domaine via chaque carte.`, 'info');
+};
+
+// Auto-refresh every 15s if any scraping in progress
+let autoRefresh;
+function startAutoRefresh() {
+  if (autoRefresh) return;
+  autoRefresh = setInterval(() => {
+    const running = Object.values(scrapeStatus).some(s => s.scrape_status === 'running');
+    if (running) load();
+  }, 15000);
+}
+
+load().then(startAutoRefresh);
+</script>
+</body>
+</html>

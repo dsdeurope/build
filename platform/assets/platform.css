@@ -259,8 +259,10 @@ aside#sidebar nav{flex:1;padding:8px 0}
 .panel .table-wrap,.panel>.table-wrap{border-radius:0 0 12px 12px;border:none;border-top:1px solid var(--border)}
 /* ── KPI cards ───────────────────────────────────── */
 .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:14px;margin-bottom:20px}
-.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;transition:border-color var(--transition)}
-.kpi-card:hover{border-color:var(--accent)}
+.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:18px 20px;transition:all var(--transition)}
+.kpi-card:hover{border-color:var(--accent);transform:translateY(-1px)}
+.kpi-highlight{border-color:var(--green)!important;background:linear-gradient(135deg,var(--surface),rgba(16,185,129,.08))!important}
+.kpi-highlight:hover{border-color:var(--green)!important;box-shadow:0 0 0 2px rgba(16,185,129,.2)!important}
 .kpi-value{font-size:28px;font-weight:800;letter-spacing:-1px;line-height:1}
 .kpi-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-top:4px}
 .kpi-grid-sm{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px}

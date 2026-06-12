@@ -151,7 +151,10 @@ async function load(p = _page) {
     const tb = document.getElementById('tbody');
     if (!list.length) { tb.innerHTML='<tr><td colspan="9" class="text-center text-muted">Aucun footprint</td></tr>'; return; }
     tb.innerHTML = list.map(b=>`<tr>
-      <td><a href="/boutique.html?id=${b.id}" class="link">${b.domain}</a></td>
+      <td>
+        <a href="https://${b.domain}" target="_blank" rel="noopener" class="link">${b.domain}</a>
+        <a href="/boutique.html?id=${b.id}" class="text-muted text-sm" title="Fiche interne" style="margin-left:4px">↗</a>
+      </td>
       <td><span class="badge badge-info">${b.type||'shopify'}</span></td>
       <td>${b.niche||'—'}</td>
       <td>${fmt(b.traffic)}</td>

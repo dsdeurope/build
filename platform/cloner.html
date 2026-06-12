@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Sites à cloner</title>
+<link rel="stylesheet" href="/assets/platform.css">
+<style>
+.clone-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px;margin-top:20px}
+.clone-card{background:var(--surface);border:1px solid var(--green);border-radius:var(--radius-lg);padding:20px;display:flex;flex-direction:column;gap:12px;transition:all var(--transition);position:relative;overflow:hidden}
+.clone-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--green),#34d399)}
+.clone-card:hover{transform:translateY(-3px);box-shadow:0 8px 32px rgba(16,185,129,.2);border-color:#34d399}
+.clone-domain{font-size:1.1rem;font-weight:800;letter-spacing:-.02em;color:var(--text)}
+.clone-visit-btn{display:flex;align-items:center;gap:8px;padding:10px 16px;background:linear-gradient(135deg,var(--green),#059669);color:#fff;border-radius:var(--radius);font-weight:700;font-size:.9rem;text-decoration:none;transition:all var(--transition);width:100%;justify-content:center}
+.clone-visit-btn:hover{background:linear-gradient(135deg,#34d399,var(--green));transform:scale(1.02)}
+.clone-visit-btn svg{width:16px;height:16px;flex-shrink:0}
+.clone-meta{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.clone-stat{background:var(--surface2);border-radius:var(--radius);padding:10px 12px}
+.clone-stat-val{font-size:1.1rem;font-weight:800;color:var(--text)}
+.clone-stat-label{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;margin-top:2px}
+.clone-stat-ca .clone-stat-val{color:var(--green)}
+.clone-badge-row{display:flex;gap:6px;flex-wrap:wrap}
+.clone-kw{font-size:.75rem;color:var(--muted);border-top:1px solid var(--border);padding-top:10px}
+.clone-kw span{color:var(--accent2)}
+.empty-state-big{text-align:center;padding:80px 20px;color:var(--muted)}
+.empty-state-big .icon{font-size:3rem;margin-bottom:16px}
+</style>
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Sites à cloner</span>
+      <div class="topbar-right">
+        <span class="badge badge-success" id="clone-count">Chargement…</span>
+        <a href="/boutiques.html" class="btn btn-sm">Toutes les boutiques →</a>
+      </div>
+    </header>
+    <div class="content">
+
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <div style="flex:1">
+          <div style="font-size:1.5rem;font-weight:800;color:var(--green)">🚀 Sites à cloner rapidement</div>
+          <div class="text-muted" style="font-size:.85rem;margin-top:4px">Score ≥ 7.5 · Pipeline V35 · Classés par score décroissant</div>
+        </div>
+      </div>
+
+      <div class="clone-grid" id="clone-grid">
+        <div class="empty-state">Chargement…</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, apiGet, fmt, badge } from '/assets/platform.js';
+checkAuth(); buildNav();
+
+function esc(s) { const d=document.createElement('div'); d.textContent=String(s||''); return d.innerHTML; }
+const BASKET = { bijoux:85, mode:55, beaute:45, sport:65, maison:75, electronique:120, nutrition:40, animaux:35, sante:50, luxe:200, auto:80, jardin:45, enfant:40 };
+const CONV_RATE = {shopify:0.018, woocommerce:0.014, prestashop:0.012, magento:0.010};
+function caMonth(b) {
+  if (b.ca_monthly) return b.ca_monthly;
+  const basket = BASKET[b.niche] || 50;
+  const conv = CONV_RATE[b.type] || 0.015;
+  return Math.round((b.traffic_monthly || b.traffic || 0) * conv * basket);
+}
+function clonability(b) {
+  const map = {
+    shopify:     {label:'Shopify — 1 jour',   days:1,  color:'var(--green)'},
+    woocommerce: {label:'WooC. — 2 jours',    days:2,  color:'var(--green)'},
+    prestashop:  {label:'PrestaShop — 4j',    days:4,  color:'var(--yellow)'},
+    magento:     {label:'Magento — 7 jours',  days:7,  color:'var(--red)'},
+    vtex:        {label:'VTEX — 5 jours',     days:5,  color:'var(--yellow)'},
+  };
+  return map[b.type] || {label:'Inconnu — 3j', days:3, color:'var(--muted)'};
+}
+function fmtEur(n) { return n >= 1000 ? `${(n/1000).toFixed(1)}k€` : `${n}€`; }
+function scoreBar(s) {
+  const pct = Math.min(s / 10 * 100, 100);
+  const col = s >= 8 ? 'var(--green)' : s >= 6.5 ? 'var(--blue)' : 'var(--yellow)';
+  return `<div style="height:4px;background:var(--border);border-radius:2px;margin-top:4px"><div style="width:${pct}%;height:100%;background:${col};border-radius:2px;transition:width 1s ease"></div></div>`;
+}
+
+async function loadAlerts() {
+  try {
+    const d = await apiGet('/alerts');
+    if (d.count > 0) {
+      const banner = document.createElement('div');
+      banner.style = 'background:linear-gradient(90deg,rgba(16,185,129,.15),transparent);border:1px solid var(--green);border-radius:var(--radius);padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px';
+      banner.innerHTML = `<span style="font-size:1.2rem">🔔</span><div><strong style="color:var(--green)">${esc(d.count)} nouveau${d.count>1?'x':''} winner${d.count>1?'s':''} cette semaine !</strong><div class="text-muted" style="font-size:.8rem">${d.winners.map(w=>esc(w.domain)).join(' · ')}</div></div>`;
+      document.querySelector('.clone-grid').before(banner);
+    }
+  } catch {}
+}
+
+async function load() {
+  try {
+    const d = await apiGet('/boutiques', { status: 'cloner', per: 100, sort: 'score' });
+    const grid = document.getElementById('clone-grid');
+    const list = d.list || [];
+    document.getElementById('clone-count').textContent = `${list.length} site${list.length>1?'s':''} à cloner`;
+
+    if (!list.length) {
+      grid.innerHTML = `<div class="empty-state-big" style="grid-column:1/-1"><div class="icon">🎯</div><div>Aucun site avec score ≥ 7.5</div><div style="margin-top:8px;font-size:.85rem">Relancez le pipeline pour découvrir de nouveaux sites</div></div>`;
+      return;
+    }
+
+    grid.innerHTML = list.map(b => {
+      const ca = caMonth(b);
+      const traffic = b.traffic_monthly || b.traffic || 0;
+      const score = +(b.score || 0);
+      const kws = (b.keywords || []).slice(0, 3).map(k => k.keyword).filter(Boolean);
+      return `<div class="clone-card">
+        <div>
+          <div class="clone-domain">${esc(b.domain)}</div>
+          ${scoreBar(score)}
+        </div>
+
+        <div style="display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--surface2);border-radius:var(--radius);border-left:3px solid ${clonability(b).color}">
+          <span style="font-size:.75rem;font-weight:700;color:${clonability(b).color}">⚡ ${clonability(b).label}</span>
+        </div>
+
+        <a href="https://${esc(b.domain)}" target="_blank" rel="noopener" class="clone-visit-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          Voir le site → ${esc(b.domain)}
+        </a>
+
+        <div class="clone-meta">
+          <div class="clone-stat">
+            <div class="clone-stat-val">${score.toFixed(1)}/10</div>
+            <div class="clone-stat-label">Score V35</div>
+          </div>
+          <div class="clone-stat clone-stat-ca">
+            <div class="clone-stat-val">${ca ? fmtEur(ca) : '—'}</div>
+            <div class="clone-stat-label">CA/mois est.</div>
+          </div>
+          <div class="clone-stat">
+            <div class="clone-stat-val">${traffic ? fmt(traffic) : '—'}</div>
+            <div class="clone-stat-label">Visites/mois</div>
+          </div>
+          <div class="clone-stat">
+            <div class="clone-stat-val">${b.cpc ? b.cpc.toFixed(2)+'€' : '—'}</div>
+            <div class="clone-stat-label">CPC moy.</div>
+          </div>
+        </div>
+
+        <div class="clone-badge-row">
+          <span class="badge badge-info">${esc(b.type || '—')}</span>
+          <span class="badge badge-success">${esc(b.niche || '—')}</span>
+          <span class="badge badge-warn">score ${score.toFixed(1)}</span>
+          ${b.reg_year ? `<span class="badge" style="background:var(--surface2);color:var(--muted)">📅 ${b.reg_year} (${b.domain_age_years}a)</span>` : ''}
+        </div>
+
+        ${kws.length ? `<div class="clone-kw">Mots-clés : <span>${kws.map(esc).join(' · ')}</span></div>` : ''}
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <a href="/boutique.html?id=${esc(b.id)}" class="btn btn-sm" style="flex:1;text-align:center">Fiche</a>
+          <button class="btn btn-sm btn-danger" onclick="delBoutique('${esc(b.id)}','${esc(b.domain)}')" style="flex:0">✕ Supprimer</button>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('clone-grid').innerHTML = `<div class="empty-state-big" style="grid-column:1/-1"><div>Erreur chargement</div></div>`;
+    console.error(e);
+  }
+}
+
+window.delBoutique = async function(id, domain) {
+  if (!confirm(`Supprimer "${domain}" de toutes les pages ?`)) return;
+  try {
+    const { apiDelete, toast } = await import('/assets/platform.js');
+    await apiDelete('/boutiques/' + id);
+    toast(`${domain} supprimé`, 'success');
+    load();
+  } catch(e) {
+    const { toast } = await import('/assets/platform.js');
+    toast(e.message, 'error');
+  }
+};
+
+load();
+loadAlerts();
+</script>
+</body>
+</html>

@@ -176,7 +176,10 @@ async function refresh() {
       const pct = { pending:0, scraped:30, orchestrating:60, done:100, error:0 }[b.importStatus] || 0;
       const col = b.importStatus==='done'?'#22c55e':b.importStatus==='error'?'#ef4444':'#6366f1';
       return `<tr>
-        <td><a href="/boutique.html?id=${b.id}" class="link">${b.domain}</a></td>
+        <td>
+          <a href="https://${b.domain}" target="_blank" rel="noopener" class="link">${b.domain}</a>
+          <a href="/boutique.html?id=${b.id}" class="text-muted text-sm" title="Fiche interne" style="margin-left:4px">↗</a>
+        </td>
         <td>${b.niche||'—'}</td>
         <td>${badge(b.importStatus)}</td>
         <td>

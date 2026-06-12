@@ -21,11 +21,11 @@
 
       <!-- KPIs -->
       <div class="kpi-grid" id="kpis">
-        <div class="kpi-card skeleton-loading"><div class="kpi-value">—</div><div class="kpi-label">Boutiques</div></div>
+        <a href="/boutiques.html" class="kpi-card skeleton-loading" style="display:block;text-decoration:none"><div class="kpi-value">—</div><div class="kpi-label">Boutiques</div></a>
+        <a href="/cloner.html" class="kpi-card skeleton-loading kpi-highlight" style="display:block;text-decoration:none"><div class="kpi-value">—</div><div class="kpi-label">🚀 À cloner</div></a>
         <div class="kpi-card skeleton-loading"><div class="kpi-value">—</div><div class="kpi-label">Sites live</div></div>
         <div class="kpi-card skeleton-loading"><div class="kpi-value">—</div><div class="kpi-label">Jobs contenu</div></div>
         <div class="kpi-card skeleton-loading"><div class="kpi-value">—</div><div class="kpi-label">Domaines trouvés</div></div>
-        <div class="kpi-card skeleton-loading"><div class="kpi-value">—</div><div class="kpi-label">Sites/mois</div></div>
         <div class="kpi-card skeleton-loading"><div class="kpi-value">—</div><div class="kpi-label">Workers actifs</div></div>
       </div>
 
@@ -46,9 +46,9 @@
             </div>
           </div>
           <div class="velocity-stats">
-            <div><span class="text-muted">Ce mois</span><strong id="vel-month">0</strong></div>
-            <div><span class="text-muted">Total</span><strong id="vel-total">0</strong></div>
-            <div><span class="text-muted">Taux</span><strong id="vel-rate">0%</strong></div>
+            <div><span class="text-muted">Boutiques ce mois</span><strong id="vel-month">0</strong></div>
+            <div><span class="text-muted">Sites créés</span><strong id="vel-total">0</strong></div>
+            <div><span class="text-muted">Objectif</span><strong id="vel-rate">0%</strong></div>
           </div>
         </div>
 
@@ -107,25 +107,26 @@ async function loadStats() {
     const d = await apiGet('/stats');
     const ks = document.querySelectorAll('.kpi-card');
     const vals = [
-      [d.boutiques, 'Boutiques'],
+      [d.boutiques, 'Boutiques pipeline'],
+      [d.boutiques_winners, '🚀 À cloner'],
       [d.sites_live, 'Sites live'],
       [d.jobs_total, 'Jobs contenu'],
       [d.domaines, 'Domaines trouvés'],
-      [d.velocity, 'Sites/mois'],
       ['—', 'Workers actifs'],
     ];
     ks.forEach((k,i)=>{
       k.classList.remove('skeleton-loading');
       k.querySelector('.kpi-value').textContent = fmt(vals[i][0]);
-      k.querySelector('.kpi-label').textContent = vals[i][1];
+      // labels already set in HTML for linked cards — only update non-linked cards
+      if (!k.tagName || k.tagName !== 'A') k.querySelector('.kpi-label').textContent = vals[i][1];
     });
-    // Velocity ring
+    // Velocity ring = sites clonés (production réelle, pas pipeline)
     const v = d.velocity || 0;
     const pct = Math.min(v/200, 1);
     document.getElementById('vel-arc').style.strokeDashoffset = 314 - (314*pct);
     document.getElementById('vel-val').textContent = v;
     document.getElementById('vel-month').textContent = d.boutiques_this_month || 0;
-    document.getElementById('vel-total').textContent = fmt(d.boutiques);
+    document.getElementById('vel-total').textContent = fmt(d.sites_total);
     document.getElementById('vel-rate').textContent = Math.round(pct*100)+'%';
     if (pct >= 1) document.getElementById('vel-arc').style.stroke = '#22c55e';
     else if (pct >= 0.5) document.getElementById('vel-arc').style.stroke = '#f59e0b';
@@ -138,7 +139,10 @@ async function loadBoutiques() {
     const tb = document.getElementById('boutiques-tbody');
     if (!d.list?.length) { tb.innerHTML='<tr><td colspan="7" class="text-center text-muted">Aucune boutique</td></tr>'; return; }
     tb.innerHTML = d.list.map(b=>`<tr>
-      <td><a href="/boutique.html?id=${b.id}" class="link">${b.domain}</a></td>
+      <td>
+        <a href="https://${b.domain}" target="_blank" rel="noopener" class="link">${b.domain}</a>
+        <a href="/boutique.html?id=${b.id}" class="text-muted text-sm" title="Fiche interne" style="margin-left:4px">↗</a>
+      </td>
       <td><span class="badge badge-info">${b.type||'shopify'}</span></td>
       <td>${b.niche||'—'}</td>
       <td>${fmt(b.collections)}</td>
