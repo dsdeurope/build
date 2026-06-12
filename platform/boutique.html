@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Boutique</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span><a href="/boutiques.html" class="text-muted">Boutiques</a> / <span id="topbar-title">…</span></span>
+      <div class="topbar-right">
+        <button class="btn btn-sm" id="btn-scrape" onclick="scrape()">🔍 Scraper</button>
+        <button class="btn btn-sm btn-primary" id="btn-orch" onclick="openModal('modal-orch')">⚡ Orchestrer</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <!-- Info strip -->
+      <div class="info-strip" id="info-strip">
+        <div class="info-item"><div class="info-label">Domaine</div><div class="info-val" id="i-domain">—</div></div>
+        <div class="info-item"><div class="info-label">Type</div><div class="info-val" id="i-type">—</div></div>
+        <div class="info-item"><div class="info-label">Niche</div><div class="info-val" id="i-niche">—</div></div>
+        <div class="info-item"><div class="info-label">Statut</div><div class="info-val" id="i-status">—</div></div>
+        <div class="info-item"><div class="info-label">Collections</div><div class="info-val" id="i-col">—</div></div>
+        <div class="info-item"><div class="info-label">Produits</div><div class="info-val" id="i-prod">—</div></div>
+        <div class="info-item"><div class="info-label">Trafic</div><div class="info-val" id="i-traffic">—</div></div>
+        <div class="info-item"><div class="info-label">Créé</div><div class="info-val" id="i-date">—</div></div>
+      </div>
+
+      <!-- Tabs -->
+      <div class="tabs-bar">
+        <button class="tab-btn active" onclick="showTab('infos',this)">Infos</button>
+        <button class="tab-btn" onclick="showTab('catalogue',this)">Catalogue <span class="badge badge-info" id="tab-col-count"></span></button>
+        <button class="tab-btn" onclick="showTab('jobs-ai',this)">Transcriptions IA <span class="badge badge-info" id="tab-jobs-ai-count"></span></button>
+        <button class="tab-btn" onclick="showTab('jobs-trad',this)">Traductions <span class="badge badge-info" id="tab-jobs-trad-count"></span></button>
+        <button class="tab-btn" onclick="showTab('keywords',this)">Keywords <span class="badge badge-info" id="tab-kw-count"></span></button>
+        <button class="tab-btn" onclick="showTab('sites',this)">Boutiques créées <span class="badge badge-info" id="tab-sites-count"></span></button>
+      </div>
+
+      <!-- Tab: Infos -->
+      <div class="tab-panel active" id="tab-infos">
+        <div class="panel">
+          <div class="panel-header">Informations générales</div>
+          <div class="form-grid">
+            <div>
+              <label class="form-label">Domaine</label>
+              <input id="edit-domain" class="form-input">
+            </div>
+            <div>
+              <label class="form-label">Niche</label>
+              <input id="edit-niche" class="form-input">
+            </div>
+            <div>
+              <label class="form-label">Type</label>
+              <select id="edit-type" class="form-input">
+                <option>shopify</option><option>woocommerce</option><option>prestashop</option><option>autre</option>
+              </select>
+            </div>
+            <div>
+              <label class="form-label">Trafic mensuel</label>
+              <input id="edit-traffic" class="form-input" type="number">
+            </div>
+            <div class="col-span-2">
+              <label class="form-label">Commentaire</label>
+              <textarea id="edit-comment" class="form-input" rows="3"></textarea>
+            </div>
+          </div>
+          <div style="margin-top:16px">
+            <button class="btn btn-primary" onclick="saveInfo()">Enregistrer</button>
+          </div>
+        </div>
+        <div class="panel" id="blueprint-panel" style="display:none">
+          <div class="panel-header">Blueprint scrapé</div>
+          <pre id="blueprint-json" class="code-pre"></pre>
+        </div>
+      </div>
+
+      <!-- Tab: Catalogue -->
+      <div class="tab-panel" id="tab-catalogue">
+        <div class="panel">
+          <div class="panel-header">Collections scrapées</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Handle</th><th>Titre</th><th>Produits</th><th>URL source</th></tr></thead>
+              <tbody id="col-tbody"><tr><td colspan="5" class="text-center text-muted">Aucune collection</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Transcriptions IA -->
+      <div class="tab-panel" id="tab-jobs-ai">
+        <div class="panel">
+          <div class="panel-header">Jobs de contenu IA</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Type</th><th>Langue</th><th>Site</th><th>Statut</th><th>Score</th><th>Date</th></tr></thead>
+              <tbody id="jobs-ai-tbody"><tr><td colspan="6" class="text-center text-muted">Aucun job</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Traductions -->
+      <div class="tab-panel" id="tab-jobs-trad">
+        <div class="panel">
+          <div class="panel-header">Jobs de traduction</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Type</th><th>Langue</th><th>Pays</th><th>Statut</th><th>Score</th><th>Date</th></tr></thead>
+              <tbody id="jobs-trad-tbody"><tr><td colspan="6" class="text-center text-muted">Aucun job</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Keywords -->
+      <div class="tab-panel" id="tab-keywords">
+        <div class="panel">
+          <div class="panel-header">Mots-clés cibles</div>
+          <div id="keywords-list" class="chip-list"></div>
+          <div style="margin-top:16px;display:flex;gap:8px">
+            <input id="kw-input" class="form-input" placeholder="Ajouter un mot-clé…" onkeydown="if(event.key==='Enter')addKw()">
+            <button class="btn btn-primary" onclick="addKw()">Ajouter</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab: Sites créés -->
+      <div class="tab-panel" id="tab-sites">
+        <div class="panel">
+          <div class="panel-header">Sites générés</div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>Domaine</th><th>Langues</th><th>Pages</th><th>Statut</th><th>Créé</th><th>Lien</th></tr></thead>
+              <tbody id="sites-tbody"><tr><td colspan="6" class="text-center text-muted">Aucun site généré</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Orchestrate modal -->
+<div class="modal" id="modal-orch">
+  <div class="modal-box">
+    <div class="modal-header"><span>⚡ Lancer l'orchestration</span><button class="modal-close" onclick="closeModal('modal-orch')">✕</button></div>
+    <div class="modal-body">
+      <label class="form-label">Domaine cible *</label>
+      <input id="orch-target" class="form-input" placeholder="monsite.fr">
+      <label class="form-label">Langues</label>
+      <div class="chip-list" id="orch-langs">
+        <label class="chip-check"><input type="checkbox" value="fr" checked> fr</label>
+        <label class="chip-check"><input type="checkbox" value="de" checked> de</label>
+        <label class="chip-check"><input type="checkbox" value="es" checked> es</label>
+        <label class="chip-check"><input type="checkbox" value="it"> it</label>
+        <label class="chip-check"><input type="checkbox" value="en"> en</label>
+        <label class="chip-check"><input type="checkbox" value="nl"> nl</label>
+        <label class="chip-check"><input type="checkbox" value="pt"> pt</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-orch')">Annuler</button>
+      <button class="btn btn-primary" onclick="orchestrate()">Lancer</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, apiGet, apiPost, apiPut, fmt, fmtDate, badge, toast, openModal, closeModal } from '/assets/platform.js';
+checkAuth(); buildNav();
+window.openModal = openModal; window.closeModal = closeModal;
+
+const id = new URLSearchParams(location.search).get('id');
+let _b = null;
+
+async function load() {
+  try {
+    const d = await apiGet('/boutiques/'+id);
+    _b = d.boutique;
+    document.getElementById('topbar-title').textContent = _b.domain;
+    document.title = `V35 — ${_b.domain}`;
+    document.getElementById('i-domain').textContent = _b.domain;
+    document.getElementById('i-type').innerHTML = `<span class="badge badge-info">${_b.type||'shopify'}</span>`;
+    document.getElementById('i-niche').textContent = _b.niche||'—';
+    document.getElementById('i-status').innerHTML = badge(_b.importStatus);
+    document.getElementById('i-col').textContent = fmt(_b.collections);
+    document.getElementById('i-prod').textContent = fmt(_b.products);
+    document.getElementById('i-traffic').textContent = fmt(_b.traffic);
+    document.getElementById('i-date').textContent = fmtDate(_b.createdAt);
+    // Edit form
+    document.getElementById('edit-domain').value = _b.domain||'';
+    document.getElementById('edit-niche').value = _b.niche||'';
+    document.getElementById('edit-type').value = _b.type||'shopify';
+    document.getElementById('edit-traffic').value = _b.traffic||0;
+    document.getElementById('edit-comment').value = _b.comment||'';
+    // Blueprint
+    if (_b.blueprint) {
+      document.getElementById('blueprint-panel').style.display='';
+      document.getElementById('blueprint-json').textContent = JSON.stringify(_b.blueprint, null, 2);
+    }
+    // Catalogue
+    const cols = _b.blueprint?.collections||[];
+    document.getElementById('tab-col-count').textContent = cols.length;
+    document.getElementById('col-tbody').innerHTML = cols.length
+      ? cols.map((c,i)=>`<tr>
+          <td>${i+1}</td>
+          <td><code>${c.handle||'—'}</code></td>
+          <td>${c.title||'—'}</td>
+          <td>${c.products||0}</td>
+          <td>${c.url?`<a href="${c.url}" target="_blank" class="link">${c.url.slice(0,50)}</a>`:'—'}</td>
+        </tr>`).join('')
+      : '<tr><td colspan="5" class="text-center text-muted">Scraper la boutique pour voir les collections</td></tr>';
+    // Keywords
+    const kws = _b.keywords||[];
+    document.getElementById('tab-kw-count').textContent = kws.length;
+    renderKws(kws);
+    // Sites
+    const sites = _b.sites||[];
+    document.getElementById('tab-sites-count').textContent = sites.length;
+    // Jobs count placeholder
+    document.getElementById('tab-jobs-ai-count').textContent = '0';
+    document.getElementById('tab-jobs-trad-count').textContent = '0';
+  } catch(e) { toast(e.message,'error'); }
+}
+
+function renderKws(kws) {
+  document.getElementById('keywords-list').innerHTML = kws.map((k,i)=>`
+    <span class="chip">${k}<button onclick="removeKw(${i})">✕</button></span>`).join('');
+}
+
+window.addKw = async function() {
+  const v = document.getElementById('kw-input').value.trim();
+  if (!v || !_b) return;
+  const kws = [...(_b.keywords||[]), v];
+  try {
+    await apiPut('/boutiques/'+id, { keywords: kws });
+    _b.keywords = kws;
+    document.getElementById('kw-input').value = '';
+    document.getElementById('tab-kw-count').textContent = kws.length;
+    renderKws(kws);
+  } catch(e) { toast(e.message,'error'); }
+};
+
+window.removeKw = async function(i) {
+  const kws = (_b.keywords||[]).filter((_,j)=>j!==i);
+  try {
+    await apiPut('/boutiques/'+id, { keywords: kws });
+    _b.keywords = kws;
+    document.getElementById('tab-kw-count').textContent = kws.length;
+    renderKws(kws);
+  } catch(e) { toast(e.message,'error'); }
+};
+
+window.saveInfo = async function() {
+  try {
+    await apiPut('/boutiques/'+id, {
+      domain: document.getElementById('edit-domain').value,
+      niche: document.getElementById('edit-niche').value,
+      type: document.getElementById('edit-type').value,
+      traffic: +document.getElementById('edit-traffic').value||0,
+      comment: document.getElementById('edit-comment').value,
+    });
+    toast('Enregistré','success');
+    load();
+  } catch(e) { toast(e.message,'error'); }
+};
+
+window.scrape = async function() {
+  document.getElementById('btn-scrape').disabled = true;
+  document.getElementById('btn-scrape').textContent = '⏳ Scraping…';
+  try {
+    const d = await apiPost('/boutiques/'+id+'/scrape', {});
+    toast(`${d.collections} collections scrapées`,'success');
+    load();
+  } catch(e) { toast(e.message,'error'); }
+  finally {
+    document.getElementById('btn-scrape').disabled = false;
+    document.getElementById('btn-scrape').textContent = '🔍 Scraper';
+  }
+};
+
+window.orchestrate = async function() {
+  const target = document.getElementById('orch-target').value.trim();
+  if (!target) return toast('Domaine cible requis','error');
+  const langs = [...document.querySelectorAll('#orch-langs input:checked')].map(c=>c.value);
+  closeModal('modal-orch');
+  toast('Pipeline lancé…','info');
+  try {
+    const d = await apiPost('/boutiques/'+id+'/orchestrate', { targetDomain: target, languages: langs });
+    toast('Orchestration démarrée: '+d.jobId,'success');
+    load();
+  } catch(e) { toast(e.message,'error'); }
+};
+
+window.showTab = function(name, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-'+name)?.classList.add('active');
+};
+
+load();
+</script>
+</body>
+</html>

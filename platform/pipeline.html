@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Pipeline</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Pipeline temps réel</span>
+      <div class="topbar-right">
+        <span class="badge badge-info" id="poll-badge">● Live</span>
+        <span class="text-muted text-sm" id="last-refresh"></span>
+        <button class="btn btn-primary" onclick="openModal('modal-wizard')">⚡ Nouveau pipeline</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <div class="kpi-grid-sm">
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-today">—</div><div class="kpi-label">Jobs aujourd'hui</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value text-blue" id="k-running">—</div><div class="kpi-label">En cours</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value text-green" id="k-done">—</div><div class="kpi-label">Terminés</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-pending">—</div><div class="kpi-label">En attente</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-rate">—</div><div class="kpi-label">Taux de succès</div></div>
+      </div>
+
+      <!-- Running boutiques -->
+      <div class="panel">
+        <div class="panel-header">Pipelines actifs <span class="badge badge-info" id="running-count">0</span></div>
+        <div id="running-list" class="activity-list">
+          <div class="empty-state">Aucun pipeline actif</div>
+        </div>
+      </div>
+
+      <!-- Orchestrateur jobs -->
+      <div class="panel">
+        <div class="panel-header">Jobs orchestrateur <span class="text-muted text-sm" id="orch-jobs-info"></span></div>
+        <div id="orch-jobs-list" class="pipeline-jobs-grid">
+          <div class="empty-state">Chargement…</div>
+        </div>
+      </div>
+
+      <!-- Recent boutiques progress -->
+      <div class="panel">
+        <div class="panel-header">Dernières boutiques — progression</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Domaine</th><th>Niche</th><th>Statut</th><th>Étape</th><th>Mise à jour</th><th>Actions</th></tr></thead>
+            <tbody id="boutiques-pipeline-tb"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Wizard modal -->
+<div class="modal" id="modal-wizard">
+  <div class="modal-box">
+    <div class="modal-header">
+      <span>⚡ Nouveau pipeline — Étape <span id="wiz-step">1</span>/3</span>
+      <button class="modal-close" onclick="closeModal('modal-wizard')">✕</button>
+    </div>
+    <div class="modal-body">
+      <!-- Step 1 -->
+      <div id="wiz-1">
+        <label class="form-label">Domaine source (boutique à copier) *</label>
+        <input id="wiz-src" class="form-input" placeholder="boutique-source.com">
+        <label class="form-label">Niche</label>
+        <select id="wiz-niche" class="form-input">
+          <option value="">— auto —</option>
+          <option>lingerie</option><option>bijoux</option><option>beaute</option><option>mode</option>
+          <option>sport</option><option>maison</option><option>electronique</option><option>animaux</option>
+          <option>cuisine</option><option>auto</option><option>luxe</option>
+        </select>
+      </div>
+      <!-- Step 2 -->
+      <div id="wiz-2" style="display:none">
+        <label class="form-label">Domaine cible *</label>
+        <input id="wiz-tgt" class="form-input" placeholder="mon-nouveau-site.fr">
+        <label class="form-label">Langues</label>
+        <div class="chip-list">
+          <label class="chip-check"><input type="checkbox" value="fr" checked> fr</label>
+          <label class="chip-check"><input type="checkbox" value="de" checked> de</label>
+          <label class="chip-check"><input type="checkbox" value="es" checked> es</label>
+          <label class="chip-check"><input type="checkbox" value="it"> it</label>
+          <label class="chip-check"><input type="checkbox" value="en"> en</label>
+          <label class="chip-check"><input type="checkbox" value="nl"> nl</label>
+          <label class="chip-check"><input type="checkbox" value="pt"> pt</label>
+        </div>
+        <label class="form-label" style="margin-top:12px">Options</label>
+        <label class="chip-check"><input type="checkbox" id="wiz-aged" checked> Rechercher domaine ancien</label>
+        <label class="chip-check" style="margin-top:6px"><input type="checkbox" id="wiz-img" checked> Collecter images</label>
+      </div>
+      <!-- Step 3 -->
+      <div id="wiz-3" style="display:none">
+        <div style="background:var(--surface2);border-radius:8px;padding:16px;margin-bottom:12px">
+          <div class="form-label">Récapitulatif</div>
+          <div id="wiz-recap" style="font-size:13px;line-height:2"></div>
+        </div>
+        <p class="text-muted text-sm">Le pipeline va : scraper la boutique source → générer le squelette PHP → chercher un domaine ancien → créer les jobs de contenu IA → configurer i18n.</p>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" id="wiz-back" onclick="wizStep(-1)" style="display:none">‹ Retour</button>
+      <button class="btn" onclick="closeModal('modal-wizard')">Annuler</button>
+      <button class="btn btn-primary" id="wiz-next" onclick="wizStep(1)">Suivant ›</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.pipeline-jobs-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;padding:16px 20px}
+.pjob-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px}
+.pjob-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.pjob-domain{font-size:13px;font-weight:700}
+.pjob-steps{display:flex;gap:4px;flex-wrap:wrap;margin-top:8px}
+.pstep{padding:3px 8px;border-radius:4px;font-size:10px;font-weight:600;text-transform:uppercase}
+.pstep-done{background:rgba(34,197,94,.15);color:#22c55e}
+.pstep-run{background:rgba(245,158,11,.15);color:#f59e0b;animation:pulse-step 1.5s ease-in-out infinite}
+.pstep-pending{background:var(--surface);color:var(--muted)}
+.pstep-error{background:rgba(239,68,68,.15);color:#ef4444}
+@keyframes pulse-step{0%,100%{opacity:1}50%{opacity:.5}}
+</style>
+
+<script type="module">
+import { checkAuth, buildNav, apiGet, apiPost, fmt, fmtDate, badge, toast, openModal, closeModal } from '/assets/platform.js';
+checkAuth(); buildNav();
+window.openModal = openModal; window.closeModal = closeModal;
+
+const ORCH = 'https://v35-orchestrateur.ernestpedanou.workers.dev';
+const STEPS = ['scrape','images','aged_domain','content_jobs','i18n','skeleton'];
+const STEP_LABELS = { scrape:'Scrape', images:'Images', aged_domain:'Aged Domain', content_jobs:'Content AI', i18n:'i18n', skeleton:'Skeleton' };
+
+let _wizStep = 1;
+
+async function refresh() {
+  try {
+    // Pipeline status from API
+    const [status, boutiques] = await Promise.all([
+      apiGet('/pipeline/status'),
+      apiGet('/boutiques', { per:15 }),
+    ]);
+    document.getElementById('k-today').textContent = status.jobs_today || 0;
+    document.getElementById('k-running').textContent = status.jobs_running || 0;
+    document.getElementById('k-done').textContent = status.jobs_done || 0;
+    document.getElementById('k-pending').textContent = status.jobs_pending || 0;
+    document.getElementById('k-rate').textContent = (status.success_rate || 0) + '%';
+    document.getElementById('last-refresh').textContent = new Date().toLocaleTimeString('fr-FR');
+
+    // Running boutiques
+    const running = status.running_boutiques || [];
+    document.getElementById('running-count').textContent = running.length;
+    const runList = document.getElementById('running-list');
+    if (!running.length) {
+      runList.innerHTML = '<div class="empty-state">Aucun pipeline actif</div>';
+    } else {
+      runList.innerHTML = running.map(b=>`
+        <div class="activity-item">
+          <span class="activity-icon text-blue">◕</span>
+          <div class="activity-body">
+            <div class="activity-title">${b.domain}</div>
+            <div class="activity-sub">${b.status} · ${fmtDate(b.updatedAt)}</div>
+          </div>
+          <a href="/boutique.html?id=${b.id}" class="btn btn-sm">→</a>
+        </div>`).join('');
+    }
+
+    // Boutiques pipeline table
+    const list = boutiques.list || [];
+    document.getElementById('boutiques-pipeline-tb').innerHTML = list.map(b=>{
+      const pct = { pending:0, scraped:30, orchestrating:60, done:100, error:0 }[b.importStatus] || 0;
+      const col = b.importStatus==='done'?'#22c55e':b.importStatus==='error'?'#ef4444':'#6366f1';
+      return `<tr>
+        <td><a href="/boutique.html?id=${b.id}" class="link">${b.domain}</a></td>
+        <td>${b.niche||'—'}</td>
+        <td>${badge(b.importStatus)}</td>
+        <td>
+          <div style="width:120px;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden">
+            <div style="width:${pct}%;height:100%;background:${col};border-radius:3px;transition:width .5s"></div>
+          </div>
+        </td>
+        <td class="text-muted text-sm">${fmtDate(b.updatedAt)}</td>
+        <td><a href="/boutique.html?id=${b.id}" class="btn btn-sm">Voir</a></td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="6" class="text-center text-muted">Aucune boutique</td></tr>';
+
+  } catch(e) { console.error(e); }
+
+  // Orchestrateur jobs
+  try {
+    const r = await fetch(ORCH+'/jobs', { signal:AbortSignal.timeout(5000) });
+    const d = await r.json();
+    const jobs = d.jobs || [];
+    document.getElementById('orch-jobs-info').textContent = `(${jobs.length} jobs)`;
+    const grid = document.getElementById('orch-jobs-list');
+    if (!jobs.length) { grid.innerHTML='<div class="empty-state">Aucun job orchestrateur</div>'; return; }
+    grid.innerHTML = jobs.slice(0,12).map(j=>{
+      const steps = j.steps || [];
+      return `<div class="pjob-card">
+        <div class="pjob-header">
+          <div class="pjob-domain">${j.sourceDomain||j.jobId}</div>
+          ${badge(j.status)}
+        </div>
+        <div class="text-muted text-xs" style="margin-bottom:8px">${j.targetDomain||''}</div>
+        <div class="pjob-steps">
+          ${STEPS.map(s=>{
+            const st = steps.find(x=>x.name===s);
+            const cls = !st?'pstep-pending':st.status==='done'?'pstep-done':st.status==='running'?'pstep-run':st.status==='error'?'pstep-error':'pstep-pending';
+            return `<span class="pstep ${cls}">${STEP_LABELS[s]}</span>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }).join('');
+  } catch {}
+}
+
+// Wizard
+window.wizStep = function(dir) {
+  _wizStep += dir;
+  if (_wizStep < 1) _wizStep = 1;
+  if (_wizStep > 3) { runPipeline(); return; }
+  [1,2,3].forEach(i=>document.getElementById('wiz-'+i).style.display=i===_wizStep?'':'none');
+  document.getElementById('wiz-step').textContent = _wizStep;
+  document.getElementById('wiz-back').style.display = _wizStep>1?'':'none';
+  document.getElementById('wiz-next').textContent = _wizStep===3 ? '🚀 Lancer' : 'Suivant ›';
+  if (_wizStep===3) {
+    const src = document.getElementById('wiz-src').value;
+    const tgt = document.getElementById('wiz-tgt').value;
+    const niche = document.getElementById('wiz-niche').value;
+    const langs = [...document.querySelectorAll('#modal-wizard .chip-check input:checked')].map(c=>c.value);
+    document.getElementById('wiz-recap').innerHTML = `
+      <div>Source : <strong>${src}</strong></div>
+      <div>Cible : <strong>${tgt||'non défini'}</strong></div>
+      <div>Niche : <strong>${niche||'auto'}</strong></div>
+      <div>Langues : <strong>${langs.join(', ')}</strong></div>
+      <div>Domaine ancien : <strong>${document.getElementById('wiz-aged').checked?'Oui':'Non'}</strong></div>
+    `;
+  }
+};
+
+async function runPipeline() {
+  const src = document.getElementById('wiz-src').value.trim();
+  const tgt = document.getElementById('wiz-tgt').value.trim();
+  if (!src||!tgt) return toast('Domaines source et cible requis','error');
+  const langs = [...document.querySelectorAll('#modal-wizard .chip-check input:checked')].map(c=>c.value);
+  const niche = document.getElementById('wiz-niche').value;
+  closeModal('modal-wizard');
+  toast('Pipeline lancé…','info');
+  try {
+    await apiPost('/pipeline/run', { sourceDomain:src, targetDomain:tgt, niche, languages:langs });
+    toast('Pipeline démarré !','success');
+    refresh();
+  } catch(e) { toast(e.message,'error'); }
+  _wizStep=1;
+  [1,2,3].forEach(i=>document.getElementById('wiz-'+i).style.display=i===1?'':'none');
+}
+
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>

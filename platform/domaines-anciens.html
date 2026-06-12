@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Domaines Anciens</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Domaines Anciens</span>
+      <div class="topbar-right">
+        <button class="btn btn-primary" onclick="runSearch()">🔍 Lancer la recherche</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <!-- Search panel -->
+      <div class="panel">
+        <div class="panel-header">Paramètres de recherche</div>
+        <div class="form-grid">
+          <div>
+            <label class="form-label">Niche</label>
+            <select id="s-niche" class="form-input">
+              <option value="">— Toutes —</option>
+              <option>lingerie</option><option>bijoux</option><option>beaute</option><option>mode</option>
+              <option>sport</option><option>maison</option><option>electronique</option><option>animaux</option>
+              <option>cuisine</option><option>jardinage</option><option>voyages</option><option>sante</option>
+              <option>librairie</option><option>musique</option><option>art</option><option>auto</option><option>luxe</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">TLDs</label>
+            <div class="chip-list">
+              <label class="chip-check"><input type="checkbox" value=".fr" checked> .fr</label>
+              <label class="chip-check"><input type="checkbox" value=".com" checked> .com</label>
+              <label class="chip-check"><input type="checkbox" value=".net"> .net</label>
+              <label class="chip-check"><input type="checkbox" value=".be"> .be</label>
+              <label class="chip-check"><input type="checkbox" value=".ch"> .ch</label>
+            </div>
+          </div>
+          <div>
+            <label class="form-label">Âge minimum (jours)</label>
+            <input id="s-age" class="form-input" type="number" value="365">
+          </div>
+          <div>
+            <label class="form-label">Résultats max</label>
+            <input id="s-max" class="form-input" type="number" value="20">
+          </div>
+        </div>
+        <div id="search-progress" style="display:none;margin-top:12px">
+          <div class="progress-bar"><div class="progress-fill" id="prog-fill" style="width:0%"></div></div>
+          <div class="text-muted text-sm" id="prog-label">Recherche en cours…</div>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="panel">
+        <div class="panel-header">
+          Résultats <span class="text-muted" id="res-count"></span>
+          <button class="btn btn-sm" id="btn-save-all" style="display:none" onclick="saveAll()">💾 Tout enregistrer</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Domaine</th><th>TLD</th><th>Âge (jours)</th><th>1ère apparition</th>
+              <th>Disponible</th><th>Source</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="res-tbody"><tr><td colspan="7" class="text-center text-muted">Lancez une recherche pour voir les résultats</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Saved aged domains -->
+      <div class="panel">
+        <div class="panel-header">Domaines anciens enregistrés <span class="text-muted" id="saved-count"></span></div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Domaine</th><th>Niche</th><th>Âge</th><th>Statut</th><th>Enregistré le</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="saved-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, apiGet, apiPost, fmt, fmtDate, badge, toast } from '/assets/platform.js';
+checkAuth(); buildNav();
+
+const AGED_WORKER = 'https://v35-aged-domain-finder.ernestpedanou.workers.dev';
+let _results = [];
+
+window.runSearch = async function() {
+  const niche = document.getElementById('s-niche').value;
+  const tlds = [...document.querySelectorAll('.chip-check input:checked')].map(c=>c.value);
+  const minAge = +document.getElementById('s-age').value||365;
+  const maxRes = +document.getElementById('s-max').value||20;
+  if (!tlds.length) return toast('Sélectionnez au moins un TLD','error');
+
+  document.getElementById('search-progress').style.display='';
+  document.getElementById('prog-fill').style.width='30%';
+  document.getElementById('prog-label').textContent = 'Requête Wayback CDX…';
+
+  try {
+    const url = AGED_WORKER + (niche ? `?niche=${niche}&tlds=${tlds.join(',')}&minAge=${minAge}&max=${maxRes}` : `?tlds=${tlds.join(',')}&minAge=${minAge}&max=${maxRes}`);
+    const r = await fetch(url, { signal: AbortSignal.timeout(55000) });
+    const d = await r.json();
+    document.getElementById('prog-fill').style.width='100%';
+    document.getElementById('prog-label').textContent = `${d.found||0} domaines trouvés`;
+    _results = d.domains || [];
+    renderResults(_results);
+    document.getElementById('btn-save-all').style.display = _results.length ? '' : 'none';
+  } catch(e) {
+    toast('Erreur: '+e.message,'error');
+  } finally {
+    setTimeout(()=>document.getElementById('search-progress').style.display='none', 3000);
+  }
+};
+
+function renderResults(list) {
+  document.getElementById('res-count').textContent = `(${list.length})`;
+  const tb = document.getElementById('res-tbody');
+  if (!list.length) { tb.innerHTML='<tr><td colspan="7" class="text-center text-muted">Aucun résultat</td></tr>'; return; }
+  tb.innerHTML = list.map((d,i)=>`<tr>
+    <td><strong>${d.domain}</strong></td>
+    <td>.${d.domain.split('.').pop()}</td>
+    <td>${d.ageDays||'—'}</td>
+    <td>${d.firstSeen ? new Date(d.firstSeen).toLocaleDateString('fr-FR') : '—'}</td>
+    <td>${d.available
+      ? '<span class="badge badge-success">✓ Disponible</span>'
+      : '<span class="badge badge-warn">Non vérifié</span>'}</td>
+    <td class="text-sm text-muted">${d.source||'Wayback'}</td>
+    <td class="actions">
+      <button class="btn btn-sm btn-primary" onclick="saveDomain(${i})">💾 Sauver</button>
+      <a href="https://who.is/whois/${d.domain}" target="_blank" class="btn btn-sm">Whois</a>
+    </td>
+  </tr>`).join('');
+}
+
+window.saveDomain = async function(i) {
+  const d = _results[i];
+  const niche = document.getElementById('s-niche').value;
+  try {
+    await apiPost('/domaines', {
+      domain: d.domain,
+      niche,
+      status: d.available ? 'available' : 'pending',
+      aged: true,
+      ageDays: d.ageDays,
+      firstSeen: d.firstSeen,
+      source: 'wayback-cdx',
+    });
+    toast(d.domain+' enregistré','success');
+    loadSaved();
+  } catch(e) { toast(e.message,'error'); }
+};
+
+window.saveAll = async function() {
+  const niche = document.getElementById('s-niche').value;
+  let saved = 0;
+  for (const d of _results) {
+    try {
+      await apiPost('/domaines', {
+        domain: d.domain, niche,
+        status: d.available ? 'available' : 'pending',
+        aged: true, ageDays: d.ageDays, firstSeen: d.firstSeen, source: 'wayback-cdx',
+      });
+      saved++;
+    } catch {}
+  }
+  toast(`${saved} domaines enregistrés`,'success');
+  loadSaved();
+};
+
+async function loadSaved() {
+  try {
+    const d = await apiGet('/domaines', { status: 'available' });
+    const aged = d.list.filter(x=>x.aged);
+    document.getElementById('saved-count').textContent = `(${aged.length})`;
+    const tb = document.getElementById('saved-tbody');
+    if (!aged.length) { tb.innerHTML='<tr><td colspan="6" class="text-center text-muted">Aucun domaine ancien enregistré</td></tr>'; return; }
+    tb.innerHTML = aged.map(x=>`<tr>
+      <td><strong>${x.domain}</strong></td>
+      <td>${x.niche||'—'}</td>
+      <td>${x.ageDays ? x.ageDays+'j' : '—'}</td>
+      <td>${badge(x.status)}</td>
+      <td>${fmtDate(x.createdAt)}</td>
+      <td><a href="https://web.archive.org/web/*/${x.domain}" target="_blank" class="btn btn-sm">Archive</a></td>
+    </tr>`).join('');
+  } catch {}
+}
+
+loadSaved();
+</script>
+</body>
+</html>

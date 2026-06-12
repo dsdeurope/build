@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Dashboard</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Dashboard</span>
+      <div class="topbar-right">
+        <span id="clock" class="text-muted"></span>
+        <span class="badge badge-success" id="health-badge">●&nbsp;Système OK</span>
+      </div>
+    </header>
+    <div class="content">
+
+      <!-- KPIs -->
+      <div class="kpi-grid" id="kpis">
+        <div class="kpi-card skeleton-loading"><div class="kpi-value">—</div><div class="kpi-label">Boutiques</div></div>
+        <div class="kpi-card skeleton-loading"><div class="kpi-value">—</div><div class="kpi-label">Sites live</div></div>
+        <div class="kpi-card skeleton-loading"><div class="kpi-value">—</div><div class="kpi-label">Jobs contenu</div></div>
+        <div class="kpi-card skeleton-loading"><div class="kpi-value">—</div><div class="kpi-label">Domaines trouvés</div></div>
+        <div class="kpi-card skeleton-loading"><div class="kpi-value">—</div><div class="kpi-label">Sites/mois</div></div>
+        <div class="kpi-card skeleton-loading"><div class="kpi-value">—</div><div class="kpi-label">Workers actifs</div></div>
+      </div>
+
+      <div class="grid-2col">
+        <!-- Velocity ring -->
+        <div class="panel">
+          <div class="panel-header">Vélocité mensuelle <span class="badge badge-info" id="vel-target">objectif: 200</span></div>
+          <div class="velocity-wrap">
+            <svg class="velocity-ring" viewBox="0 0 120 120">
+              <circle cx="60" cy="60" r="50" fill="none" stroke="#1e2a3a" stroke-width="12"/>
+              <circle id="vel-arc" cx="60" cy="60" r="50" fill="none" stroke="#6366f1" stroke-width="12"
+                stroke-dasharray="314" stroke-dashoffset="314" stroke-linecap="round"
+                transform="rotate(-90 60 60)" style="transition:stroke-dashoffset 1s ease"/>
+            </svg>
+            <div class="velocity-center">
+              <div class="velocity-val" id="vel-val">0</div>
+              <div class="velocity-sub">/ 200 sites</div>
+            </div>
+          </div>
+          <div class="velocity-stats">
+            <div><span class="text-muted">Ce mois</span><strong id="vel-month">0</strong></div>
+            <div><span class="text-muted">Total</span><strong id="vel-total">0</strong></div>
+            <div><span class="text-muted">Taux</span><strong id="vel-rate">0%</strong></div>
+          </div>
+        </div>
+
+        <!-- Recent pipeline activity -->
+        <div class="panel">
+          <div class="panel-header">Activité récente</div>
+          <div id="activity-list" class="activity-list">
+            <div class="empty-state">Chargement…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent boutiques -->
+      <div class="panel">
+        <div class="panel-header">
+          Dernières boutiques
+          <a href="/boutiques.html" class="btn btn-sm">Voir tout →</a>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr>
+              <th>Domaine</th><th>Type</th><th>Niche</th>
+              <th>Collections</th><th>Produits</th><th>Statut</th><th>Date</th>
+            </tr></thead>
+            <tbody id="boutiques-tbody"><tr><td colspan="7" class="text-center text-muted">Chargement…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Worker health strip -->
+      <div class="panel">
+        <div class="panel-header">
+          Workers <span class="text-muted" id="workers-status"></span>
+          <a href="/monitoring.html" class="btn btn-sm">Monitoring complet →</a>
+        </div>
+        <div class="worker-grid" id="workers-grid">
+          <div class="empty-state">Chargement…</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, buildTopbar, apiGet, fmt, fmtDate, badge } from '/assets/platform.js';
+checkAuth(); buildNav(); buildTopbar('Dashboard');
+
+// Clock
+setInterval(()=>{
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('fr-FR');
+},1000);
+
+async function loadStats() {
+  try {
+    const d = await apiGet('/stats');
+    const ks = document.querySelectorAll('.kpi-card');
+    const vals = [
+      [d.boutiques, 'Boutiques'],
+      [d.sites_live, 'Sites live'],
+      [d.jobs_total, 'Jobs contenu'],
+      [d.domaines, 'Domaines trouvés'],
+      [d.velocity, 'Sites/mois'],
+      ['—', 'Workers actifs'],
+    ];
+    ks.forEach((k,i)=>{
+      k.classList.remove('skeleton-loading');
+      k.querySelector('.kpi-value').textContent = fmt(vals[i][0]);
+      k.querySelector('.kpi-label').textContent = vals[i][1];
+    });
+    // Velocity ring
+    const v = d.velocity || 0;
+    const pct = Math.min(v/200, 1);
+    document.getElementById('vel-arc').style.strokeDashoffset = 314 - (314*pct);
+    document.getElementById('vel-val').textContent = v;
+    document.getElementById('vel-month').textContent = d.boutiques_this_month || 0;
+    document.getElementById('vel-total').textContent = fmt(d.boutiques);
+    document.getElementById('vel-rate').textContent = Math.round(pct*100)+'%';
+    if (pct >= 1) document.getElementById('vel-arc').style.stroke = '#22c55e';
+    else if (pct >= 0.5) document.getElementById('vel-arc').style.stroke = '#f59e0b';
+  } catch(e) { console.error(e); }
+}
+
+async function loadBoutiques() {
+  try {
+    const d = await apiGet('/boutiques', { per: 8 });
+    const tb = document.getElementById('boutiques-tbody');
+    if (!d.list?.length) { tb.innerHTML='<tr><td colspan="7" class="text-center text-muted">Aucune boutique</td></tr>'; return; }
+    tb.innerHTML = d.list.map(b=>`<tr>
+      <td><a href="/boutique.html?id=${b.id}" class="link">${b.domain}</a></td>
+      <td><span class="badge badge-info">${b.type||'shopify'}</span></td>
+      <td>${b.niche||'—'}</td>
+      <td>${fmt(b.collections)}</td>
+      <td>${fmt(b.products)}</td>
+      <td>${badge(b.importStatus)}</td>
+      <td>${fmtDate(b.createdAt)}</td>
+    </tr>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function loadActivity() {
+  try {
+    const d = await apiGet('/boutiques', { per: 10 });
+    const el = document.getElementById('activity-list');
+    if (!d.list?.length) { el.innerHTML='<div class="empty-state">Aucune activité</div>'; return; }
+    const icons = { pending:'○', running:'◌', scraped:'◑', orchestrating:'◕', done:'●', error:'✕' };
+    el.innerHTML = d.list.map(b=>`<div class="activity-item">
+      <span class="activity-icon ${b.importStatus==='done'?'text-green':b.importStatus==='error'?'text-red':'text-blue'}">${icons[b.importStatus]||'○'}</span>
+      <div class="activity-body">
+        <div class="activity-title">${b.domain}</div>
+        <div class="activity-sub">${b.niche||'—'} · ${fmtDate(b.updatedAt)}</div>
+      </div>
+      <span class="badge badge-sm ${b.importStatus==='done'?'badge-success':b.importStatus==='error'?'badge-err':'badge-info'}">${b.importStatus}</span>
+    </div>`).join('');
+  } catch(e) {}
+}
+
+async function loadMonitoring() {
+  try {
+    const d = await apiGet('/monitoring');
+    document.getElementById('workers-status').textContent = `${d.up}/${d.total} opérationnels`;
+    document.getElementById('workers-grid').innerHTML = d.workers.map(w=>`
+      <div class="worker-card ${w.status==='up'?'worker-up':'worker-down'}">
+        <div class="worker-name">${w.name}</div>
+        <div class="worker-latency">${w.latency||'—'}ms</div>
+        <div class="worker-dot"></div>
+      </div>`).join('');
+    const up = d.workers.filter(w=>w.status==='up').length;
+    const pct = Math.round(up/d.total*100);
+    const hb = document.getElementById('health-badge');
+    if (pct===100) { hb.textContent='● Système OK'; hb.className='badge badge-success'; }
+    else if (pct>=70) { hb.textContent=`⚠ ${pct}% opérationnel`; hb.className='badge badge-warn'; }
+    else { hb.textContent=`✕ Dégradé (${pct}%)`; hb.className='badge badge-err'; }
+    // Update KPI workers
+    const ks = document.querySelectorAll('.kpi-card');
+    ks[5].querySelector('.kpi-value').textContent = `${up}/${d.total}`;
+    ks[5].classList.remove('skeleton-loading');
+  } catch(e) {}
+}
+
+loadStats(); loadBoutiques(); loadActivity(); loadMonitoring();
+setInterval(loadMonitoring, 30000);
+</script>
+</body>
+</html>

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Footprints</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Footprints</span>
+      <div class="topbar-right">
+        <button class="btn btn-sm" onclick="openModal('modal-csv')">⬆ Import CSV</button>
+        <button class="btn btn-primary" onclick="openModal('modal-add')">+ Ajouter</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <div class="kpi-grid-sm">
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-total">—</div><div class="kpi-label">Total footprints</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-scraped">—</div><div class="kpi-label">Scrapés</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-orch">—</div><div class="kpi-label">En orchestration</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-done">—</div><div class="kpi-label">Terminés</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value" id="k-traffic">—</div><div class="kpi-label">Trafic total</div></div>
+      </div>
+
+      <div class="filters-bar">
+        <input type="search" id="q" placeholder="Rechercher domaine…" oninput="load(1)" class="filter-input">
+        <select id="f-type" onchange="load(1)" class="filter-select">
+          <option value="">Tous types</option>
+          <option>shopify</option><option>woocommerce</option><option>prestashop</option><option>autre</option>
+        </select>
+        <select id="f-niche" onchange="load(1)" class="filter-select">
+          <option value="">Toutes niches</option>
+          <option>lingerie</option><option>bijoux</option><option>beaute</option><option>mode</option>
+          <option>sport</option><option>maison</option><option>electronique</option><option>animaux</option>
+          <option>cuisine</option><option>jardinage</option><option>voyages</option><option>sante</option>
+          <option>auto</option><option>luxe</option>
+        </select>
+        <select id="f-status" onchange="load(1)" class="filter-select">
+          <option value="">Tous statuts</option>
+          <option>pending</option><option>scraped</option><option>orchestrating</option><option>done</option><option>error</option>
+        </select>
+        <select id="f-sort" onchange="load(1)" class="filter-select">
+          <option value="">Tri: récent</option>
+          <option value="traffic">Tri: trafic ↓</option>
+        </select>
+        <span class="text-muted" id="total-label"></span>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Domaine</th><th>Type</th><th>Niche</th><th>Trafic</th>
+            <th>Collections</th><th>Produits</th><th>Statut</th><th>Commentaire</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="pagination"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Add modal -->
+<div class="modal" id="modal-add">
+  <div class="modal-box">
+    <div class="modal-header"><span>Nouveau footprint</span><button class="modal-close" onclick="closeModal('modal-add')">✕</button></div>
+    <div class="modal-body">
+      <label class="form-label">Domaine *</label><input id="a-domain" class="form-input" placeholder="example.com">
+      <label class="form-label">Type</label>
+      <select id="a-type" class="form-input"><option>shopify</option><option>woocommerce</option><option>prestashop</option><option>autre</option></select>
+      <label class="form-label">Niche</label><input id="a-niche" class="form-input" placeholder="lingerie, mode…">
+      <label class="form-label">Trafic mensuel estimé</label><input id="a-traffic" class="form-input" type="number" placeholder="0">
+      <label class="form-label">Commentaire</label><textarea id="a-comment" class="form-input" rows="2"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add')">Annuler</button>
+      <button class="btn btn-primary" onclick="addFootprint()">Ajouter</button>
+    </div>
+  </div>
+</div>
+
+<!-- CSV import modal -->
+<div class="modal" id="modal-csv">
+  <div class="modal-box modal-lg">
+    <div class="modal-header"><span>⬆ Import CSV</span><button class="modal-close" onclick="closeModal('modal-csv')">✕</button></div>
+    <div class="modal-body">
+      <p class="text-muted text-sm">Format attendu : <code>domaine,type,niche,trafic,commentaire</code> (une ligne par domaine, sans en-tête)</p>
+      <textarea id="csv-input" class="form-input" rows="12" style="margin-top:12px;font-family:monospace;font-size:12px" placeholder="example.com,shopify,lingerie,50000,Top performer&#10;store2.com,woocommerce,bijoux,30000,"></textarea>
+      <div id="csv-preview" style="margin-top:10px"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-csv')">Annuler</button>
+      <button class="btn btn-sm" onclick="previewCsv()">Aperçu</button>
+      <button class="btn btn-primary" onclick="importCsv()">Importer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Orchestrate modal -->
+<div class="modal" id="modal-orch">
+  <div class="modal-box">
+    <div class="modal-header"><span>⚡ Orchestrer</span><button class="modal-close" onclick="closeModal('modal-orch')">✕</button></div>
+    <div class="modal-body">
+      <div id="orch-domain-label" class="text-muted text-sm" style="margin-bottom:12px"></div>
+      <label class="form-label">Domaine cible *</label><input id="orch-target" class="form-input" placeholder="monsite.fr">
+      <label class="form-label">Langues</label>
+      <div class="chip-list">
+        <label class="chip-check"><input type="checkbox" value="fr" checked> fr</label>
+        <label class="chip-check"><input type="checkbox" value="de" checked> de</label>
+        <label class="chip-check"><input type="checkbox" value="es" checked> es</label>
+        <label class="chip-check"><input type="checkbox" value="it"> it</label>
+        <label class="chip-check"><input type="checkbox" value="en"> en</label>
+        <label class="chip-check"><input type="checkbox" value="nl"> nl</label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-orch')">Annuler</button>
+      <button class="btn btn-primary" onclick="orchestrate()">Lancer</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, apiGet, apiPost, apiDelete, fmt, fmtDate, badge, toast, openModal, closeModal, paginationHtml } from '/assets/platform.js';
+checkAuth(); buildNav();
+window.openModal = openModal; window.closeModal = closeModal;
+let _page = 1, _orchId = null;
+
+async function load(p = _page) {
+  _page = p;
+  const params = { page:p, per:30 };
+  const q=document.getElementById('q').value; if(q) params.q=q;
+  const t=document.getElementById('f-type').value; if(t) params.type=t;
+  const n=document.getElementById('f-niche').value; if(n) params.niche=n;
+  const s=document.getElementById('f-status').value; if(s) params.status=s;
+  const so=document.getElementById('f-sort').value; if(so) params.sort=so;
+  try {
+    const d = await apiGet('/footprints', params);
+    document.getElementById('total-label').textContent = `${d.total} footprints`;
+    const list = d.list || [];
+    document.getElementById('k-total').textContent = d.total;
+    document.getElementById('k-scraped').textContent = list.filter(b=>b.importStatus==='scraped').length;
+    document.getElementById('k-orch').textContent = list.filter(b=>b.importStatus==='orchestrating').length;
+    document.getElementById('k-done').textContent = list.filter(b=>b.importStatus==='done').length;
+    document.getElementById('k-traffic').textContent = fmt(list.reduce((s,b)=>s+(b.traffic||0),0));
+    const tb = document.getElementById('tbody');
+    if (!list.length) { tb.innerHTML='<tr><td colspan="9" class="text-center text-muted">Aucun footprint</td></tr>'; return; }
+    tb.innerHTML = list.map(b=>`<tr>
+      <td><a href="/boutique.html?id=${b.id}" class="link">${b.domain}</a></td>
+      <td><span class="badge badge-info">${b.type||'shopify'}</span></td>
+      <td>${b.niche||'—'}</td>
+      <td>${fmt(b.traffic)}</td>
+      <td>${fmt(b.collections)}</td>
+      <td>${fmt(b.products)}</td>
+      <td>${badge(b.importStatus)}</td>
+      <td class="text-muted text-sm">${(b.comment||'').slice(0,30)||'—'}</td>
+      <td class="actions">
+        <button class="btn btn-sm" onclick="scrape('${b.id}',this)">🔍</button>
+        <button class="btn btn-sm btn-primary" onclick="openOrch('${b.id}','${b.domain}')">⚡</button>
+        <button class="btn btn-sm btn-danger" onclick="del('${b.id}','${b.domain}')">✕</button>
+      </td>
+    </tr>`).join('');
+    document.getElementById('pagination').innerHTML = paginationHtml(p, d.pages, 'window._load');
+    window._load = load;
+  } catch(e) { toast(e.message,'error'); }
+}
+
+window.scrape = async function(id, btn) {
+  btn.disabled=true; btn.textContent='⏳';
+  try {
+    const d = await apiPost('/boutiques/'+id+'/scrape', {});
+    toast(`${d.collections} collections scrapées`,'success'); load(_page);
+  } catch(e) { toast(e.message,'error'); }
+  finally { btn.disabled=false; btn.textContent='🔍'; }
+};
+
+window.openOrch = function(id, domain) {
+  _orchId = id;
+  document.getElementById('orch-domain-label').textContent = 'Source: '+domain;
+  openModal('modal-orch');
+};
+
+window.orchestrate = async function() {
+  const target = document.getElementById('orch-target').value.trim();
+  if (!target) return toast('Domaine cible requis','error');
+  const langs = [...document.querySelectorAll('#modal-orch .chip-check input:checked')].map(c=>c.value);
+  closeModal('modal-orch');
+  toast('Pipeline lancé…','info');
+  try {
+    await apiPost('/boutiques/'+_orchId+'/orchestrate', { targetDomain:target, languages:langs });
+    toast('Orchestration démarrée','success'); load(_page);
+  } catch(e) { toast(e.message,'error'); }
+};
+
+window.addFootprint = async function() {
+  const domain = document.getElementById('a-domain').value.trim();
+  if (!domain) return toast('Domaine requis','error');
+  try {
+    await apiPost('/footprints', {
+      domain, type:document.getElementById('a-type').value,
+      niche:document.getElementById('a-niche').value,
+      traffic:+document.getElementById('a-traffic').value||0,
+      comment:document.getElementById('a-comment').value,
+    });
+    closeModal('modal-add'); toast('Footprint ajouté','success'); load(1);
+  } catch(e) { toast(e.message,'error'); }
+};
+
+window.del = async function(id, domain) {
+  if (!confirm(`Supprimer ${domain} ?`)) return;
+  try { await apiDelete('/boutiques/'+id); toast('Supprimé','success'); load(_page); }
+  catch(e) { toast(e.message,'error'); }
+};
+
+function parseCsv(raw) {
+  return raw.trim().split('\n').map(line => {
+    const [domain='',type='shopify',niche='',traffic='0',comment=''] = line.split(',').map(s=>s.trim());
+    return { domain, type:type||'shopify', niche, traffic:+traffic||0, comment };
+  }).filter(r=>r.domain);
+}
+
+window.previewCsv = function() {
+  const rows = parseCsv(document.getElementById('csv-input').value);
+  document.getElementById('csv-preview').innerHTML = rows.length
+    ? `<div class="badge badge-info">${rows.length} lignes détectées</div> ${rows.slice(0,3).map(r=>`<span class="chip-sm">${r.domain}</span>`).join('')}${rows.length>3?` +${rows.length-3}`:''}`
+    : '<div class="badge badge-err">Aucune ligne valide</div>';
+};
+
+window.importCsv = async function() {
+  const rows = parseCsv(document.getElementById('csv-input').value);
+  if (!rows.length) return toast('Aucune ligne valide','error');
+  try {
+    const d = await apiPost('/import/csv', { rows });
+    closeModal('modal-csv');
+    toast(`${d.created} importés, ${d.skipped} doublons ignorés`,'success');
+    load(1);
+  } catch(e) { toast(e.message,'error'); }
+};
+
+window.load = load;
+load(1);
+</script>
+</body>
+</html>

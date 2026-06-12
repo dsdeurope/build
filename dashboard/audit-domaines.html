@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>V35 — Audit Domaines</title>
+  <style>
+    :root{--bg:#0d0d0d;--surface:#111520;--border:#1e2535;--green:#00ff88;--yellow:#ffd700;--orange:#ff8c00;--red:#ff4444;--blue:#4488ff;--text:#e2e8f0;--muted:#64748b;}
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:14px;}
+    header{position:sticky;top:0;z-index:100;display:flex;align-items:center;gap:1rem;padding:.8rem 2rem;background:rgba(13,13,13,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);}
+    .logo{font-weight:700;color:var(--text);}.logo span{color:var(--orange);}
+    nav a{color:var(--muted);text-decoration:none;font-size:.85rem;margin-left:1.5rem;transition:color .2s;}
+    nav a:hover,nav a.active{color:var(--text);}
+    .btn{padding:.4rem 1rem;border:none;border-radius:6px;cursor:pointer;font-size:.8rem;font-weight:600;transition:opacity .2s;}.btn:hover{opacity:.85;}
+    .btn-refresh{background:var(--surface);border:1px solid var(--border);color:var(--text);margin-left:auto;}
+    .cards{display:flex;gap:1rem;padding:1.5rem 2rem;flex-wrap:wrap;}
+    .card{flex:1;min-width:190px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:1rem 1.4rem;}
+    .card-icon{font-size:1.3rem;margin-bottom:.3rem;}.card-n{font-size:1.7rem;font-weight:700;}
+    .card-l{font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-top:2px;}
+    .card.p{border-color:rgba(0,255,136,.2);}.card.p .card-n{color:var(--green);}
+    .card.a{border-color:rgba(255,140,0,.25);}.card.a .card-n{color:var(--orange);}
+    .section{margin:0 2rem 2rem;}
+    .section-header{display:flex;align-items:center;gap:.8rem;padding:.8rem 0;border-bottom:2px solid var(--border);}
+    .section-title{font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;}
+    .sc-cnt{font-size:.75rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:2px 10px;color:var(--muted);}
+    .sc-srch{margin-left:auto;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:.3rem .7rem;border-radius:6px;font-size:.8rem;width:200px;}
+    .t-prosp .section-title{color:var(--green);}.t-prosp .section-title::before{content:'📊 ';}
+    .t-acq .section-title{color:var(--orange);}.t-acq .section-title::before{content:'🏷️ ';}
+    .table-wrap{overflow-x:auto;border:1px solid var(--border);border-top:none;border-radius:0 0 8px 8px;margin-bottom:2rem;}
+    table{width:100%;border-collapse:collapse;}
+    thead th{padding:.55rem .9rem;text-align:left;font-size:.65rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);background:rgba(30,37,53,.5);border-bottom:1px solid var(--border);white-space:nowrap;}
+    tbody td{padding:.6rem .9rem;border-bottom:1px solid #0f131a;vertical-align:middle;}
+    tbody tr:last-child td{border-bottom:none;}tbody tr:hover td{background:#0a0d14;}
+    .diode{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:.65rem;font-weight:700;white-space:nowrap;}
+    .diode::before{content:'';width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+    .d-orange{background:rgba(255,140,0,.12);color:var(--orange);border:1px solid rgba(255,140,0,.4);}.d-orange::before{background:var(--orange);animation:blink 1s infinite;}
+    .d-yellow{background:rgba(255,215,0,.1);color:var(--yellow);border:1px solid rgba(255,215,0,.3);}.d-yellow::before{background:var(--yellow);}
+    .d-green{background:rgba(0,255,136,.08);color:var(--green);border:1px solid rgba(0,255,136,.25);}.d-green::before{background:var(--green);}
+    .d-grey{background:rgba(100,116,139,.1);color:var(--muted);border:1px solid rgba(100,116,139,.2);}.d-grey::before{background:var(--muted);}
+    @keyframes blink{0%,100%{opacity:1;}50%{opacity:.2;}}
+    .avail-badge{display:inline-block;padding:2px 8px;border-radius:8px;font-size:.65rem;font-weight:600;}
+    .av-actif{background:rgba(0,255,136,.08);color:var(--green);border:1px solid rgba(0,255,136,.2);}
+    .av-disponible{background:rgba(255,140,0,.1);color:var(--orange);border:1px solid rgba(255,140,0,.3);}
+    .av-parke{background:rgba(255,215,0,.1);color:var(--yellow);border:1px solid rgba(255,215,0,.25);}
+    .av-expire{background:rgba(255,68,68,.1);color:var(--red);border:1px solid rgba(255,68,68,.25);}
+    .av-other{background:rgba(100,116,139,.1);color:var(--muted);border:1px solid rgba(100,116,139,.2);}
+    .btn-sm{padding:2px 8px;border-radius:5px;font-size:.68rem;font-weight:600;cursor:pointer;border:1px solid transparent;transition:all .2s;white-space:nowrap;}
+    .btn-seq{border-color:rgba(168,85,247,.4);background:rgba(168,85,247,.1);color:#a855f7;}.btn-seq:hover,.btn-seq.running{background:rgba(168,85,247,.25);}
+    .btn-seq.running{opacity:.6;cursor:not-allowed;}
+    .btn-scrape{border-color:rgba(251,191,36,.5);background:rgba(251,191,36,.1);color:#fbbf24;}.btn-scrape:hover{background:rgba(251,191,36,.2);}
+    .btn-scrape:disabled{opacity:.35;cursor:not-allowed;filter:grayscale(.8);}
+    .btn-check{border-color:rgba(68,136,255,.4);background:rgba(68,136,255,.1);color:var(--blue);}.btn-check:hover{background:rgba(68,136,255,.2);}
+    .btn-buy{border-color:rgba(0,255,136,.4);background:rgba(0,255,136,.08);color:var(--green);}.btn-buy:hover{background:rgba(0,255,136,.15);}
+    .btn-detect{border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.07);color:#fbbf24;font-size:.65rem;}
+    .btn-edit{background:none;border:none;cursor:pointer;color:var(--muted);font-size:.78rem;padding:0 2px;transition:color .2s;}.btn-edit:hover{color:var(--text);}
+    .ca-val{font-size:.77rem;color:var(--green);font-weight:600;}
+    .comp-easy{color:var(--green);font-weight:700;font-size:.77rem;}
+    .comp-med{color:var(--yellow);font-weight:700;font-size:.77rem;}
+    .comp-hard{color:var(--red);font-weight:700;font-size:.77rem;}
+    .alt-row{display:flex;align-items:center;gap:3px;margin-bottom:3px;}
+    .alt-row:last-child{margin-bottom:0;}
+    .alt-d{font-size:.68rem;color:var(--muted);font-family:'Courier New',monospace;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+    .domain-link{color:var(--text);text-decoration:none;font-weight:600;font-size:.82rem;}.domain-link:hover{color:var(--blue);}
+    .fp-score{font-size:.78rem;}.fp-hi{color:var(--orange);}.fp-med{color:var(--yellow);}.fp-lo{color:var(--muted);}
+    .wb{font-size:.73rem;color:var(--muted);}.wb.ok{color:var(--green);}
+    .empty,.loading{text-align:center;padding:3rem 2rem;color:var(--muted);font-size:.85rem;}
+    .spinner{display:inline-block;width:15px;height:15px;border:2px solid var(--border);border-top-color:var(--blue);border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-right:.4rem;}
+    @keyframes spin{to{transform:rotate(360deg);}}
+    .toast{position:fixed;bottom:1.5rem;right:1.5rem;background:#1e2535;border:1px solid var(--border);border-radius:8px;padding:.7rem 1.2rem;font-size:.82rem;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999;max-width:280px;}
+    .toast.show{opacity:1;}
+    .sc-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:1000;display:none;align-items:center;justify-content:center;}
+    .sc-overlay.open{display:flex;}
+    .sc-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:min(680px,95vw);max-height:85vh;overflow-y:auto;}
+    .sc-head{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.5rem;border-bottom:1px solid var(--border);font-size:.95rem;font-weight:700;}
+    .sc-body{padding:1.5rem;}
+    .sc-stat{display:flex;gap:1rem;margin-bottom:1.2rem;flex-wrap:wrap;}
+    .sc-card{flex:1;min-width:120px;background:#0d0d0d;border:1px solid var(--border);border-radius:8px;padding:.8rem 1rem;}
+    .sc-card-n{font-size:1.6rem;font-weight:700;}.sc-card-l{font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:2px;}
+    .sc-list{list-style:none;display:flex;flex-direction:column;gap:3px;max-height:200px;overflow-y:auto;margin-bottom:.5rem;}
+    .sc-list li{padding:.35rem .7rem;background:#0d0d0d;border-radius:6px;font-size:.75rem;display:flex;align-items:center;gap:.5rem;}
+    .sc-idx{width:20px;font-size:.63rem;color:var(--muted);text-align:right;flex-shrink:0;}
+    .sc-path{margin-left:auto;font-size:.63rem;color:var(--muted);font-family:'Courier New',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;}
+    .sc-actions{display:flex;gap:.8rem;margin-top:1.2rem;padding-top:1rem;border-top:1px solid var(--border);flex-wrap:wrap;}
+    .btn-dl{padding:.45rem 1.1rem;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;border:1px solid rgba(68,136,255,.5);background:rgba(68,136,255,.15);color:var(--blue);}.btn-deploy{padding:.45rem 1.1rem;border-radius:8px;font-size:.8rem;font-weight:700;cursor:pointer;border:1px solid rgba(0,255,136,.5);background:rgba(0,255,136,.15);color:var(--green);}
+  </style>
+</head>
+<body>
+<header>
+  <a href="/" class="logo">Zenith<span>lab</span></a>
+  <nav>
+    <a href="/">Dashboard</a><a href="/domaines.html">Domaines</a>
+    <a href="/audit-domaines.html" class="active">Audit</a><a href="/spots.html">Spots</a><a href="/calendrier.html">Calendrier</a>
+  </nav>
+  <button class="btn btn-refresh" onclick="load()">↻ Actualiser</button>
+</header>
+<div class="cards">
+  <div class="card p"><div class="card-icon">📊</div><div class="card-n" id="cntProsp">—</div><div class="card-l">Sites leaders</div></div>
+  <div class="card a"><div class="card-icon">🏷️</div><div class="card-n" id="cntAcq">—</div><div class="card-l">À acquérir</div></div>
+  <div class="card" style="border-color:rgba(255,68,68,.2)"><div class="card-icon">🟠</div><div class="card-n" id="cntAlert" style="color:var(--orange)">—</div><div class="card-l">Alertes achat</div></div>
+  <div class="card" style="border-color:rgba(0,255,136,.2)"><div class="card-icon">📈</div><div class="card-n" id="cntCA" style="color:var(--green);font-size:1.2rem">—</div><div class="card-l">CA Estimé / mois *</div></div>
+</div>
+<div id="nfBar" style="padding:.5rem 2rem;display:flex;gap:.4rem;flex-wrap:wrap;border-bottom:1px solid var(--border)"></div>
+<div style="border-bottom:1px solid var(--border);">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:.55rem 2rem .3rem;">
+    <span style="font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)">📅 Calendrier Backlinks</span>
+    <a href="/calendrier.html" style="font-size:.72rem;color:var(--green);text-decoration:none;font-weight:600;">Voir tout →</a>
+  </div>
+  <div style="display:flex;gap:1rem;padding:.3rem 2rem .7rem;align-items:center;flex-wrap:wrap;">
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap" id="auditCalCards"></div>
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:1px;background:var(--border);border-radius:6px;overflow:hidden;min-width:260px;margin-left:auto" id="auditCalWeek"></div>
+  </div>
+</div>
+<div class="section t-prosp">
+  <div class="section-header">
+    <span class="section-title">Sites Leaders (Prospection)</span>
+    <span class="sc-cnt" id="countProsp">0</span>
+    <input class="sc-srch" type="text" placeholder="Filtrer…" oninput="filterTable('prosp',this.value)">
+  </div>
+  <div class="table-wrap"><table>
+    <thead><tr>
+      <th>Domaine</th><th>Niches</th><th>Diode</th><th>FP</th>
+      <th>Score</th><th>WB</th><th>CA / mois</th><th>Compétition</th><th>Actions</th>
+    </tr></thead>
+    <tbody id="tbodyProsp"><tr><td colspan="9" class="loading"><span class="spinner"></span>Chargement…</td></tr></tbody>
+  </table></div>
+</div>
+<p style="font-size:.63rem;color:var(--muted);padding:.2rem 1rem .8rem;font-style:italic">* CA = trafic estimé × taux de conversion × panier moyen. Estimation heuristique — non contractuel. ↑ = signal Wayback actif.</p>
+<div class="section t-acq">
+  <div class="section-header">
+    <span class="section-title">Domaines à Acquérir</span>
+    <span class="sc-cnt" id="countAcq">0</span>
+    <input class="sc-srch" type="text" placeholder="Filtrer…" oninput="filterTable('acq',this.value)">
+  </div>
+  <div class="table-wrap"><table>
+    <thead><tr>
+      <th>Domaine</th><th>Niches</th><th>Disponibilité</th><th>Diode</th>
+      <th>Score</th><th>WB</th><th>Actions</th>
+    </tr></thead>
+    <tbody id="tbodyAcq"><tr><td colspan="7" class="loading"><span class="spinner"></span>Chargement…</td></tr></tbody>
+  </table></div>
+</div>
+<div id="scModal" class="sc-overlay" onclick="closeSc()">
+  <div class="sc-box" onclick="event.stopPropagation()">
+    <div class="sc-head">
+      <span>⚙ Configuration du Scraping : <span id="scDomain" style="color:var(--blue)"></span></span>
+      <button onclick="closeSc()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:1.4rem;padding:0">×</button>
+    </div>
+    <div id="scBody" class="sc-body"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+if(sessionStorage.getItem('v35_auth')!=='c0e1ef644e74252419e56e7818885cbeaf7bd35bec04b0dfda954678e4f16354')location.replace('/login.html?r='+encodeURIComponent(location.pathname));
+const API_HUNTER='https://v35-domain-hunter.ernestpedanou.workers.dev';
+const API_SEQ='https://v35-sequenceur.ernestpedanou.workers.dev';
+const API_FACTORY='https://v35-site-factory.ernestpedanou.workers.dev';
+const API_SKELETON='https://v35-skeleton-builder.ernestpedanou.workers.dev';
+const REGISTRAR='https://www.ovh.com/fr/domaines/?domain=';
+let allProsp=[],allAcq=[],nicheF=null;
+// ── Niche data ──
+const NM={'Lingerie':{CR:.028,AOV:58},'Mode Femme':{CR:.022,AOV:72},'Mode Homme':{CR:.018,AOV:85},
+  'Luminaires':{CR:.015,AOV:145},'Décoration':{CR:.014,AOV:110},'Beauté':{CR:.025,AOV:48},
+  'Bien-être':{CR:.020,AOV:62},'Sport':{CR:.020,AOV:95},'Bijoux':{CR:.018,AOV:120},
+  'Bagagerie':{CR:.016,AOV:95},'Maroquinerie':{CR:.015,AOV:130},'Accessoires':{CR:.020,AOV:58},
+  'High-Tech':{CR:.014,AOV:210},'Enfants':{CR:.022,AOV:65},'Alimentaire':{CR:.030,AOV:38},
+  'Animaux':{CR:.025,AOV:42},'Voyage':{CR:.015,AOV:155},'Auto':{CR:.012,AOV:180},
+  'default':{CR:.018,AOV:50}};
+const NK={'Lingerie':['lingerie','dessous','soutien','culotte','bra'],
+  'Mode Femme':['robe','femme','mode','fashion','vetements'],'Mode Homme':['homme','men','menswear','costume'],
+  'Luminaires':['lampe','lumiere','luminaire','eclairage'],'Décoration':['deco','decoration','maison','meuble','canape'],
+  'Beauté':['beaute','soin','cosmetique','parfum','serum'],'Bien-être':['bienetre','zen','yoga','relaxation','sophrologie'],
+  'Sport':['sport','trail','bike','velo','fitness','running'],'Bijoux':['bijou','bague','collier','bracelet'],
+  'Bagagerie':['bagage','sac','valise','cabai','trolley','backpack'],'Maroquinerie':['cuir','maroquin','portefeuille','ceinture'],
+  'Accessoires':['accessoire','chapeau','echarpe','gant','lunettes'],'High-Tech':['tech','electronique','gaming','smartphone'],
+  'Enfants':['enfant','bebe','kids','jouet'],'Alimentaire':['food','epicerie','biscuit','cafe','bio'],
+  'Animaux':['animal','chien','chat','pet'],'Voyage':['voyage','travel','camping','trek'],
+  'Auto':['auto','moto','voiture','pieces','tuning']};
+const NC={'Lingerie':'#f472b6','Mode Femme':'#c084fc','Mode Homme':'#818cf8','Luminaires':'#fbbf24',
+  'Décoration':'#fb923c','Beauté':'#f43f5e','Bien-être':'#2dd4bf','Sport':'#34d399',
+  'Bijoux':'#a78bfa','Bagagerie':'#60a5fa','Maroquinerie':'#a16207','Accessoires':'#e879f9',
+  'High-Tech':'#38bdf8','Enfants':'#4ade80','Alimentaire':'#84cc16','Animaux':'#f97316',
+  'Voyage':'#06b6d4','Auto':'#94a3b8'};
+const GROUPS={Fashion:['Lingerie','Mode Femme','Mode Homme','Accessoires','Bijoux','Bagagerie','Maroquinerie'],Home:['Décoration','Luminaires'],Health:['Beauté','Bien-être','Sport','Thermique'],Family:['Enfants'],Nature:['Alimentaire','Animaux','Voyage'],Tech:['High-Tech','Auto']};
+function groupOf(n){for(const[g,ns]of Object.entries(GROUPS))if(ns.includes(n))return g;return null;}
+function norm(s){return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^a-z]/g,' ');}
+function detectNiches(domain){
+  const parts=norm(domain.replace(/\.(fr|com|net|org|eu|io)$/,'')).split(/[-_. ]+/);
+  const sc={};
+  for(const[n,ws]of Object.entries(NK))for(const p of parts)for(const w of ws){
+    if(!p||p.length<2)continue;
+    if(p===w)sc[n]=(sc[n]||0)+3;
+    else if(p.length>=3&&(p.includes(w)||w.includes(p)&&w.length>=4))sc[n]=(sc[n]||0)+1;
+  }
+  const sorted=Object.entries(sc).sort((a,b)=>b[1]-a[1]).filter(([,s])=>s>=1).map(([n])=>n);
+  if(!sorted.length)return null;
+  const g=groupOf(sorted[0]);
+  const r=sorted.filter(n=>!g||groupOf(n)===g).slice(0,2);
+  return r.length?r:null;
+}
+function nichesHTML(niches){
+  if(!niches)return'<span style="color:var(--muted);font-size:.63rem">…</span>';
+  return niches.map((n,i)=>{
+    if(n==='Non-classé')return`<span style="padding:2px 7px;border-radius:8px;font-size:.63rem;background:rgba(100,116,139,.1);color:var(--muted);border:1px solid rgba(100,116,139,.2)">Non-classé</span>`;
+    if(n==='Analyse Manuelle Requise')return`<span style="padding:2px 7px;border-radius:8px;font-size:.63rem;background:rgba(255,68,68,.1);color:var(--red);border:1px solid rgba(255,68,68,.3)" title="3 tentatives échouées">⚠ Manuel</span>`;
+    const c=NC[n]||'#64748b';
+    return`<span style="padding:2px 7px;border-radius:8px;font-size:.63rem;font-weight:600;cursor:pointer;background:${c}${i?'12':'22'};color:${c};border:1px solid ${c}${i?'22':'44'}" onclick="filterByNiche('${n}')" title="Filtrer: ${n}">${n}</span>`;
+  }).join(' ');
+}
+function nichesTags(domain){
+  const cached=JSON.parse(localStorage.getItem('nc_'+domain)||'null');
+  return nichesHTML(cached||detectNiches(domain));
+}
+async function autoAnalyzeNiches(domains){
+  const todo=domains.filter(d=>!localStorage.getItem('nc_'+d.domain)&&!detectNiches(d.domain)).slice(0,5);
+  for(const d of todo){
+    let niches=null;
+    try{
+      const r=await fetch(API_SEQ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:d.domain,action:'analyze-mesh'}),signal:AbortSignal.timeout(15000)});
+      if(r.ok){const j=await r.json();if(j.niches?.length)niches=j.niches;}
+    }catch{}
+    if(!niches)try{
+      const html=await proxyFetch(`https://${d.domain}`);
+      const doc=new DOMParser().parseFromString(html,'text/html');
+      const text=[doc.title,...[...doc.querySelectorAll('meta[name="description"],meta[property="og:description"],h1,nav a')].slice(0,12).map(el=>el.content||el.textContent)].join(' ');
+      const sc={},tn=norm(text);
+      for(const[n,ws]of Object.entries(NK))for(const w of ws){const c=(tn.match(new RegExp(w,'g'))||[]).length;if(c)sc[n]=(sc[n]||0)+c;}
+      niches=Object.entries(sc).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([n])=>n);
+    }catch{}
+    localStorage.setItem('nc_'+d.domain,JSON.stringify(niches?.length?niches:['Non-classé']));
+    const cell=document.getElementById('nc_'+d.domain.replace(/[^a-z0-9]/g,'_'));
+    if(cell)cell.innerHTML=nichesHTML(JSON.parse(localStorage.getItem('nc_'+d.domain)));
+    await new Promise(r=>setTimeout(r,400));
+  }
+}
+// ── CA Estimé ──
+function getOv(d){try{return JSON.parse(localStorage.getItem('ca_'+d));}catch{return null;}}
+function setOv(d,cr,aov){localStorage.setItem('ca_'+d,JSON.stringify({cr:+cr,aov:+aov}));}
+function estimTraf(d){
+  const fp=d.fpScore||0,sn=d.wayback?.snapshots||0;
+  const boost=JSON.parse(localStorage.getItem('wbr_'+d.domain)||'null');
+  const m=boost==='active'?2:1;
+  if(fp>=70||sn>=50)return 50000*m;
+  if(fp>=60&&sn>=20)return 20000*m;
+  if(fp>=40&&sn>=10)return 8000*m;
+  if(fp>=30&&sn>=5) return 3000;
+  if(fp>=20)        return 1000;
+  return 300;
+}
+function caData(d){
+  const niches=detectNiches(d.domain)||[],m=NM[niches[0]]||NM.default,ov=getOv(d.domain);
+  const cr=ov?.cr||m.CR,aov=ov?.aov||m.AOV;
+  return{ca:Math.round(estimTraf(d)*cr*aov),cr,aov};
+}
+function fmtCA(ca){return ca.toLocaleString('fr-FR')+' €';}
+
+async function refreshWBActive(){
+  const today=new Date();
+  const from=new Date(today-30*86400000).toISOString().slice(0,10).replace(/-/g,'');
+  for(const d of allProsp.slice(0,8)){
+    if(localStorage.getItem('wbr_'+d.domain))continue;
+    try{
+      const r=await fetch(`https://web.archive.org/cdx/search/cdx?url=${d.domain}&output=json&limit=1&fl=timestamp&from=${from}`,{signal:AbortSignal.timeout(4000)});
+      const j=await r.json();
+      if(j.length>1){localStorage.setItem('wbr_'+d.domain,'active');
+        const cell=document.getElementById('ca_'+d.domain.replace(/\W/g,'_'));
+        if(cell){const{ca,cr,aov}=caData(d);cell.innerHTML=`<span class="ca-val" title="Trafic actif — snapshot WB récent">${fmtCA(ca)} ↑</span> <button class="btn-edit" onclick="editCA('${d.domain}')" title="CR:${(cr*100).toFixed(1)}% AOV:${aov}€">✎</button>`;}
+      }
+    }catch{}
+  }
+}
+
+// ── Compétition ──
+function competScore(d){
+  const fp=d.fpScore||0,sn=d.wayback?.snapshots||0;
+  return Math.max(1,Math.min(10,Math.round(fp/14)+(sn>=50?3:sn>=20?2:sn>=5?1:0)));
+}
+function competCell(s){
+  const cls=s<=3?'comp-easy':s<=6?'comp-med':'comp-hard';
+  return`<span class="${cls}" title="Facilité entrée ${s}/10">${s}/10 ${s<=3?'Facile':s<=6?'Moyen':'Difficile'}</span>`;
+}
+
+// ── Alternatives (Acquisition) ──
+function suggestAlts(domain){
+  const base=domain.replace(/\.(fr|com|net|org|eu)$/,'').split('-');
+  const kw=base.find(p=>p.length>3&&!/^(www|shop|boutique|store|paris|france|la|le|les)$/.test(p))||base[0];
+  const tld=domain.endsWith('.fr')?'.fr':'.com';
+  return[`boutique-${kw}${tld}`,`${kw}-pro${tld}`,`les-${kw}s${tld}`].filter(d=>d!==domain);
+}
+async function checkDispo(dom,btn){
+  btn.disabled=true;btn.textContent='…';
+  try{
+    const r=await fetch(`https://cloudflare-dns.com/dns-query?name=${dom}&type=A`,{headers:{Accept:'application/dns-json'}});
+    const j=await r.json();const free=j.Status===3||!j.Answer?.length;
+    btn.textContent=free?'✅':'🔴';btn.style.color=free?'var(--green)':'var(--red)';
+    btn.style.borderColor=free?'rgba(0,255,136,.4)':'rgba(255,68,68,.4)';
+  }catch{btn.textContent='?';}
+  btn.disabled=false;
+}
+
+// ── Niche filter ──
+function filterByNiche(n){nicheF=(nicheF===n?null:n);renderProsp(allProsp);renderAcq(allAcq);renderNicheFilter();}
+function renderNicheFilter(){
+  const cts={};[...allProsp,...allAcq].forEach(d=>{(JSON.parse(localStorage.getItem('nc_'+d.domain)||'null')||detectNiches(d.domain)||[]).filter(n=>n&&n!=='Non-classé'&&n!=='Analyse Manuelle Requise').forEach(n=>{cts[n]=(cts[n]||0)+1;});});
+  const bar=document.getElementById('nfBar');if(!bar)return;
+  bar.innerHTML=(nicheF?`<button onclick="filterByNiche(null)" style="padding:3px 10px;border-radius:12px;font-size:.65rem;cursor:pointer;border:1px solid rgba(255,68,68,.4);background:rgba(255,68,68,.1);color:var(--red)">✕ ${nicheF}</button> `:'')+Object.entries(cts).sort((a,b)=>b[1]-a[1]).map(([n,c])=>{const col=NC[n]||'#64748b';const act=nicheF===n;return`<button onclick="filterByNiche('${n}')" style="padding:3px 10px;border-radius:12px;font-size:.65rem;cursor:pointer;border:1px solid ${col}${act?'99':'33'};background:${col}${act?'33':'11'};color:${col};font-weight:${act?700:400}">${n} <span style="opacity:.6">${c}</span></button>`;}).join('');
+}
+function getType(d){return d.type||(d.availability==='actif'?'PROSPECTION':'ACQUISITION');}
+function availClass(a){return{actif:'av-actif',disponible:'av-disponible','parké':'av-parke','expiré':'av-expire'}[a]||'av-other';}
+function fpClass(s){return s>=50?'fp-hi':s>=30?'fp-med':'fp-lo';}
+async function load(){
+  try{const nm=await fetch('/data/niche_map.json').then(r=>r.json());for(const[d,ns]of Object.entries(nm))if(!localStorage.getItem('nc_'+d))localStorage.setItem('nc_'+d,JSON.stringify(ns));}catch{}
+  try{const km=await fetch(`${API_SEQ}?action=niches`).then(r=>r.json());if(typeof km==='object'&&!km.error)for(const[d,ns]of Object.entries(km))if(!localStorage.getItem('nc_'+d))localStorage.setItem('nc_'+d,JSON.stringify(ns));}catch{}
+  try{
+    const r=await fetch(`${API_HUNTER}?action=report`);
+    const data=await r.json();
+    const all=(data.opportunities||[]).filter(d=>!d.domain.includes('/'));
+    allProsp=all.filter(d=>getType(d)==='PROSPECTION');
+    allAcq  =all.filter(d=>getType(d)==='ACQUISITION');
+    renderCards();renderProsp(allProsp);renderAcq(allAcq);renderNicheFilter();
+    setTimeout(refreshWBActive,2000);
+  }catch{
+    document.getElementById('tbodyProsp').innerHTML='<tr><td colspan="9" class="empty">API inaccessible.</td></tr>';
+    document.getElementById('tbodyAcq').innerHTML='<tr><td colspan="8" class="empty">API inaccessible.</td></tr>';
+  }
+}
+
+function renderCards(){
+  const all=[...allProsp,...allAcq];
+  document.getElementById('cntProsp').textContent=allProsp.length;
+  document.getElementById('cntAcq').textContent=allAcq.length;
+  document.getElementById('cntAlert').textContent=all.filter(d=>d.diode?.color==='orange').length;
+  document.getElementById('cntCA').textContent=fmtCA(allProsp.reduce((s,d)=>s+caData(d).ca,0));
+}
+
+function filterTable(type,val){
+  const src=type==='prosp'?allProsp:allAcq;
+  const f=val.toLowerCase(),out=f?src.filter(d=>d.domain.toLowerCase().includes(f)):src;
+  if(type==='prosp')renderProsp(out);else renderAcq(out);
+}
+
+function renderProsp(list){
+  const flist=nicheF?list.filter(d=>{const ns=JSON.parse(localStorage.getItem('nc_'+d.domain)||'null')||detectNiches(d.domain)||[];return ns.includes(nicheF);}):list;
+  document.getElementById('countProsp').textContent=flist.length;
+  const sorted=[...flist].sort((a,b)=>(b.fpScore||0)-(a.fpScore||0));
+  if(!sorted.length){document.getElementById('tbodyProsp').innerHTML='<tr><td colspan="9" class="empty">Aucun site leader.</td></tr>';return;}
+  document.getElementById('tbodyProsp').innerHTML=sorted.map(d=>{
+    const dc=d.diode?.color||'grey',wb=d.wayback||{};
+    const{ca,cr,aov}=caData(d),cs=competScore(d);
+    const hasHistory=(d.fpScore||0)>0||(wb.snapshots||0)>0;
+    const caId='ca_'+d.domain.replace(/\W/g,'_');
+    return`<tr>
+      <td><a href="https://${d.domain}" target="_blank" class="domain-link">${d.domain}</a></td>
+      <td id="nc_${d.domain.replace(/[^a-z0-9]/g,'_')}">${nichesTags(d.domain)}</td>
+      <td><span class="diode d-${dc}">${d.diode?.verdict||'—'}</span></td>
+      <td><span class="fp-score ${fpClass(d.fpScore||0)}">${d.fpScore||0}%</span></td>
+      <td style="font-size:.76rem">${d.totalScore||0}/100</td>
+      <td class="wb ${wb.snapshots?'ok':''}">${wb.snapshots?`✓ ${wb.snapshots}`:'—'}</td>
+      <td id="${caId}"><span class="ca-val">${fmtCA(ca)}</span> <button class="btn-edit" onclick="editCA('${d.domain}')" title="CR:${(cr*100).toFixed(1)}% AOV:${aov}€">✎</button></td>
+      <td>${competCell(cs)}</td>
+      <td><div style="display:flex;gap:3px;white-space:nowrap"><button class="btn-sm btn-seq" id="seq-${d.domain}" onclick="triggerSeq('${d.domain}',this)">Audit</button><button class="btn-sm btn-scrape" ${hasHistory?'':`disabled title="Aucun historique — potentiellement hors index"`} onclick="${hasHistory?`openScraper('${d.domain}')`:''}">Scraper</button></div></td>
+    </tr>`;
+  }).join('');
+  autoAnalyzeNiches(sorted);
+}
+
+function renderAcq(list){
+  const flist=nicheF?list.filter(d=>{const ns=JSON.parse(localStorage.getItem('nc_'+d.domain)||'null')||detectNiches(d.domain)||[];return ns.includes(nicheF);}):list;
+  document.getElementById('countAcq').textContent=flist.length;
+  const sorted=[...flist].sort((a,b)=>{
+    const pa=a.diode?.priority||9,pb=b.diode?.priority||9;
+    return pa!==pb?pa-pb:(b.wayback?.snapshots||0)-(a.wayback?.snapshots||0);
+  });
+  if(!sorted.length){document.getElementById('tbodyAcq').innerHTML='<tr><td colspan="7" class="empty">Aucun domaine à acquérir.</td></tr>';return;}
+  document.getElementById('tbodyAcq').innerHTML=sorted.map(d=>{
+    const dc=d.diode?.color||'grey',wb=d.wayback||{};
+    return`<tr>
+      <td><a href="https://${d.domain}" target="_blank" class="domain-link">${d.domain}</a></td>
+      <td id="nc_${d.domain.replace(/[^a-z0-9]/g,'_')}">${nichesTags(d.domain)}</td>
+      <td><span class="avail-badge ${availClass(d.availability)}">${d.availability||'inconnu'}</span></td>
+      <td><span class="diode d-${dc}">${d.diode?.verdict||'—'}</span></td>
+      <td style="font-size:.76rem">${d.totalScore||0}/100</td>
+      <td class="wb ${wb.snapshots?'ok':''}">${wb.snapshots?`✓ ${wb.snapshots}`:'—'}</td>
+      <td><div style="display:flex;gap:3px;white-space:nowrap">
+        <button class="btn-sm btn-check" onclick="openAlts('${d.domain}')">Alt. Achat</button>
+        <button class="btn-sm" style="border-color:rgba(255,140,0,.4);background:rgba(255,140,0,.1);color:var(--orange)" onclick="buyDomain('${d.domain}',this)">Prix OVH</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+  autoAnalyzeNiches(sorted);
+}
+
+async function triggerSeq(domain,btn){
+  btn.disabled=true;btn.textContent='…';
+  try{
+    const r=await fetch(API_SEQ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain,action:'analyze-mesh'})});
+    const data=await r.json();
+    if(data.niches?.length&&data.niches[0]!=='Non-classé'){
+      localStorage.setItem('nc_'+domain,JSON.stringify(data.niches));
+      const cell=document.getElementById('nc_'+domain.replace(/[^a-z0-9]/g,'_'));
+      if(cell)cell.innerHTML=nichesHTML(data.niches);
+      showToast('Niches: '+data.niches.join(' · '));
+    }else showToast('Audit lancé — '+domain);
+    btn.textContent='✓';btn.style.color='var(--green)';btn.style.borderColor='rgba(0,255,136,.4)';
+  }catch{btn.textContent='Audit';btn.style.color='';showToast('Erreur connexion séquenceur');}
+  btn.disabled=false;
+}
+
+function buyDomain(domain,btn){
+  window.open(REGISTRAR+encodeURIComponent(domain),'_blank');
+  btn.style.cssText='border-color:rgba(0,255,136,.3);background:rgba(0,255,136,.08);color:var(--green)';btn.textContent='✓ OVH';
+}
+function editCA(domain){
+  const d=allProsp.find(x=>x.domain===domain);if(!d)return;
+  const{cr,aov}=caData(d);
+  const r1=prompt(`CR pour ${domain}\nActuel: ${(cr*100).toFixed(1)}%\nNouveau (ex: 2.5 pour 2.5%):`,(cr*100).toFixed(1));
+  if(r1===null)return;
+  const r2=prompt(`Panier moyen pour ${domain}\nActuel: ${aov}€\nNouveau (€):`,aov);
+  if(r2===null)return;
+  const nCR=parseFloat(r1)/100,nAOV=parseFloat(r2);
+  if(isNaN(nCR)||isNaN(nAOV)||nCR<=0||nAOV<=0){showToast('Valeurs invalides');return;}
+  setOv(domain,nCR,nAOV);renderProsp(allProsp);renderCards();
+  showToast('CA: '+fmtCA(caData(d).ca));
+}
+
+// ── Scraper ──
+function isCFChallenge(h){return/cf-browser-verification|Just a moment\.\.\.|__cf_chl/.test(h);}
+async function proxyFetch(url){
+  const dom=url.replace(/^https?:\/\//,'').split('/')[0];
+  for(const mk of[
+    u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+    u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,
+    u=>`https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(u)}`,
+  ]){try{const r=await fetch(mk(url),{signal:AbortSignal.timeout(9000)});if(!r.ok)continue;const t=await r.text();if(!isCFChallenge(t))return t;}catch{}}
+  try{
+    const j=await fetch(`https://web.archive.org/cdx/search/cdx?url=${dom}&output=json&limit=1&fl=timestamp&from=20250101&filter=statuscode:200`,{signal:AbortSignal.timeout(5000)}).then(r=>r.json());
+    if(j.length>1){const wb=await fetch(`https://web.archive.org/web/${j[1][0]}if_/${url}`,{signal:AbortSignal.timeout(12000)});if(wb.ok)return wb.text();}
+  }catch{}
+  throw new Error('Proxy + Wayback inaccessibles');
+}
+function mvpN(n){return n<=5?n:n<=15?Math.max(3,Math.ceil(n*.5)):n<=40?Math.max(5,Math.ceil(n*.3)):Math.max(8,Math.min(15,Math.ceil(n*.2)));}
+let _bp=null;
+
+async function openScraper(domain){
+  document.getElementById('scDomain').textContent=domain;
+  document.getElementById('scBody').innerHTML='<div class="loading"><span class="spinner"></span>Analyse en cours…</div>';
+  document.getElementById('scModal').classList.add('open');
+  let cols;
+  try{
+    const r=await fetch(API_SEQ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'scrape-collections',domain}),signal:AbortSignal.timeout(20000)});
+    const d=await r.json();
+    if(!d.collections?.length)throw new Error(d.error||'Aucune collection détectée');
+    cols=d.collections;
+  }catch(e){document.getElementById('scBody').innerHTML=`<div class="empty">❌ ${e.message}</div>`;return;}
+  if(cols.some(c=>c.products!=null))cols.sort((a,b)=>(b.products||0)-(a.products||0));
+  const total=cols.length,mvp=mvpN(total),top=cols.slice(0,mvp);
+  _bp={source:domain,scrapedAt:new Date().toISOString(),totalCollections:total,mvpCollections:mvp,mvpSelection:top,allCollections:cols,shopify_hint:'Admin > Products > Collections',woo_hint:'Products > Categories'};
+  const pct=total?Math.round(mvp/total*100):0;
+  document.getElementById('scBody').innerHTML=`<div class="sc-stat"><div class="sc-card"><div class="sc-card-n" style="color:var(--blue)">${total}</div><div class="sc-card-l">Inventaire</div></div><div class="sc-card"><div class="sc-card-n" style="color:var(--green)">${mvp}</div><div class="sc-card-l">Potentiel rentable</div></div><div class="sc-card"><div class="sc-card-n" style="color:var(--yellow)">${pct}%</div><div class="sc-card-l">Du catalogue</div></div></div><p style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:.2rem 0 .5rem">Prévisualisation — collections détectées</p><ul class="sc-list" id="scColList">${cols.map((c,i)=>`<li><input type="checkbox" id="col${i}" ${i<mvp?'checked':''}><label for="col${i}" style="flex:1;cursor:pointer;font-size:.75rem;margin-left:.4rem">${c.title||c.path.split('/').pop().replace(/-/g,' ')}</label>${c.products!=null?`<span style="font-size:.63rem;color:var(--green);font-weight:600;white-space:nowrap">${c.products} prod.</span>`:''}<span class="sc-path">${c.path}</span></li>`).join('')}</ul><div class="sc-actions"><div style="display:flex;align-items:center;gap:.6rem;flex:1;flex-wrap:wrap"><label style="font-size:.78rem;color:var(--muted)">Collections à cloner :</label><input type="number" id="scCloneN" value="${mvp}" min="1" max="${total}" style="width:58px;background:#0d0d0d;border:1px solid var(--border);color:var(--text);padding:.3rem .5rem;border-radius:6px;font-size:.82rem" onchange="updateChecks(this.value,${total})"><span style="font-size:.72rem;color:var(--muted)">Recommandé : <strong style="color:var(--green)">${mvp}</strong></span></div><button class="btn-deploy" onclick="launchExtraction()">🚀 Lancer l'extraction</button><button class="btn-dl" onclick="dlBP()">⬇ blueprint.json</button><button class="btn-deploy" style="background:rgba(168,85,247,.15);border-color:rgba(168,85,247,.5);color:#a855f7" onclick="openDeployModal()">⚡ Déployer le site</button><button class="btn-deploy" style="background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.4);color:#22c55e" onclick="openSkeletonModal()">🎨 Squelette PHP</button></div>`;
+}
+function closeSc(){document.getElementById('scModal').classList.remove('open');}
+function openDeployModal(){
+  if(!_bp)return;
+  const niches=JSON.parse(localStorage.getItem('nc_'+_bp.source)||'null')||detectNiches(_bp.source)||[];
+  const niche=niches[0]||'Mode Femme';
+  document.getElementById('scBody').innerHTML=`
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:1.2rem">Déployer un site statique SEO depuis le blueprint de <strong style="color:var(--blue)">${_bp.source}</strong></p>
+    <div style="margin-bottom:1rem">
+      <label style="font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:.4rem">Domaine cible (ton domaine acquis)</label>
+      <input id="deployDomain" type="text" placeholder="ex: ma-boutique-lingerie.fr" value="${_bp.source}" style="width:100%;background:#0d0d0d;border:1px solid var(--border);color:var(--text);padding:.6rem .9rem;border-radius:8px;font-size:.88rem">
+    </div>
+    <div style="margin-bottom:1.2rem">
+      <label style="font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:.4rem">Niche détectée</label>
+      <input id="deployNiche" type="text" value="${niche}" style="width:100%;background:#0d0d0d;border:1px solid var(--border);color:var(--text);padding:.6rem .9rem;border-radius:8px;font-size:.88rem">
+    </div>
+    <div style="background:#0a0d14;border-radius:8px;padding:.8rem 1rem;margin-bottom:1.2rem;font-size:.75rem;color:var(--muted)">
+      <strong style="color:var(--text)">Pages générées :</strong> Accueil · Collections · ${_bp.mvpCollections} pages collection · Mentions légales · CGV · Confidentialité · sitemap.xml · robots.txt
+    </div>
+    <div class="sc-actions">
+      <button class="btn-deploy" style="background:rgba(168,85,247,.2);border-color:rgba(168,85,247,.6);color:#a855f7;flex:1" onclick="runDeploy()">⚡ Générer & Déployer</button>
+      <button class="btn-dl" onclick="closeSc()">Annuler</button>
+    </div>
+    <div id="deployStatus" style="margin-top:1rem;font-size:.78rem;color:var(--muted)"></div>`;
+}
+async function runDeploy(){
+  const domain=document.getElementById('deployDomain').value.trim();
+  const niche=document.getElementById('deployNiche').value.trim();
+  if(!domain||!_bp)return;
+  const st=document.getElementById('deployStatus');
+  st.innerHTML='<span class="spinner" style="display:inline-block"></span> Génération en cours…';
+  try{
+    const r=await fetch(API_FACTORY,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({blueprint:_bp,niche,domain}),signal:AbortSignal.timeout(30000)});
+    const d=await r.json();
+    if(d.error)throw new Error(d.error);
+    st.innerHTML=`<div style="padding:.8rem 1rem;background:rgba(0,255,136,.08);border:1px solid rgba(0,255,136,.25);border-radius:8px">
+      ✅ <strong style="color:var(--green)">${d.pages} pages déployées</strong><br>
+      <span style="color:var(--muted)">Slug : ${d.slug}</span><br>
+      <a href="${d.serverUrl}" target="_blank" style="color:var(--blue);font-weight:600">${d.serverUrl}</a>
+    </div>`;
+  }catch(e){st.innerHTML=`<span style="color:var(--red)">❌ ${e.message}</span>`;}
+}
+function openSkeletonModal(){
+  if(!_bp)return;
+  const niches=JSON.parse(localStorage.getItem('nc_'+_bp.source)||'null')||detectNiches(_bp.source)||[];
+  const niche=niches[0]||'generique';
+  document.getElementById('scDomain').textContent=_bp.source+' — Squelette PHP';
+  document.getElementById('scBody').innerHTML=`
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:1.2rem">Génère un squelette PHP complet (home, collections, blog, légal, sitemap) pour <strong style="color:var(--blue)">${_bp.source}</strong></p>
+    <div style="margin-bottom:1rem">
+      <label style="font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:.4rem">Domaine cible</label>
+      <input id="skDomain" type="text" value="${_bp.source}" style="width:100%;background:#0d0d0d;border:1px solid var(--border);color:var(--text);padding:.6rem .9rem;border-radius:8px;font-size:.88rem">
+    </div>
+    <div style="margin-bottom:1.2rem">
+      <label style="font-size:.72rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);display:block;margin-bottom:.4rem">Niche (charte graphique auto)</label>
+      <input id="skNiche" type="text" value="${niche}" style="width:100%;background:#0d0d0d;border:1px solid var(--border);color:var(--text);padding:.6rem .9rem;border-radius:8px;font-size:.88rem">
+    </div>
+    <div style="background:#0a0d14;border-radius:8px;padding:.8rem 1rem;margin-bottom:1.2rem;font-size:.75rem;color:var(--muted)">
+      <strong style="color:var(--text)">Fichiers générés :</strong> index.php · collections/ · blog/ · includes/ (config, header, footer) · assets/css + js · data/ JSON · .htaccess · robots.txt · sitemap.php · mentions-légales · CGV
+    </div>
+    <div class="sc-actions">
+      <button class="btn-deploy" style="background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.5);color:#22c55e;flex:1" onclick="runSkeleton()">🎨 Générer le squelette</button>
+      <button class="btn-dl" onclick="closeSc()">Annuler</button>
+    </div>
+    <div id="skStatus" style="margin-top:1rem;font-size:.78rem;color:var(--muted)"></div>`;
+}
+async function runSkeleton(){
+  const domain=document.getElementById('skDomain').value.trim();
+  const niche=document.getElementById('skNiche').value.trim();
+  if(!domain||!_bp)return;
+  const st=document.getElementById('skStatus');
+  st.innerHTML='<span class="spinner" style="display:inline-block"></span> Génération en cours…';
+  try{
+    const r=await fetch(API_SKELETON,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({blueprint:_bp,niche,domain}),signal:AbortSignal.timeout(30000)});
+    const d=await r.json();
+    if(d.error)throw new Error(d.error);
+    // Download all files as individual blobs via a ZIP-like multi-download trigger
+    const files=d.files||{};
+    const keys=Object.keys(files);
+    st.innerHTML=`<div style="padding:.8rem 1rem;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.25);border-radius:8px">
+      ✅ <strong style="color:#22c55e">${keys.length} fichiers générés</strong> · niche: ${d.niche} · couleur: <span style="display:inline-block;width:12px;height:12px;border-radius:2px;background:${d.palette?.primary};vertical-align:middle"></span> ${d.palette?.primary}<br>
+      <small style="color:var(--muted)">${keys.slice(0,6).join(' · ')}${keys.length>6?' …':''}</small><br>
+      <button class="btn-dl" style="margin-top:.8rem" onclick="dlSkeleton(window._skFiles)">⬇ Télécharger skeleton.json</button>
+    </div>`;
+    window._skFiles=d;
+  }catch(e){st.innerHTML=`<span style="color:var(--red)">❌ ${e.message}</span>`;}
+}
+function dlSkeleton(d){if(!d)return;const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([JSON.stringify(d,null,2)],{type:'application/json'})),download:`skeleton-${d.domain||'site'}.json`});a.click();URL.revokeObjectURL(a.href);}
+function updateChecks(n,total){const v=Math.max(1,Math.min(+n||1,total));document.getElementById('scCloneN').value=v;document.querySelectorAll('#scColList input[type=checkbox]').forEach((cb,i)=>cb.checked=i<v);}
+function launchExtraction(){if(!_bp)return;const sel=[];document.querySelectorAll('#scColList input[type=checkbox]:checked').forEach(cb=>{const i=+cb.id.replace('col','');if(_bp.allCollections[i])sel.push(_bp.allCollections[i]);});_bp.mvpSelection=sel;_bp.mvpCollections=sel.length;dlBP();showToast(`${sel.length} collection${sel.length>1?'s':''} extraite${sel.length>1?'s':''}`);}
+function dlBP(){if(!_bp)return;const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([JSON.stringify(_bp,null,2)],{type:'application/json'})),download:`blueprint-${_bp.source}.json`});a.click();URL.revokeObjectURL(a.href);}
+function deployAct(src){const t=allAcq[0]?.domain;showToast(t?`${src} → ${t}`:'Aucun domaine acquisition');if(t)window.open(REGISTRAR+t,'_blank');}
+async function openAlts(domain){
+  document.getElementById('scDomain').textContent=domain+' — Alt. Acquisition';
+  document.getElementById('scBody').innerHTML='<div class="loading"><span class="spinner"></span>Vérification DNS…</div>';
+  document.getElementById('scModal').classList.add('open');
+  const alts=suggestAlts(domain);
+  const res=await Promise.all(alts.map(async alt=>{
+    try{const r=await fetch(`https://cloudflare-dns.com/dns-query?name=${alt}&type=A`,{headers:{Accept:'application/dns-json'}});
+      const j=await r.json();return{alt,free:j.Status===3||!j.Answer?.length};
+    }catch{return{alt,free:null};}
+  }));
+  const niches=JSON.parse(localStorage.getItem('nc_'+domain)||'null')||detectNiches(domain)||[];
+  document.getElementById('scBody').innerHTML=`
+    <p style="font-size:.8rem;color:var(--muted);margin-bottom:1.2rem">Alternatives pour <strong>${domain}</strong>${niches.length?' · '+niches.slice(0,2).join(', '):''}</p>
+    <div style="display:flex;flex-direction:column;gap:.6rem">
+      ${res.map(({alt,free})=>`<div style="display:flex;align-items:center;gap:.8rem;padding:.7rem 1rem;background:#0d0d0d;border-radius:8px;border:1px solid ${free?'rgba(0,255,136,.2)':free===false?'rgba(255,68,68,.15)':'var(--border)'}">
+        <span style="font-family:'Courier New',monospace;font-size:.85rem;flex:1">${alt}</span>
+        <span style="font-size:.78rem;font-weight:700;color:${free?'var(--green)':free===false?'var(--red)':'var(--muted)'}">${free?'✅ Libre':free===false?'🔴 Pris':'?'}</span>
+        <button class="btn-dl" style="padding:.3rem .8rem;font-size:.75rem" onclick="window.open('${REGISTRAR}${alt}','_blank')">💰 Acheter</button>
+      </div>`).join('')}
+    </div>`;
+}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),3500);}
+
+function renderAuditCal(){
+  const sc=JSON.parse(localStorage.getItem('bl_schedule')||'null')?.spots;
+  if(!sc){document.getElementById('auditCalCards').innerHTML='<span style="font-size:.75rem;color:var(--muted)">Aucun calendrier — <a href="/calendrier.html" style="color:var(--green)">générer →</a></span>';return;}
+  const todayStr=new Date().toISOString().slice(0,10);
+  const today=new Date();today.setHours(0,0,0,0);
+  const dow=today.getDay(),mon=new Date(today);mon.setDate(today.getDate()-(dow===0?6:dow-1));
+  const days=Array.from({length:7},(_,i)=>{const d=new Date(mon);d.setDate(mon.getDate()+i);return d;});
+  const wStrs=days.map(d=>d.toISOString().slice(0,10));
+  const ok=sc.filter(s=>s.status==='OK').length,wait=sc.filter(s=>s.status==='EN ATTENTE').length;
+  const wkT=sc.filter(s=>wStrs.includes(s.date)).length,wkD=sc.filter(s=>wStrs.includes(s.date)&&s.status==='OK').length;
+  const todN=sc.filter(s=>s.date===todayStr).length;
+  document.getElementById('auditCalCards').innerHTML=[
+    [todN+' auj.','#ffd700'],[wkD+'/'+wkT+' sem.','#ff8c00'],[ok+' OK','#00ff88'],[wait+' en att.','#64748b'],
+  ].map(([v,c])=>`<span style="padding:3px 10px;border-radius:8px;font-size:.72rem;font-weight:700;color:${c};background:${c}18;border:1px solid ${c}44">${v}</span>`).join('');
+  const DNAME=['L','M','M','J','V','S','D'];
+  document.getElementById('auditCalWeek').innerHTML=days.map((d,i)=>{
+    const ds=d.toISOString().slice(0,10),isToday=ds===todayStr,isWE=i>=5;
+    const sp=sc.filter(s=>s.date===ds),done=sp.filter(s=>s.status==='OK').length;
+    return`<div style="background:${isToday?'#111a2a':'var(--surface)'};padding:.4rem .3rem;text-align:center;${isWE?'opacity:.4':''}">
+      <div style="font-size:.58rem;color:${isToday?'var(--orange)':'var(--muted)'};text-transform:uppercase">${DNAME[i]}</div>
+      <div style="font-size:.72rem;font-weight:700;color:${isToday?'var(--orange)':'var(--text)'}">${d.getDate()}</div>
+      ${sp.length?`<div style="font-size:.6rem;color:${done===sp.length?'var(--green)':'var(--yellow)'};margin-top:1px">${done}/${sp.length}</div>`:'<div style="font-size:.6rem;color:#1e2535">·</div>'}
+    </div>`;
+  }).join('');
+}
+load();renderAuditCal();setInterval(load,90000);
+</script>
+</body>
+</html>

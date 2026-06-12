@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Connexion</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#070b14;color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;min-height:100vh;display:flex;align-items:center;justify-content:center}
+.card{background:#0d1320;border:1px solid #1e2a3a;border-radius:12px;padding:48px 40px;width:380px;text-align:center}
+.logo{font-size:28px;font-weight:800;color:#6366f1;letter-spacing:-1px;margin-bottom:4px}
+.logo span{color:#a5b4fc}
+.subtitle{color:#64748b;font-size:13px;margin-bottom:32px}
+input{width:100%;background:#0a0f1a;border:1px solid #1e2a3a;border-radius:8px;padding:12px 16px;color:#e2e8f0;font-size:14px;outline:none;margin-bottom:12px;transition:border .2s}
+input:focus{border-color:#6366f1}
+input[type=password]{letter-spacing:4px}
+.btn{width:100%;background:#6366f1;color:#fff;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;margin-top:4px;transition:background .2s}
+.btn:hover{background:#4f46e5}
+.err{color:#ef4444;font-size:13px;margin-top:12px;min-height:20px}
+.tagline{color:#334155;font-size:11px;margin-top:24px}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">V35<span>Build</span></div>
+  <div class="subtitle">Build Platform — build.zenithlab.net</div>
+  <input type="password" id="pwd" placeholder="Mot de passe" onkeydown="if(event.key==='Enter')login()">
+  <button class="btn" onclick="login()">Connexion</button>
+  <div class="err" id="err"></div>
+  <div class="tagline">© 2026 V35 — Accès restreint</div>
+</div>
+<script>
+async function sha256(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function login(){
+  const v=document.getElementById('pwd').value;
+  const h=await sha256(v);
+  if(h==='c0e1ef644e74252419e56e7818885cbeaf7bd35bec04b0dfda954678e4f16354'){
+    sessionStorage.setItem('v35_auth',h);
+    window.location.href='/index.html';
+  }else{
+    document.getElementById('err').textContent='Mot de passe incorrect';
+    setTimeout(()=>document.getElementById('err').textContent='',2000);
+  }
+}
+// already logged in?
+if(sessionStorage.getItem('v35_auth')==='c0e1ef644e74252419e56e7818885cbeaf7bd35bec04b0dfda954678e4f16354')
+  window.location.href='/index.html';
+</script>
+</body>
+</html>
