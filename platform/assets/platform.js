@@ -73,6 +73,7 @@ const NAV_ITEMS = [
   { href: '/pipeline.html',              icon: '⚡', label: 'Pipeline' },
   { href: '/boutiques.html',             icon: '◉', label: 'Boutiques' },
   { href: '/domaines-footprints.html',   icon: '◎', label: 'Footprints' },
+  { href: '/dorks.html',                 icon: '🔍', label: 'Dorks' },
   { href: '/sites.html',                 icon: '✦', label: 'Sites' },
   { href: '/contenu.html',               icon: '⌁', label: 'Contenu' },
   { href: '/domaines.html',              icon: '⏣', label: 'Domaines' },

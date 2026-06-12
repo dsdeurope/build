@@ -8,8 +8,11 @@ const CORS = {
 };
 
 const WORKERS = {
-  BUILD_API:'https://v35-build-api.ernestpedanou.workers.dev',
-  SEQ:      'https://v35-sequenceur.ernestpedanou.workers.dev',
+  BUILD_API:   'https://v35-build-api.ernestpedanou.workers.dev',
+  SCRAPER:     'https://v35-build-scraper.ernestpedanou.workers.dev',
+  CONTENT_AI:  'https://v35-content-ai.ernestpedanou.workers.dev',
+  SEO_ENGINE:  'https://v35-seo-engine.ernestpedanou.workers.dev',
+  SEQ:         'https://v35-sequenceur.ernestpedanou.workers.dev',
   ORCH:     'https://v35-orchestrateur.ernestpedanou.workers.dev',
   AGED:     'https://v35-aged-domain-finder.ernestpedanou.workers.dev',
   SKELETON: 'https://v35-skeleton-builder.ernestpedanou.workers.dev',
@@ -104,6 +107,26 @@ export default {
       return ok({ score:ageScore+snapScore+tldScore, breakdown:{age:ageScore,snapshots:snapScore,tld:tldScore} });
     }
 
+    // ── /api/content (proxy → content-ai) ───────────────────────────────────
+    if (resource === 'content') {
+      const path = url.pathname.replace('/api/content', '/api') || '/api/health';
+      try {
+        const r = await fetch(WORKERS.CONTENT_AI+path, { method, headers:{'Content-Type':'application/json'}, body:method==='POST'?JSON.stringify(body):undefined, signal:AbortSignal.timeout(30000) });
+        const d = await r.json();
+        return Response.json(d, { headers:CORS });
+      } catch(e) { return err('Content AI unavailable: '+e.message); }
+    }
+
+    // ── /api/seo (proxy → seo-engine) ───────────────────────────────────────
+    if (resource === 'seo') {
+      const path = url.pathname.replace('/api/seo', '/api') || '/api/health';
+      try {
+        const r = await fetch(WORKERS.SEO_ENGINE+path, { method, headers:{'Content-Type':'application/json'}, body:method==='POST'?JSON.stringify(body):undefined, signal:AbortSignal.timeout(15000) });
+        const d = await r.json();
+        return Response.json(d, { headers:CORS });
+      } catch(e) { return err('SEO Engine unavailable: '+e.message); }
+    }
+
     // ── /api/monitoring ──────────────────────────────────────────────────────
     if (resource === 'monitoring') {
       const checks = await Promise.allSettled(
@@ -172,8 +195,17 @@ export default {
         }
       }
       if (sub==='scrape') {
-        const r = await fetch(WORKERS.SEQ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'scrape-collections',domain:boutique.domain}),signal:AbortSignal.timeout(25000)});
-        const d = await r.json();
+        // Route through build-scraper (universal CMS, UA rotation, key rotation, Wayback fallback)
+        const scraperTarget = WORKERS.SCRAPER+'/api/scrape';
+        let d = {};
+        try {
+          const r = await fetch(scraperTarget,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:boutique.domain}),signal:AbortSignal.timeout(30000)});
+          d = await r.json();
+        } catch {
+          // fallback to sequenceur
+          const r2 = await fetch(WORKERS.SEQ,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'scrape-collections',domain:boutique.domain}),signal:AbortSignal.timeout(25000)});
+          d = await r2.json();
+        }
         if (d.collections?.length) {
           boutique.blueprint={source:boutique.domain,collections:d.collections,totalCollections:d.collections.length};
           boutique.collections=d.collections.length;
