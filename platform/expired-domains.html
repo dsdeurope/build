@@ -7,214 +7,218 @@
 <style>
 .ed-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-top:14px}
 .ed-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;transition:border-color .2s}
-.ed-card:hover{border-color:var(--blue)}
+.ed-card:hover{border-color:var(--accent)}
 .ed-domain{font-size:15px;font-weight:700;margin-bottom:8px}
-.ed-domain a{color:var(--text);text-decoration:none}
-.ed-domain a:hover{color:var(--blue)}
-.ed-badges{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
-.badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;color:#fff}
-.badge-tld-fr{background:var(--green)}
-.badge-tld-com{background:var(--blue)}
-.badge-tld-other{background:var(--muted)}
+.ed-domain a{color:var(--fg);text-decoration:none}
+.ed-domain a:hover{color:var(--accent)}
 .score-bar{height:5px;background:var(--border);border-radius:3px;margin:6px 0;overflow:hidden}
-.score-fill{height:100%;border-radius:3px;background:var(--blue)}
+.score-fill{height:100%;border-radius:3px;background:var(--accent)}
 .ed-meta{font-size:11px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px;margin:6px 0}
-.ed-price{font-size:14px;font-weight:700;color:var(--text)}
-.ed-kw{font-size:10px;color:var(--muted);margin:4px 0}
-.ed-status{font-size:11px;margin:4px 0}
+.ed-price{font-size:14px;font-weight:700}
 .card-actions{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}
 .overview-bar{display:flex;gap:20px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 18px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
-.ov-stat{text-align:center;min-width:70px}
 .ov-val{font-size:20px;font-weight:700;display:block;line-height:1.2}
 .ov-label{font-size:10px;color:var(--muted);text-transform:uppercase}
 .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
-.toolbar select,.toolbar input{background:var(--surface);border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:6px;font-size:12px}
-.empty-state{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-state{text-align:center;padding:60px 20px;color:var(--muted);grid-column:1/-1}
+.niche-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;color:#fff}
+.tld-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700}
 </style>
 </head>
 <body>
-<div id="app"></div>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Domaines Expirés</span>
+      <div class="topbar-right">
+        <button class="btn btn-primary" onclick="openModal('modal-agent')">▶ Lancer l'agent</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <!-- Stats -->
+      <div class="overview-bar" id="overview"></div>
+
+      <!-- Filters -->
+      <div class="toolbar">
+        <select class="filter-select" id="f-niche" onchange="applyFilters()">
+          <option value="">Toutes niches</option>
+          <option>bijoux</option><option>mode</option><option>beaute</option><option>sport</option>
+          <option>maison</option><option>electronique</option><option>nutrition</option>
+          <option>animaux</option><option>sante</option><option>luxe</option>
+        </select>
+        <select class="filter-select" id="f-tld" onchange="applyFilters()">
+          <option value="">Tous TLD</option>
+          <option value="fr">.fr</option><option value="com">.com</option>
+          <option value="net">.net</option><option value="shop">.shop</option>
+        </select>
+        <input type="number" class="filter-input" placeholder="Prix max €" id="f-price" style="width:100px" oninput="applyFilters()">
+        <select class="filter-select" id="f-sort" onchange="applyFilters()">
+          <option value="score">Score ↓</option>
+          <option value="price">Prix ↑</option>
+          <option value="alpha">A-Z</option>
+        </select>
+        <span class="text-muted" id="count-label"></span>
+        <button class="btn btn-sm" onclick="load()">↺</button>
+      </div>
+
+      <div class="ed-grid" id="ed-grid">
+        <div class="empty-state">Chargement…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal agent -->
+<div class="modal" id="modal-agent">
+  <div class="modal-box">
+    <div class="modal-header"><span>▶ Agent domaines expirés</span><button class="modal-close" onclick="closeModal('modal-agent')">✕</button></div>
+    <div class="modal-body">
+      <p class="text-muted" style="font-size:13px">Exécutez dans un terminal :</p>
+      <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 12px;font-family:monospace;font-size:13px;position:relative">
+        <span id="agent-cmd">python3 /tmp/expired_domains.py</span>
+        <button class="btn btn-sm" style="position:absolute;right:6px;top:6px" onclick="navigator.clipboard.writeText(document.getElementById('agent-cmd').textContent).then(()=>toast('Copié !','success'))">📋</button>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn" onclick="closeModal('modal-agent')">Fermer</button></div>
+  </div>
+</div>
+
+<!-- Modal lier boutique -->
+<div class="modal" id="modal-link">
+  <div class="modal-box">
+    <div class="modal-header"><span>🔗 Lier à une boutique</span><button class="modal-close" onclick="closeModal('modal-link')">✕</button></div>
+    <div class="modal-body">
+      <p id="link-domain-label" class="text-muted" style="font-size:12px;margin-bottom:10px"></p>
+      <select id="boutique-select" class="form-input"></select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-link')">Annuler</button>
+      <button class="btn btn-primary" onclick="confirmLink()">Confirmer</button>
+    </div>
+  </div>
+</div>
+
 <script type="module">
-import { buildNav, buildSidebar, apiGet, apiPut, apiDelete, toast, openModal, closeModal, esc, fmt } from '/assets/platform.js';
+import { checkAuth, buildNav, apiGet, apiPut, apiDelete, toast, openModal, closeModal } from '/assets/platform.js';
+checkAuth(); buildNav();
+window.openModal = openModal; window.closeModal = closeModal;
 
-const NICHES = ['bijoux','mode','beaute','sport','maison','electronique','nutrition','animaux','sante','luxe'];
 const NICHE_COLORS = {bijoux:'#f59e0b',mode:'#8b5cf6',beaute:'#ec4899',sport:'#22c55e',maison:'#3b82f6',electronique:'#6366f1',nutrition:'#f97316',animaux:'#14b8a6',sante:'#06b6d4',luxe:'#a78bfa'};
-const STATUS_ICONS = {available:'🟢',auction:'🟡',unknown:'⚪'};
+const TLD_COLORS  = {'.fr':'#16a34a','.com':'#2563eb','.net':'#7c3aed','.shop':'#db2777'};
 
-let allDomains = [];
-let filters = { niche:'', tld:'', maxPrice:'', sort:'score' };
+function esc(s) { const d=document.createElement('div'); d.textContent=String(s||''); return d.innerHTML; }
 
-function tldClass(domain) {
-  if(domain.endsWith('.fr')) return 'badge-tld-fr';
-  if(domain.endsWith('.com')) return 'badge-tld-com';
-  return 'badge-tld-other';
-}
-function tldLabel(domain) { return '.'+domain.split('.').pop(); }
+let _all = [], _pending = { id:null, domain:null };
 
-function filtered() {
-  let d = [...allDomains];
-  if(filters.niche) d = d.filter(x => x.niche === filters.niche);
-  if(filters.tld) d = d.filter(x => x.domain.endsWith('.'+filters.tld));
-  if(filters.maxPrice) d = d.filter(x => !x.price_eur || x.price_eur <= +filters.maxPrice);
-  if(filters.sort === 'score') d.sort((a,b) => (b.score||0)-(a.score||0));
-  else if(filters.sort === 'price') d.sort((a,b) => (a.price_eur||999)-(b.price_eur||999));
-  else if(filters.sort === 'age') d.sort((a,b) => (b.age_years||0)-(a.age_years||0));
-  else if(filters.sort === 'recent') d.sort((a,b) => (b.found_at||0)-(a.found_at||0));
-  return d;
+async function load() {
+  try {
+    const res = await apiGet('/expired-domains', { per: 2000 });
+    _all = res.list || [];
+    renderOverview();
+    applyFilters();
+  } catch(e) { toast(e.message, 'error'); }
 }
 
-function overviewHTML(domains) {
-  const total = domains.length;
-  const nicheCounts = {};
-  let priceSum = 0, priceCount = 0;
-  domains.forEach(d => {
-    nicheCounts[d.niche] = (nicheCounts[d.niche]||0)+1;
-    if(d.price_eur){ priceSum += d.price_eur; priceCount++; }
-  });
-  const avgPrice = priceCount ? Math.round(priceSum/priceCount) : 0;
-  const topNiche = Object.entries(nicheCounts).sort((a,b)=>b[1]-a[1])[0];
-  return `<div class="overview-bar">
-    <div class="ov-stat"><span class="ov-val">${total}</span><span class="ov-label">Domaines</span></div>
-    ${Object.entries(nicheCounts).map(([n,c])=>`<div class="ov-stat"><span class="ov-val" style="color:${NICHE_COLORS[n]}">${c}</span><span class="ov-label">${n}</span></div>`).join('')}
-    <div class="ov-stat" style="margin-left:auto"><span class="ov-val">${avgPrice ? avgPrice+'€' : '—'}</span><span class="ov-label">Prix moy.</span></div>
-  </div>`;
+function renderOverview() {
+  const counts = {};
+  _all.forEach(d => { counts[d.niche] = (counts[d.niche]||0)+1; });
+  const prices = _all.filter(d=>d.price_eur).map(d=>d.price_eur);
+  const avgP = prices.length ? Math.round(prices.reduce((a,b)=>a+b,0)/prices.length) : 0;
+
+  document.getElementById('overview').innerHTML =
+    `<div style="text-align:center;min-width:60px"><span class="ov-val">${_all.length}</span><span class="ov-label">Total</span></div>` +
+    Object.entries(counts).map(([n,c])=>`<div style="text-align:center;min-width:50px"><span class="ov-val" style="color:${NICHE_COLORS[n]}">${c}</span><span class="ov-label">${n}</span></div>`).join('') +
+    `<div style="text-align:center;min-width:60px;margin-left:auto"><span class="ov-val">${avgP?avgP+'€':'—'}</span><span class="ov-label">Prix moy.</span></div>`;
 }
+
+window.applyFilters = function() {
+  const niche  = document.getElementById('f-niche').value;
+  const tld    = document.getElementById('f-tld').value;
+  const maxP   = +document.getElementById('f-price').value || 0;
+  const sort   = document.getElementById('f-sort').value;
+
+  let d = [..._all];
+  if (niche) d = d.filter(x => x.niche === niche);
+  if (tld)   d = d.filter(x => x.domain.endsWith('.'+tld));
+  if (maxP)  d = d.filter(x => !x.price_eur || x.price_eur <= maxP);
+  if (sort === 'score') d.sort((a,b)=>(b.score||0)-(a.score||0));
+  else if (sort === 'price') d.sort((a,b)=>(a.price_eur||999)-(b.price_eur||999));
+  else if (sort === 'alpha') d.sort((a,b)=>a.domain.localeCompare(b.domain));
+
+  document.getElementById('count-label').textContent = `${d.length} domaine(s)`;
+  const grid = document.getElementById('ed-grid');
+  if (!d.length) { grid.innerHTML = '<div class="empty-state">Aucun domaine.<br>Lancez l\'agent pour en récupérer.</div>'; return; }
+  grid.innerHTML = d.map(cardHTML).join('');
+};
 
 function cardHTML(d) {
-  const tld = tldLabel(d.domain);
+  const tld   = '.' + d.domain.split('.').pop();
+  const price = d.price_eur ? d.price_eur + '€/an' : '—';
+  const tldColor  = TLD_COLORS[tld] || '#6b7280';
+  const nicheColor = NICHE_COLORS[d.niche] || '#6b7280';
   const kw = (d.keywords||[]).join(', ');
-  const price = d.price_type === 'auction' ? 'Enchère' : (d.price_eur ? d.price_eur+'€/an' : '—');
-  const statusIcon = STATUS_ICONS[d.status] || '⚪';
-  const linked = d.linked_boutique_domain ? `<span style="color:var(--green);font-size:10px">→ ${esc(d.linked_boutique_domain)}</span>` : '';
-  return `<div class="ed-card" data-id="${esc(d.id)}">
+  const linked = d.linked_boutique_domain
+    ? `<div style="font-size:10px;color:#22c55e;margin-top:4px">→ ${esc(d.linked_boutique_domain)}</div>` : '';
+  return `<div class="ed-card">
     <div class="ed-domain"><a href="https://whois.domaintools.com/${esc(d.domain)}" target="_blank" rel="noopener">${esc(d.domain)}</a></div>
-    <div class="ed-badges">
-      <span class="badge ${tldClass(d.domain)}">${esc(tld)}</span>
-      <span class="badge" style="background:${NICHE_COLORS[d.niche]||'#666'}">${esc(d.niche)}</span>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">
+      <span class="tld-badge" style="background:${tldColor};color:#fff">${esc(tld)}</span>
+      <span class="niche-badge" style="background:${nicheColor}">${esc(d.niche)}</span>
+      <span class="badge ${d.status==='available'?'badge-success':'badge-warn'}" style="font-size:10px">${esc(d.status||'?')}</span>
     </div>
-    <div style="font-size:11px;color:var(--muted);margin-bottom:3px">Score ${d.score||0}/100</div>
-    <div class="score-bar"><div class="score-fill" style="width:${d.score||0}%"></div></div>
+    <div style="font-size:11px;color:var(--muted)">Score ${d.score||0}/100</div>
+    <div class="score-bar"><div class="score-fill" style="width:${Math.min(d.score||0,100)}%"></div></div>
     <div class="ed-meta">
-      <span><strong class="ed-price">${esc(price)}</strong></span>
+      <span class="ed-price">${esc(price)}</span>
       ${d.age_years ? `<span>${d.age_years} ans</span>` : ''}
-      <span>${statusIcon} ${esc(d.status||'unknown')}</span>
     </div>
-    ${kw ? `<div class="ed-kw">🔑 ${esc(kw)}</div>` : ''}
+    ${kw ? `<div style="font-size:10px;color:var(--muted)">🔑 ${esc(kw)}</div>` : ''}
     ${linked}
     <div class="card-actions">
-      <button class="btn btn-sm" onclick="linkBoutique('${esc(d.id)}','${esc(d.niche)}','${esc(d.domain)}')">🔗 Lier boutique</button>
-      <button class="btn btn-sm" onclick="window.open('https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(d.domain)}','_blank')">🛒 Vérifier prix</button>
+      <button class="btn btn-sm" onclick="linkBoutique('${esc(d.id)}','${esc(d.niche)}','${esc(d.domain)}')">🔗 Lier</button>
+      <button class="btn btn-sm" onclick="window.open('https://www.namecheap.com/domains/registration/results/?domain=${encodeURIComponent(d.domain)}','_blank')">🛒 Prix</button>
       <button class="btn btn-sm btn-danger" onclick="removeDomain('${esc(d.id)}')">✕</button>
     </div>
   </div>`;
 }
 
-function render() {
-  const domains = filtered();
-  document.getElementById('overview').innerHTML = overviewHTML(allDomains);
-  const grid = document.getElementById('ed-grid');
-  if(!domains.length) { grid.innerHTML = '<div class="empty-state">Aucun domaine trouvé.<br>Lancez l\'agent pour en récupérer.</div>'; return; }
-  grid.innerHTML = domains.map(cardHTML).join('');
-}
-
-async function load() {
-  const params = {};
-  if(filters.niche) params.niche = filters.niche;
-  if(filters.tld) params.tld = filters.tld;
-  const res = await apiGet('/expired-domains', params);
-  allDomains = Array.isArray(res) ? res : (res?.data || res?.domains || []);
-  render();
-}
-
 window.removeDomain = async function(id) {
-  if(!confirm('Retirer ce domaine ?')) return;
-  await apiDelete('/expired-domains/'+id);
-  allDomains = allDomains.filter(d => d.id !== id);
-  render();
-  toast('Domaine retiré');
+  if (!confirm('Retirer ce domaine ?')) return;
+  try {
+    await apiDelete('/expired-domains/'+id);
+    _all = _all.filter(d => d.id !== id);
+    renderOverview(); applyFilters();
+    toast('Domaine retiré', 'success');
+  } catch(e) { toast(e.message, 'error'); }
 };
 
 window.linkBoutique = async function(domainId, niche, domainName) {
-  const res = await apiGet('/boutiques', {per:300});
-  const boutiques = (Array.isArray(res) ? res : (res?.data || res?.boutiques || [])).filter(b => b.niche === niche);
-  const opts = boutiques.length
-    ? boutiques.map(b => `<option value="${esc(b.id)}">${esc(b.domain||b.name||b.id)}</option>`).join('')
-    : '<option disabled>Aucune boutique pour cette niche</option>';
-  openModal(`<div style="padding:20px;min-width:320px">
-    <h3 style="margin:0 0 14px">🔗 Lier à une boutique <span style="font-size:12px;color:var(--muted)">(${esc(niche)})</span></h3>
-    <p style="font-size:12px;color:var(--muted);margin:0 0 10px">${esc(domainName)}</p>
-    <select id="boutique-select" style="width:100%;margin-bottom:14px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px">${opts}</select>
-    <div style="display:flex;gap:8px;justify-content:flex-end">
-      <button class="btn" onclick="closeModal()">Annuler</button>
-      <button class="btn btn-primary" onclick="confirmLink('${esc(domainId)}','${esc(domainName)}')">Confirmer</button>
-    </div>
-  </div>`);
+  _pending = { id: domainId, domain: domainName };
+  document.getElementById('link-domain-label').textContent = domainName + ' → ' + niche;
+  try {
+    const res = await apiGet('/boutiques', { per: 300, niche });
+    const list = res.list || [];
+    document.getElementById('boutique-select').innerHTML = list.length
+      ? list.map(b=>`<option value="${esc(b.id)}">${esc(b.domain)}</option>`).join('')
+      : '<option disabled>Aucune boutique pour cette niche</option>';
+    openModal('modal-link');
+  } catch(e) { toast(e.message, 'error'); }
 };
 
-window.confirmLink = async function(domainId, domainName) {
+window.confirmLink = async function() {
   const sel = document.getElementById('boutique-select');
-  if(!sel || !sel.value) return;
-  await apiPut('/boutiques/'+sel.value, { expired_domain: domainName });
-  closeModal();
-  toast('Boutique liée !');
-  await load();
+  if (!sel?.value) return;
+  try {
+    await apiPut('/boutiques/'+sel.value, { expired_domain: _pending.domain });
+    closeModal('modal-link');
+    toast('Boutique liée !', 'success');
+    await load();
+  } catch(e) { toast(e.message, 'error'); }
 };
 
-function buildPage() {
-  document.getElementById('app').innerHTML = `
-    ${buildNav()}
-    <div class="layout">
-      ${buildSidebar()}
-      <main class="main">
-        <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-          <h1 style="margin:0;font-size:18px">🔥 Domaines Expirés</h1>
-          <button class="btn btn-primary" onclick="showAgentModal()">▶ Lancer l'agent</button>
-        </div>
-        <div id="overview"></div>
-        <div class="toolbar">
-          <select id="f-niche" onchange="setFilter('niche',this.value)">
-            <option value="">Toutes niches</option>
-            ${NICHES.map(n=>`<option value="${n}">${n}</option>`).join('')}
-          </select>
-          <select id="f-tld" onchange="setFilter('tld',this.value)">
-            <option value="">Tous TLD</option>
-            <option value="fr">.fr</option>
-            <option value="com">.com</option>
-            <option value="net">.net</option>
-          </select>
-          <input type="number" placeholder="Prix max €" id="f-price" min="0" style="width:100px" oninput="setFilter('maxPrice',this.value)">
-          <select id="f-sort" onchange="setFilter('sort',this.value)">
-            <option value="score">Score ↓</option>
-            <option value="price">Prix ↑</option>
-            <option value="age">Âge ↓</option>
-            <option value="recent">Récents</option>
-          </select>
-          <button class="btn" onclick="load()">↺ Rafraîchir</button>
-        </div>
-        <div class="ed-grid" id="ed-grid"><div class="empty-state">Chargement…</div></div>
-      </main>
-    </div>
-  `;
-}
-
-window.setFilter = function(key, val) { filters[key] = val; render(); };
-
-window.showAgentModal = function() {
-  const cmd = 'python3 /tmp/expired_domains.py';
-  openModal(`<div style="padding:20px;min-width:340px">
-    <h3 style="margin:0 0 12px">▶ Lancer l'agent</h3>
-    <p style="font-size:12px;color:var(--muted);margin:0 0 10px">Exécutez cette commande dans un terminal :</p>
-    <div style="background:var(--border);border-radius:6px;padding:10px 12px;font-family:monospace;font-size:13px;position:relative">
-      <span id="agent-cmd">${esc(cmd)}</span>
-      <button class="btn btn-sm" style="position:absolute;right:6px;top:6px" onclick="navigator.clipboard.writeText('${esc(cmd)}').then(()=>toast('Copié !'))">📋 Copier</button>
-    </div>
-    <div style="display:flex;justify-content:flex-end;margin-top:14px">
-      <button class="btn" onclick="closeModal()">Fermer</button>
-    </div>
-  </div>`);
-};
-
-buildPage();
 load();
 </script>
 </body>

@@ -1,0 +1,1690 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Traduction</title>
+<link rel="stylesheet" href="/assets/platform.css">
+<style>
+.vault-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
+.key-row { display:flex; align-items:center; gap:8px; padding:8px; background:var(--surface); border:1px solid var(--border); border-radius:6px; margin-bottom:6px; font-size:12px; }
+.key-row .key-badge { padding:2px 8px; border-radius:12px; font-size:10px; font-weight:700; }
+.key-badge.AIza { background:#1e40af; color:#93c5fd; }
+.key-badge.AQ   { background:#7c3aed; color:#ddd6fe; }
+.key-badge.unknown { background:#374151; color:#d1d5db; }
+.key-input { flex:1; font-family:monospace; font-size:11px; }
+.route-chip { display:inline-block; padding:3px 10px; border-radius:12px; font-size:11px; font-weight:600; margin:2px; }
+.route-chip.gemini { background:rgba(99,102,241,.15); color:#818cf8; border:1px solid #4338ca; }
+.route-chip.qwen   { background:rgba(245,158,11,.15); color:#fbbf24; border:1px solid #d97706; }
+.drop-zone { border:2px dashed var(--border); border-radius:8px; padding:30px; text-align:center; cursor:pointer; transition:.2s; color:var(--muted); }
+.drop-zone:hover,.drop-zone.drag-over { border-color:var(--accent); background:rgba(99,102,241,.06); color:var(--fg); }
+.drop-zone.has-file { border-color:#22c55e; background:rgba(34,197,94,.06); }
+.progress-bar { height:6px; background:var(--border); border-radius:3px; overflow:hidden; margin:6px 0; }
+.progress-fill { height:100%; background:var(--accent); border-radius:3px; transition:width .3s; }
+.status-log { font-family:monospace; font-size:12px; background:#0a0a0f; border:1px solid var(--border); border-radius:6px; padding:12px; max-height:220px; overflow-y:auto; color:#a0a0b0; line-height:1.8; }
+.status-log .ok   { color:#22c55e; }
+.status-log .err  { color:#ef4444; }
+.status-log .info { color:#6366f1; }
+.status-log .warn { color:#f59e0b; }
+.col-chip { display:inline-flex; align-items:center; gap:4px; padding:4px 10px; border-radius:16px; border:1px solid var(--border); background:var(--surface); font-size:12px; cursor:pointer; margin:3px; }
+.col-chip.checked { border-color:var(--accent); background:rgba(99,102,241,.1); }
+.lang-btn { padding:5px 12px; border-radius:16px; border:1px solid var(--border); background:var(--surface); cursor:pointer; font-size:12px; transition:.15s; display:inline-block; margin:3px; }
+.lang-btn.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+.import-zone { font-family:monospace; font-size:11px; width:100%; height:80px; background:#0a0a0f; border:1px solid var(--border); border-radius:4px; color:#a0a0b0; padding:8px; resize:vertical; }
+</style>
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Traduction — V35 Protocol</span>
+      <div class="topbar-right" style="display:flex;gap:8px;align-items:center">
+        <span id="vault-status" class="badge badge-warn" style="font-size:11px">Vault non configuré</span>
+        <button class="btn btn-sm" onclick="exportVault()">⬇ Export config</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <!-- ── Vault ── -->
+      <div class="vault-grid">
+        <!-- Gemini Keys -->
+        <div class="card">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span>Gemini API Vault</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="btn btn-sm" style="font-size:11px">+ Créer une clé →</a>
+              <span id="gemini-count" class="badge badge-info" style="font-size:10px">0 clé(s)</span>
+            </div>
+          </div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
+            <div id="gemini-keys-list"></div>
+            <div style="display:flex;gap:6px">
+              <input id="new-gemini-key" class="form-input key-input" type="password" placeholder="AIzaSy… ou AQ…" style="flex:1">
+              <button class="btn btn-sm btn-primary" onclick="addGeminiKey()">+ Ajouter</button>
+            </div>
+            <div style="margin-top:4px">
+              <label style="font-size:12px">Modèle Gemini</label>
+              <select id="gemini-model" class="form-input" style="font-size:12px;margin-top:4px">
+                <option value="gemini-2.5-flash">gemini-2.5-flash (rapide)</option>
+                <option value="gemini-2.5-pro">gemini-2.5-pro (puissant)</option>
+                <option value="gemini-2.0-flash">gemini-2.0-flash (stable)</option>
+                <option value="gemini-1.5-flash">gemini-1.5-flash (fallback)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Qwen + Import -->
+        <div class="card">
+          <div class="card-header">Qwen (descriptions produits)</div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
+            <div style="font-size:11px;color:var(--muted)">Via OpenRouter — routé auto pour <code>descriptions_produits</code></div>
+            <div style="display:flex;gap:6px">
+              <input id="qwen-key" class="form-input key-input" type="password" placeholder="sk-or-v1-…" style="flex:1">
+              <button class="btn btn-sm" onclick="testQwen()">Tester</button>
+            </div>
+            <div style="border-top:1px solid var(--border);padding-top:8px">
+              <div style="font-size:12px;margin-bottom:4px">Import config JSON (V35 protocol):</div>
+              <textarea id="import-json" class="import-zone" placeholder='{"api_vault":{"gemini":{"keys":[…]},"qwen":{"key":"…"}}}'></textarea>
+              <button class="btn btn-sm btn-primary" style="margin-top:6px;width:100%" onclick="importConfig()">⬆ Importer</button>
+              <button id="btn-save-vault" class="btn btn-primary" style="margin-top:10px;width:100%" onclick="saveVault()">
+                💾 Sauvegarder le vault
+              </button>
+              <div id="save-status" style="font-size:11px;color:#22c55e;text-align:center;display:none;margin-top:6px">✅ Vault sauvegardé</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Routing rules ── -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">Routing V35 — element_type → LLM</div>
+        <div class="card-body" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center" id="routing-display"></div>
+      </div>
+
+      <!-- ── Bibliothèque de Prompts ── -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+          <span>Bibliothèque de Prompts</span>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-sm" onclick="injectPromptsInTemplate()">📥 Injecter dans template</button>
+            <button class="btn btn-sm btn-primary" onclick="savePrompts()">💾 Sauvegarder</button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px" id="prompt-tabs">
+            <button class="lang-btn active" data-pt="titres_h1" onclick="switchPromptTab('titres_h1',this)">Titres H1</button>
+            <button class="lang-btn" data-pt="collections" onclick="switchPromptTab('collections',this)">Collections</button>
+            <button class="lang-btn" data-pt="descriptions_produits" onclick="switchPromptTab('descriptions_produits',this)">Descriptions</button>
+            <button class="lang-btn" data-pt="collection_intro" onclick="switchPromptTab('collection_intro',this)">Intro Collection</button>
+            <button class="lang-btn" data-pt="collection_longues" onclick="switchPromptTab('collection_longues',this)">Collection Longue</button>
+            <button class="lang-btn" data-pt="homepage" onclick="switchPromptTab('homepage',this)">Homepage</button>
+            <button class="lang-btn" data-pt="blog" onclick="switchPromptTab('blog',this)">Blog</button>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px">
+            Type actif : <strong id="prompt-type-label">titres_h1</strong>
+            <span style="margin-left:10px">→ routé sur <span id="prompt-provider-label" class="route-chip gemini" style="padding:1px 8px">gemini</span></span>
+            <span style="margin-left:10px;color:#f59e0b">Utilisez <code>[LANG]</code> pour la langue cible</span>
+          </div>
+          <textarea id="prompt-editor" class="import-zone" style="height:100px;width:100%" placeholder="Entrez votre prompt ici…"></textarea>
+        </div>
+      </div>
+
+      <!-- ── File + Langs ── -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div class="card">
+          <div class="card-header">Fichier XLSX / CSV</div>
+          <div class="card-body">
+            <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+              <div id="drop-label">
+                <div style="font-size:28px">📁</div>
+                <div>Glisser ou cliquer — fichier prompts V35</div>
+                <div style="font-size:11px;margin-top:6px;color:var(--muted)">Colonnes attendues :<br><code>element_type · source_fr · prompt_text · seo_keywords</code></div>
+              </div>
+            </div>
+            <input id="file-input" type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(this.files[0])">
+            <div id="file-info" style="font-size:11px;color:var(--muted);margin-top:6px"></div>
+            <div style="margin-top:10px;display:flex;gap:8px">
+              <button class="btn btn-sm" onclick="downloadTemplate()" style="flex:1">📥 Template XLSX</button>
+            </div>
+            <div style="margin-top:8px">
+              <label style="font-size:12px"><input type="checkbox" id="keep-html" checked style="accent-color:var(--accent)"> Conserver balises HTML</label>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span>Pays cibles <span id="lang-count" class="badge badge-info" style="font-size:10px">0 sélectionné(s)</span></span>
+            <div style="display:flex;gap:4px">
+              <button class="btn btn-sm" onclick="selectAllLangs(false)">Aucun</button>
+              <button class="btn btn-sm btn-primary" onclick="selectAllLangs(true)">Tous</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="lang-grid">
+              <div class="lang-btn active" data-lang="en" data-pays="États-Unis">🇺🇸 États-Unis</div>
+              <div class="lang-btn active" data-lang="de" data-pays="Allemagne">🇩🇪 Allemagne</div>
+              <div class="lang-btn active" data-lang="es" data-pays="Espagne">🇪🇸 Espagne</div>
+              <div class="lang-btn active" data-lang="it" data-pays="Italie">🇮🇹 Italie</div>
+              <div class="lang-btn" data-lang="pt" data-pays="Portugal">🇵🇹 Portugal</div>
+              <div class="lang-btn" data-lang="nl" data-pays="Pays-Bas">🇳🇱 Pays-Bas</div>
+              <div class="lang-btn" data-lang="pl" data-pays="Pologne">🇵🇱 Pologne</div>
+              <div class="lang-btn" data-lang="ro" data-pays="Roumanie">🇷🇴 Roumanie</div>
+              <div class="lang-btn" data-lang="sv" data-pays="Suède">🇸🇪 Suède</div>
+              <div class="lang-btn" data-lang="da" data-pays="Danemark">🇩🇰 Danemark</div>
+              <div class="lang-btn" data-lang="fi" data-pays="Finlande">🇫🇮 Finlande</div>
+              <div class="lang-btn" data-lang="no" data-pays="Norvège">🇳🇴 Norvège</div>
+              <div class="lang-btn" data-lang="cs" data-pays="République Tchèque">🇨🇿 Rép. Tchèque</div>
+              <div class="lang-btn" data-lang="sk" data-pays="Slovaquie">🇸🇰 Slovaquie</div>
+              <div class="lang-btn" data-lang="sl" data-pays="Slovénie">🇸🇮 Slovénie</div>
+              <div class="lang-btn" data-lang="hr" data-pays="Croatie">🇭🇷 Croatie</div>
+              <div class="lang-btn" data-lang="bg" data-pays="Bulgarie">🇧🇬 Bulgarie</div>
+              <div class="lang-btn" data-lang="el" data-pays="Grèce">🇬🇷 Grèce</div>
+              <div class="lang-btn" data-lang="et" data-pays="Estonie">🇪🇪 Estonie</div>
+              <div class="lang-btn" data-lang="lt" data-pays="Lituanie">🇱🇹 Lituanie</div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:8px">Chaque pays = un onglet dans l'XLSX résultat</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── V35 Preview ── -->
+      <div class="card" id="col-card" style="display:none;margin-bottom:16px">
+        <div class="card-header">Aperçu — Contenu détecté <span id="col-hint" style="font-size:12px;color:var(--muted);font-weight:400"></span></div>
+        <div class="card-body" id="col-select-wrap" style="overflow-x:auto"></div>
+      </div>
+
+      <!-- ── Actions + Log ── -->
+      <div class="card">
+        <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <button id="btn-translate" class="btn btn-primary" onclick="startTranslation()" disabled>🌐 Lancer la traduction</button>
+            <button id="btn-download" class="btn" onclick="downloadResult()" style="display:none">⬇ Télécharger XLSX</button>
+            <div id="progress-wrap" style="flex:1;min-width:200px;display:none">
+              <div style="font-size:11px;color:var(--muted)" id="progress-label">0 / 0</div>
+              <div class="progress-bar"><div class="progress-fill" id="progress-fill" style="width:0%"></div></div>
+            </div>
+          </div>
+          <div class="status-log" id="status-log">V35 Protocol ready — configurez le vault et chargez un fichier.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script type="module">
+import { checkAuth, buildNav, toast } from '/assets/platform.js';
+import { V35Vault, V35Router }       from '/assets/v35-vault.js';
+checkAuth(); buildNav();
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+const vault  = new V35Vault();
+const router = new V35Router(vault, log);
+
+// Configure your OpenRouter key via Settings → Vault
+
+let _wb = null, _sheets = {}, _selectedCols = new Set(), _resultWb = null;
+
+const LANG_NAMES = { en:'anglais',es:'espagnol',de:'allemand',it:'italien',pt:'portugais',nl:'néerlandais',pl:'polonais',ro:'roumain',sv:'suédois',da:'danois',fi:'finnois',no:'norvégien',cs:'tchèque',sk:'slovaque',sl:'slovène',hr:'croate',bg:'bulgare',el:'grec',et:'estonien',lt:'lituanien' };
+
+// Restore persisted Qwen key display
+const qkey = vault.config.api_vault.qwen?.key;
+if (qkey) document.getElementById('qwen-key').value = qkey;
+
+// ── Vault UI ──────────────────────────────────────────────────────────────────
+function renderVault() {
+  const keys = vault.config.api_vault.gemini.keys;
+  const activeKey = vault.getActiveGeminiKey();
+  document.getElementById('gemini-count').textContent = `${keys.length} clé(s)`;
+  document.getElementById('gemini-keys-list').innerHTML = keys.map((k,i) => `
+    <div class="key-row">
+      <span class="key-badge ${k.type}">${k.type}</span>
+      <span style="flex:1;font-family:monospace;color:var(--muted)">${k.key.slice(0,8)}…${k.key.slice(-4)}</span>
+      <span style="font-size:10px;color:var(--muted)">${k.calls_count||0} appels</span>
+      ${k === activeKey ? '<span class="badge badge-success" style="font-size:10px">actif</span>' : ''}
+      ${k.last_error ? `<span title="${k.last_error}" style="color:#ef4444;font-size:16px;cursor:help">⚠</span>` : ''}
+      <button class="btn btn-sm" onclick="window._testKey(${i})">Test</button>
+      <button class="btn btn-sm btn-danger" onclick="window._removeKey(${i})">✕</button>
+    </div>`).join('') || '<div style="font-size:12px;color:var(--muted)">Aucune clé Gemini</div>';
+
+  // Vault status badge
+  const hasGemini = keys.filter(k=>k.status!=='disabled').length > 0;
+  const hasQwen   = !!vault.config.api_vault.qwen?.key;
+  const badge = document.getElementById('vault-status');
+  if (hasGemini && hasQwen) { badge.textContent='Vault OK (Gemini + Qwen)'; badge.className='badge badge-success'; }
+  else if (hasGemini) { badge.textContent='Vault OK (Gemini)'; badge.className='badge badge-info'; }
+  else { badge.textContent='Vault non configuré'; badge.className='badge badge-warn'; }
+
+  // Routing display
+  const r = vault.config.routing_rules;
+  document.getElementById('routing-display').innerHTML =
+    (r.gemini_targets||[]).map(t=>`<span class="route-chip gemini">⚡ ${t}</span>`).join('') +
+    (r.qwen_targets||[]).map(t=>`<span class="route-chip qwen">🔶 ${t}</span>`).join('') +
+    `<span style="font-size:11px;color:var(--muted);margin-left:8px">Rotation 429 auto · ${vault.config.error_handling.max_retries} retries</span>`;
+
+  checkReady();
+}
+
+window._testKey = async function(idx) {
+  const k = vault.config.api_vault.gemini.keys[idx];
+  if (!k) return;
+  log(`Test clé ${k.type} (${k.key.slice(0,8)}…)…`, 'info');
+  try {
+    await router.testGeminiKey(k.key, document.getElementById('gemini-model').value);
+    k.last_error = null;
+    log(`Clé ${idx+1} valide ✓`, 'ok');
+    vault.save(); renderVault();
+  } catch(e) {
+    k.last_error = e.message;
+    log(`Clé ${idx+1} invalide: ${e.message}`, 'err');
+    vault.save(); renderVault();
+  }
+};
+
+window._removeKey = function(idx) {
+  vault.removeGeminiKey(idx);
+  log(`Clé ${idx+1} supprimée`, 'info');
+  renderVault();
+};
+
+window.addGeminiKey = function() {
+  const v = document.getElementById('new-gemini-key').value.trim();
+  if (!v) return toast('Clé vide', 'error');
+  if (vault.addGeminiKey(v)) {
+    document.getElementById('new-gemini-key').value = '';
+    log(`Clé ajoutée (${v.startsWith('AIza')?'AIza':v.startsWith('AQ')?'AQ':'unknown'} type)`, 'ok');
+    renderVault();
+  } else {
+    toast('Clé déjà présente ou invalide', 'error');
+  }
+};
+
+window.saveQwen = function() {
+  const k = document.getElementById('qwen-key').value.trim();
+  if (!k) return;
+  vault.config.api_vault.qwen.key = k;
+  vault.config.api_vault.qwen.status = 'active';
+  vault.save(); renderVault();
+  log('Clé Qwen sauvegardée', 'ok');
+};
+
+window.testQwen = async function() {
+  const k = document.getElementById('qwen-key').value.trim();
+  vault.config.api_vault.qwen.key = k;
+  try {
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${k}`},
+      body: JSON.stringify({ model:'qwen/qwen-2.5-7b-instruct', messages:[{role:'user',content:'Reply: OK'}], max_tokens:5 }),
+    });
+    if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error?.message || r.statusText);
+    log('Clé Qwen valide ✓', 'ok');
+    vault.save(); renderVault();
+  } catch(e) { log(`Qwen invalide: ${e.message}`, 'err'); }
+};
+
+window.saveVault = function() {
+  const qk = document.getElementById('qwen-key').value.trim();
+  if (qk) {
+    vault.config.api_vault.qwen.key = qk;
+    vault.config.api_vault.qwen.status = 'active';
+  }
+  vault.save();
+  renderVault();
+  const s = document.getElementById('save-status');
+  s.style.display = 'block';
+  setTimeout(() => s.style.display = 'none', 3000);
+  toast('Vault sauvegardé', 'success');
+  log('Vault sauvegardé ✓', 'ok');
+};
+
+window.importConfig = function() {
+  const raw = document.getElementById('import-json').value.trim();
+  if (!raw) return toast('JSON vide', 'error');
+  try {
+    const n = vault.importConfig(raw);
+    log(`Config V35 importée — ${n} clé(s) Gemini`, 'ok');
+    const qk = vault.config.api_vault.qwen?.key;
+    if (qk) document.getElementById('qwen-key').value = qk;
+    document.getElementById('import-json').value = '';
+    renderVault(); toast('Config importée', 'success');
+  } catch(e) { log(`Import échoué: ${e.message}`, 'err'); toast('JSON invalide', 'error'); }
+};
+
+window.exportVault = function() {
+  const cfg = JSON.parse(JSON.stringify(vault.config));
+  // Mask keys in export
+  cfg.api_vault.gemini.keys.forEach(k => k.key = k.key.slice(0,8)+'…');
+  cfg.api_vault.qwen.key = '***';
+  const blob = new Blob([JSON.stringify(cfg, null,2)], {type:'application/json'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='v35-vault-export.json'; a.click();
+};
+
+// ── Pays mapping (lang → pays name) ──────────────────────────────────────────
+const LANG_TO_PAYS = { en:'États-Unis',es:'Espagne',de:'Allemagne',it:'Italie',pt:'Portugal',nl:'Pays-Bas',pl:'Pologne',ro:'Roumanie',sv:'Suède',da:'Danemark',fi:'Finlande',no:'Norvège',cs:'République Tchèque',sk:'Slovaquie',sl:'Slovénie',hr:'Croatie',bg:'Bulgarie',el:'Grèce',et:'Estonie',lt:'Lituanie' };
+
+// ── Batch types: send all rows together, parse JSON response ──────────────────
+const BATCH_TYPES = {
+  titres_h1:            { listKey:'titres_fr',      inputCmd:'/generate',             arrayKey:'products',    valueKey:'title_final',    mode:'list',          tokensPerItem: 80  },
+  collections:          { listKey:'collections_fr', inputCmd:'/generate_collections', arrayKey:'collections', valueKey:'title_final',    mode:'list',          tokensPerItem: 60  },
+  collection_intro:     { listKey:'collections_fr', inputCmd:'/generate_intros',      arrayKey:'items',       valueKey:'above_grid_html',mode:'list',          tokensPerItem: 200 },
+  descriptions_produits:{ arrayKey:'products',                                        valueKey:'description', mode:'json_products',      tokensPerItem: 500 },
+};
+
+// maxTokens plancher par type pour les appels row-by-row
+const ROW_MAX_TOKENS = {
+  homepage:          8192,
+  collection_longues:4096,
+  collection_intro:  4096,
+  blog:              4096,
+  titres_h1:         2048,
+  collections:       2048,
+  descriptions_produits: 4096,
+  default:           2048,
+};
+
+// ── Prompts Library ───────────────────────────────────────────────────────────
+const PROMPTS_LS_KEY = 'v35_prompts';
+const DEFAULT_PROMPTS = {
+  titres_h1: `SYSTEM ROLE:
+Tu es un **Expert SEO Multilingue**.
+Tu transformes automatiquement une liste de titres produits en français en titres optimisés longue traîne pour un pays cible.
+Tu réalises l'intégralité du process **en interne**, et tu ne sors qu'un **JSON compact final** avec **un seul titre choisi par produit**.
+Contraintes :
+- Input = titres produits FR + pays cible + langue cible.
+- Génération : mot-clé principal + attributs → adaptation locale → 10 variantes internes → anti-doublon → sélection 1 titre optimal.
+- 🔥 SEO : le mot-clé doit être en début de titre
+Sur beaucoup de tes lignes, le vrai mot-clé "produit" arrive après un adjectif ou une phrase.
+Ex :
+"Tukeva metallinen hääkaari seremoniaa ja juhlia varten"
+➡️ mieux SEO serait :
+✅ "Metallinen hääkaari – tukeva kaari seremoniaan ja juhliin
+- Quelques ajustements "pro" par catégorie
+💍 Arche de mariage
+Tes titres sont bons, mais parfois trop "phrase complète".
+Excellents :
+Pyöreä hääkaari... ✅
+Suorakulmainen hääkaari... ✅
+Kuusikulmainen hääkaari... ✅
+À améliorer légèrement :
+"Kaunis vihkikaari hääseremonian keskipisteeksi"
+➡️ plus keyword-first :
+✅ "Vihkikaari / hääkaari – kaunis tausta hääseremoniaan"
+- Chaque titre = 6–8 mots, longue traîne, unique, naturel dans la langue cible.
+- Output = JSON propre, uniquement titres retenus, aucun commentaire ni explication.
+---
+## PROCESSUS INTERNE (à faire dans ta tête, ne rien afficher)
+1. EXTRACTION DES ATTRIBUTS
+   - Identifier mot-clé principal + attributs secondaires (matière, taille, couleur, usage, style, fonction).
+2. ADAPTATION LINGUISTIQUE
+   - Traduire/adopter mot-clé principal et attributs dans la langue cible.
+   - Générer variantes lexicales locales internes.
+3. GÉNÉRATION VARIANTES
+   - Créer 10 titres longue traîne candidats (6–8 mots).
+4. ANTI-DOUBLON
+   - Vérifier qu'aucun titre généré ne duplique un autre.
+   - Éliminer doublons internes.
+5. SÉLECTION FINALE
+   - Choisir le **meilleur titre unique** pour chaque produit (SEO + naturel).
+---
+## FORMAT D'INPUT UTILISATEUR
+/generate
+pays: [PAYS]
+langue: [LANG]
+titres_fr:
+- "Globe Terrestre Balle en Mousse Décorative Rétro"
+- "Globe Terrestre Design Noir Argent Élégant et Moderne"
+- "Globe Terrestre Verre Élégant pour Explorer le Monde"
+---
+## FORMAT DE SORTIE (OBLIGATOIRE)
+Tu rends **uniquement** ce JSON final :
+{"country_target":"[PAYS]","language_target":"[LANG]","products":[{"original_fr":"Globe Terrestre Lumineux Bois pour Déco Élégante","title_final":"Leuchtglobus Holz LED Modern Wohnzimmer"},{"original_fr":"Globe Terrestre en Liège 20 cm Ludique et Educatif","title_final":"Kinderfreundlicher Kork Globus 20cm Pädagogisch"}]}
+---
+## TRAITEMENT DE TON COTE (ATTENTION)
+Il y a plus de 1000 titres à traiter. Très souvent tu ne les traites pas dans leur intégralité. Il faut que tu comptes d'abord le nombre de titres à traiter et que tu t'assures que ton output contiendra ce même nombre. Souvent tu t'arrêtes à un output autour de 10000 tokens d'output quand il t'en faut probablement autour de 60000. Le traitement pour me donner l'output complet prend au moins 400 secondes d'après ce que j'ai vu lors des tests.
+---
+# END PROMPT`,
+
+  collections: `SYSTEM ROLE:
+Tu es un **Expert SEO Collections Shopify Multilingue International**.
+Tu transformes automatiquement une liste de noms de collections en français (souvent génériques ou descriptifs) en **LE titre de collection optimal** pour un pays cible.
+Tu réalises l'intégralité du process **en interne**, et tu ne sors qu'un **JSON compact final** avec **un seul titre choisi par collection**.
+Contraintes strictes :
+- Input = liste de noms collections FR + pays cible + langue cible.
+- Output = un seul titre par collection : mot-clé principal natif/local en début, naturel, 3–7 mots max, ressemble à une vraie recherche Google dans la langue cible.
+- SEO prioritaire : mot-clé principal (le plus cherché localement) en tout début, intention d'achat/usage incluse si pertinent (ex. : Deko, Geschenk, für Kinder, Kochen...).
+- Naturel et fluide : pas de keyword stacking robotique ; imite ce que les locaux tapent vraiment (pas traduction littérale FR).
+- Longueur : court et impactant pour meta title (50–60 caractères idéalement).
+- Évite superlatifs marketing : blacklist absolue = beste, premium, perfekt, luxuriös, günstig, top, billig, etc.
+- Chaque titre doit être unique dans le batch.
+- Traite max 500 collections par réponse. Si plus, réponds uniquement "NEXT_BATCH_REQUIRED" et arrête.
+PROCESSUS INTERNE (dans ta tête, ne rien afficher) :
+1. EXTRACTION DU MOT-CLÉ PRINCIPAL
+   - Identifier le cœur de la collection (ex. : tablier cuisine → "tablier de cuisine" ou "Kochschürze").
+   - Ajouter attributs secondaires si pertinents (femme, homme, enfants, professionnel, noël...).
+2. RECHERCHE MENTALE LOCALE (simule keyword research)
+   - Pense aux volumes de recherche réels dans le pays cible (ex. : Allemagne → "Kochschürze" > "Schürze Küche" ; France → "tablier cuisine" ; Espagne → "delantal cocina").
+   - Priorise termes natifs / synonymes locaux les plus tapés (ex. : DE "Schürze" souvent + "Küche" ou "Kochen").
+3. ADAPTATION LINGUISTIQUE & CULTURELLE
+   - Traduis/adapte en langue cible avec expressions naturelles.
+   - Ajoute mot d'intention/usage si ça booste (ex. : "für Frauen", "Kinder", "Weihnachten", "Geschenkidee").
+5. RECHERCHE EN LIGNE
+   - Tu as la fonctionnalité de chercher en ligne, utilise là
+6. GÉNÉRATION VARIANTES
+   - Crée 10 variantes titres candidats (3–7 mots, mot-clé début).
+   - Rends-les naturels, variés, longue traîne si pertinent.
+7. ANTI-DOUBLON & SÉLECTION FINALE
+   - Vérifie pas de doublons dans le batch.
+   - Choisis LE meilleur : le plus SEO (mot-clé fort début), naturel, intentionnel, court.
+FORMAT INPUT UTILISATEUR (exemple) :
+/generate_collections
+pays: [PAYS]
+langue: [LANG]
+collections_fr:
+- frontpage
+- tablier cuisine
+- tablier de cuisine femme
+FORMAT DE SORTIE (OBLIGATOIRE – UNIQUEMENT ÇA) :
+{"country_target":"[PAYS]","language_target":"[LANG]","collections":[{"original_fr":"tablier cuisine","title_final":"Kochschürze Küche für Frauen und Männer"},{"original_fr":"tablier de cuisine femme","title_final":"Damen Kochschürze Küche"}]}
+IMPORTANT – RÈGLES FINALES :
+- Compte les collections input → output exactement le même nombre (ou NEXT_BATCH_REQUIRED si >500).
+- Pas d'explications, pas de texte hors JSON.
+- Priorise recherches Google natives du pays.
+- Pour "frontpage" → "Willkommen" ou nom boutique si pertinent, sinon "Shop Startseite".
+END PROMPT`,
+
+  descriptions_produits: `You are a multilingual e-commerce SEO + CRO copywriter.
+
+You generate MULTIPLE product descriptions in one request.
+
+========================
+INPUTS
+========================
+
+COUNTRY_TARGET: [PAYS]
+LANGUAGE_TARGET: [LANG]
+
+PRODUCTS: array of objects containing:
+- TITLE_LOCAL (already written in target language)
+- DESC_FR_RAW (French raw text)
+
+========================
+OUTPUT RULES
+========================
+
+Return ONLY valid JSON.
+No markdown.
+No explanations.
+No text before or after JSON.
+
+JSON FORMAT (mandatory):
+{"country":"[PAYS]","language":"[LANG]","products":[{"title":"TITLE_LOCAL","description":"<section>FULL HTML HERE</section>"}]}
+
+All text inside "description" must be valid HTML. No line breaks outside JSON. Escape quotes if needed.
+
+========================
+LANGUAGE RULE
+========================
+
+All generated HTML content must be 100% written in [LANG].
+
+========================
+ABSOLUTE RULE – NO INVENTION
+========================
+
+DO NOT invent product characteristics (materials, size, colors, closure, accessories, compatibility, performance, certifications, brand, origin, warranty, price/shipping).
+
+========================
+ALLOWED CONTENT
+========================
+
+You may discuss: target audience, use cases, occasions, lifestyle context, emotional benefits.
+BUT you must NEVER present them as technical product facts.
+
+========================
+FACT POLICY
+========================
+
+Every item inside "Product Details" must come ONLY from TITLE_LOCAL or DESC_FR_RAW (after internal literal translation).
+If information is missing, write "Not specified" in [LANG].
+
+========================
+MANDATORY HTML STRUCTURE (per product)
+========================
+
+<section class="product-description" data-country="[PAYS]" data-lang="[LANG]">
+  <header><h2>TITLE_LOCAL</h2><p class="hook">1 punchy CRO sentence (no fake specs).</p></header>
+  <p class="intro">2–3 sentences: vibe, occasion, what it helps achieve (no fake specs).</p>
+  <h3>Who Is This For?</h3><ul><li>3 bullets: target users (generic, no fake specs)</li></ul>
+  <h3>Perfect Occasions</h3><ul><li>3-5 bullets: occasions (generic, no fake specs)</li></ul>
+  <h3>Why You'll Love It</h3><ul><li><strong>Benefit</strong>: generic (no fake specs)</li></ul>
+  <h3>Product Details</h3><ul><li>Material: ...</li><li>Color(s): ...</li><li>Size: ...</li><li>Care: ...</li><li>Accessories: ...</li></ul>
+  <p class="cta"><strong>Now:</strong> 1 short CTA (no fake specs).</p>
+</section>
+
+========================
+IMPORTANT
+========================
+
+Input count = output count. If 100 titles in → 100 descriptions out.
+
+END OF PROMPT`,
+
+  collection_intro: `SYSTEM ROLE — COLLECTION PAGE ABOVE-GRID INTRO ENGINE (UX-FIRST / KORAY-INSPIRED)
+
+════════════════════════════════════════════════════════════════════
+COLLECTION PAGE SKELETON — WHERE THIS TEXT LIVES
+════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────┐
+│  [BREADCRUMB]  ← theme                                          │
+│  [H1 = collection.title]  ← theme                              │
+│                                                                 │
+│  ▶▶▶ [collection_intro OUTPUT — ABOVE GRID] ◀◀◀               │
+│  · 1-2 sentences confirming intent (25-45 words)               │
+│  · 3-4 sub-type/style tags                                      │
+│                                                                 │
+│  [FILTERS / SORT / ACTIVE TAGS]  ← theme                       │
+│  [PRODUCT GRID]  ← theme                                        │
+│  [PAGINATION]  ← theme                                          │
+│                                                                 │
+│  [collection_longues OUTPUT — BELOW GRID]                       │
+│  · H2-based long SEO text (600-900 words)                       │
+│  · FAQ schema.org                                               │
+└─────────────────────────────────────────────────────────────────┘
+
+════════════════════════════════════════════════════════════════════
+MISSION — ABOVE-GRID INTRO (UX-FIRST)
+════════════════════════════════════════════════════════════════════
+
+The above-grid intro serves ONE UX purpose: immediately confirm to the visitor that they landed on the right page.
+It is the FIRST text they see after the H1.
+It must be FAST to read (5 seconds max), reassuring, and keyword-enriched.
+It does NOT replace the product grid. It introduces it.
+
+You process a BATCH of collection names → output a JSON array, one entry per collection.
+
+════════════════════════════════════════════════════════════════════
+INTERNAL WORKFLOW (execute silently — do NOT display)
+════════════════════════════════════════════════════════════════════
+
+STEP 1 — INTENT CONFIRMATION
+For each collection name, identify:
+- Primary search intent: what did the visitor type to reach this page?
+- Head term in [LANG] (native phrasing, not literal FR translation)
+- 2-3 key modifiers (style, material, room, audience, use case)
+- Taxonomy level: hub (broad) / mid (filtered) / leaf (specific)
+
+STEP 2 — INTRO SENTENCE CONSTRUCTION (25-45 words)
+Rules:
+- Lead with head_term in [LANG] naturally in first 5 words
+- State what the collection contains (product scope)
+- Add 1 key modifier or use-case signal
+- End with a forward cue toward the grid ("ci-dessous", "below", "hier", etc.) — optional
+- FORBIDDEN openers: "Discover/Explore/Welcome/Bienvenue", any opener that duplicates the H1
+- FORBIDDEN: invented specs, certifications, brand names, prices
+- FORBIDDEN: hollow adjectives (premium, exceptional, best, perfect)
+- MAX 2 sentences
+
+STEP 3 — SUB-TYPE TAGS (3-4 items)
+Generate 3-4 short tags (2-4 words each) representing the main sub-categories or styles within the collection.
+These appear as clickable visual tags below the intro sentence.
+They must reflect REAL sub-divisions of the collection (inferrable from the collection name).
+Examples: "Style industriel", "LED intégré", "Pour chambre", "Bois et métal"
+NOT: "Haute qualité", "Tendance", "Best-seller"
+
+STEP 4 — ANTI-LLM CHECK
+Re-read the intro sentence:
+- Does it open with head_term (not a generic phrase)?
+- Is it ≤45 words?
+- Zero hollow adjectives?
+- Zero invented specs?
+If any check fails: rewrite.
+
+════════════════════════════════════════════════════════════════════
+TONE BY MARKET
+════════════════════════════════════════════════════════════════════
+
+de/at: concise, factual, Qualität implied not stated
+en: direct, benefit signal in first phrase
+es/it/pt: slightly warmer, concrete
+nl/se/dk/no/fi: minimal, functional, honest
+pl/ro/cs/sk/hr/sl/bg: practical, value-clear
+el/lt/et: simple, factual
+
+════════════════════════════════════════════════════════════════════
+OUTPUT FORMAT (STRICT JSON ARRAY)
+════════════════════════════════════════════════════════════════════
+
+Return ONLY valid JSON. No markdown. No text outside JSON.
+
+[
+  {
+    "original_fr": "nom collection en français",
+    "above_grid_html": "<div class=\"collection-intro-above\" data-type=\"collection-intro\" lang=\"[LANG]\" data-country=\"[PAYS]\"><p class=\"collection-intro-text\">[25-45 word intro sentence in [LANG]]</p><div class=\"collection-subtypes\"><span class=\"subtype-tag\">[tag 1]</span><span class=\"subtype-tag\">[tag 2]</span><span class=\"subtype-tag\">[tag 3]</span></div></div>"
+  }
+]
+
+Rules:
+- Escape all inner quotes with \"
+- One JSON object per collection
+- Output count MUST equal input count
+- above_grid_html contains the complete HTML block, single-line (no newlines inside the string)
+
+════════════════════════════════════════════════════════════════════
+INPUT FORMAT
+════════════════════════════════════════════════════════════════════
+
+/generate_intros
+pays: [PAYS]
+langue: [LANG]
+collections_fr:
+- "collection name 1"
+- "collection name 2"
+
+END PROMPT`,
+
+  collection_longues: `SYSTEM ROLE — COLLECTION PAGE LONG-FORM SEO ENGINE (KORAY-STYLE TOPICAL AUTHORITY)
+
+════════════════════════════════════════════════════════════════════
+COLLECTION PAGE SKELETON — WHERE THIS TEXT LIVES
+════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────┐
+│  [BREADCRUMB]  ← theme                                          │
+│  [H1 = collection.title]  ← theme                              │
+│  [collection_intro → above_grid_html]  ← intent confirm        │
+│  [FILTERS / SORT]  ← theme                                      │
+│  [PRODUCT GRID]  ← theme                                        │
+│  [PAGINATION]  ← theme                                          │
+│                                                                 │
+│  ▶▶▶ [collection_longues OUTPUT — BELOW GRID] ◀◀◀             │
+│  · Opening paragraph (80-120 words)                             │
+│  · H2 sections × 3-4 (PAA queries, 100-160 words each)         │
+│  · FAQ section (schema.org, 3-4 Q&A)                           │
+│  · Closing + internal links                                     │
+└─────────────────────────────────────────────────────────────────┘
+
+The visitors who reach this text have scrolled past the entire product grid.
+They are HIGH-INTENT RESEARCHERS: they want to understand before buying, or they didn't find their product and need guidance.
+This text answers their questions, builds trust, and feeds Google's topical graph.
+
+════════════════════════════════════════════════════════════════════
+MISSION
+════════════════════════════════════════════════════════════════════
+
+You are a senior SEO content architect specialized in e-commerce collection/category pages.
+You build long-form SEO texts (600–900 words) that appear BELOW the product grid on collection pages.
+Their purpose: establish topical authority, capture informational + commercial intent, feed semantic cocoons, rank for mid/long-tail queries in [LANG] for [PAYS].
+You write 100% in [LANG]. You do NOT translate literally from French. You localize semantically for [PAYS] search behavior.
+You do NOT write marketing copy. You write structured, informative, search-demand-aligned content.
+
+────────────────────────────────────────────────────────────────────────────
+WHAT THIS TEXT DOES ON THE PAGE
+────────────────────────────────────────────────────────────────────────────
+
+This text sits BELOW the product grid. Shoppers who scroll past the products are high-intent researchers.
+It must:
+1. Reinforce the page's topical relevance to Google for the category keyword
+2. Answer the implicit questions a buyer has after browsing the products
+3. Create a semantic cocoon: feed related entities, synonyms, and co-occurrence terms
+4. Internally link the category to its subcategories and parent categories
+5. Serve as the topical hub for the site's niche architecture
+
+────────────────────────────────────────────────────────────────────────────
+INTERNAL WORKFLOW — EXECUTE ALL STEPS BEFORE WRITING (DO NOT DISPLAY)
+────────────────────────────────────────────────────────────────────────────
+
+STEP 1 — ENTITY RESOLUTION
+Extract from the collection name:
+A) Primary entity (head_term): the core product type people search for in [LANG]
+B) Modifiers: material, style, audience, size, room/location, occasion, feature
+C) Taxonomy position:
+   - HUB page (broad: "appliques murales") → focus on sub-type overview + selection guide
+   - MID page (filtered: "appliques murales chambre") → focus on use-case depth + specific criteria
+   - LEAF page (specific: "applique liseuse rechargeable") → focus on technical selection + compatibility
+
+STEP 2 — DEMAND MAPPING (simulate [PAYS] keyword research)
+For the head_term, mentally map:
+- Primary query: what locals search most (exact local phrasing, NOT FR translation)
+  Ex: DE "Wandleuchte Schlafzimmer" not "Wandbeleuchtung für Schlafzimmer"
+- PAA queries: 5–8 questions people ask on Google in [LANG] about this category
+  Format: "Wie wählt man...", "Quelle est la différence entre...", "How to choose...", "Was ist..."
+- Long-tail variations: room + style, material + use, size + function
+- Semantic co-occurrences: terms that always appear near the head_term in [PAYS] search results
+
+STEP 3 — SEMANTIC COCOON CONSTRUCTION
+Build the topical perimeter for this collection:
+- must_include: 6–10 terms mandatory for topical coverage (head_term synonyms + key modifiers + sub-types)
+- nice_to_include: 4–6 secondary terms that enrich semantic density without risk
+- internal_link_anchors: 2–3 subcategory or related-category names (will become <a> tags in output)
+- exclude: invented specs, model numbers, certifications, brand names, price ranges, shipping promises
+
+STEP 4 — CONTENT ARCHITECTURE DESIGN
+Choose H2 structure based on taxonomy level:
+
+For HUB pages (3–4 H2s):
+  H2-1: Selection guide ("Comment choisir...", "Wie wähle ich...", "How to choose...")
+  H2-2: Sub-types overview ("Les différents types de...", "Arten von...", "Types of...")
+  H2-3: Room/use-case guide ("Par pièce", "By room", "Nach Raum")
+  H2-4: Optional — Style guide or compatibility
+
+For MID pages (3–4 H2s):
+  H2-1: Why this specific category ("Pourquoi une [modifier] [head_term]?", "Warum...")
+  H2-2: Selection criteria specific to the modifier ("Critères de choix", "Auswahlkriterien")
+  H2-3: Styles and variants within this sub-category
+  H2-4: Practical tips for this specific use case
+
+For LEAF pages (2–3 H2s):
+  H2-1: Technical selection ("Comment choisir", compatibility criteria)
+  H2-2: Use case and installation context
+  H2-3: Maintenance / care if relevant
+
+Each H2 must be phrased as a REAL [LANG] search query (PAA-style). Not generic. Not "In this section".
+
+STEP 5 — DRAFT EACH SECTION
+Opening paragraph (80–120 words):
+- Lead with primary keyword naturally in first sentence (NOT the H1 — this text is separate)
+- Establish what the collection covers: types, users, use cases
+- No "Bienvenue", no "Discover", no opener that mirrors the H1
+- End with a forward-looking sentence that implies the text will guide the reader
+
+Each H2 section (100–160 words):
+Paragraph 1: Direct answer to the H2 question (2–3 sentences, concrete, no fluff)
+Paragraph 2: Expansion with semantic co-occurrences and sub-type mentions
+Optional: 1 short unordered list (max 4 items) ONLY if content is genuinely list-like
+Each section must contain at least 2 must_include terms naturally woven in
+
+Closing paragraph (60–80 words):
+- Summarize the selection logic for this category
+- 1–2 natural internal links to related subcategories (use <a href="#"> as placeholder)
+- Soft: no hard CTA, no "buy now", no fake urgency
+
+STEP 6 — ANTI-LLM REWRITE PASS
+Scan every sentence for:
+A) Generic openers to eliminate: "This collection...", "In this category...", "You will find..."
+B) Hollow adjectives: premium, top-quality, exceptional, outstanding, perfect, ideal
+C) Template repetition: same sentence structure opening multiple paragraphs
+D) Over-stated claims: "the best selection", "unmatched quality", "widest range"
+E) Filler transitions: "Furthermore,", "In addition,", "It is worth noting that"
+F) Three-adjective stacks: "elegant, modern and refined"
+
+Target style: noun-led, concrete, varied syntax, restrained, informative peer voice.
+
+STEP 7 — SEMANTIC COVERAGE AUDIT
+Verify:
+✓ head_term appears 3–5× in body text (not counting H2s)
+✓ At least 6 must_include terms are present naturally
+✓ At least 2 internal_link_anchors are used as <a href="#"> in the closing
+✓ No exclude terms present
+✓ H2s read as real [LANG] search queries
+
+STEP 8 — QUALITY CHECKS (set truthfully)
+no_hallucinated_specs: true/false
+anti_llm_pass: true/false
+semantic_density_ok: true/false
+keyword_coverage_ok: true/false
+internal_links_present: true/false
+
+────────────────────────────────────────────────────────────────────────────
+BANNED PHRASES (ABSOLUTE — any language equivalent)
+────────────────────────────────────────────────────────────────────────────
+
+"Discover / Explore / Shop now / Find the perfect"
+"Designed for / Ideal for / Perfect for / Made for"
+"Premium / Top-quality / Best / Ultimate / Exceptional"
+"You will find / In this collection you will discover"
+"We offer / We have / Our range includes"
+"Don't miss / Don't hesitate"
+"It is important to note / Furthermore / In addition"
+Three-adjective stacks of any kind
+
+────────────────────────────────────────────────────────────────────────────
+MANDATORY HTML OUTPUT SKELETON
+────────────────────────────────────────────────────────────────────────────
+
+<div class="collection-long-seo" lang="[LANG]" data-country="[PAYS]" data-type="collection-longues">
+
+  <p class="collection-seo-intro">
+    [Opening paragraph — head_term in first sentence, 80–120 words]
+  </p>
+
+  <section class="seo-block">
+    <h2>[PAA-style H2 in [LANG] — selection guide or why question]</h2>
+    <p>[Direct answer, 2–3 sentences]</p>
+    <p>[Expansion with semantic co-occurrences, sub-type mentions]</p>
+    <!-- optional: <ul><li>...</li></ul> only if genuinely list content -->
+  </section>
+
+  <section class="seo-block">
+    <h2>[PAA-style H2 in [LANG] — sub-types or styles]</h2>
+    <p>[...]</p>
+    <p>[...]</p>
+  </section>
+
+  <section class="seo-block">
+    <h2>[PAA-style H2 in [LANG] — use cases or rooms or occasions]</h2>
+    <p>[...]</p>
+    <p>[...]</p>
+  </section>
+
+  <!-- Add 4th section for HUB pages only -->
+  <section class="seo-block">
+    <h2>[PAA-style H2 in [LANG] — practical tips or criteria]</h2>
+    <p>[...]</p>
+    <p>[...]</p>
+  </section>
+
+  <p class="collection-seo-closing">
+    [Closing paragraph with 1–2 internal links as <a href="#">anchor text</a>, 60–80 words]
+  </p>
+
+  <section class="collection-faq" itemscope itemtype="https://schema.org/FAQPage">
+    <h2>[FAQ heading in [LANG] — e.g. "Questions fréquentes sur [collection]"]</h2>
+    <div class="faq-item" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+      <h3 itemprop="name">[Q1 — PAA-style buying/choosing question in [LANG]]</h3>
+      <div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+        <p itemprop="text">[A1 — 40–60 words, generic, no invented specs]</p>
+      </div>
+    </div>
+    <div class="faq-item" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+      <h3 itemprop="name">[Q2 — use case or compatibility question in [LANG]]</h3>
+      <div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+        <p itemprop="text">[A2 — 40–60 words, generic, no invented specs]</p>
+      </div>
+    </div>
+    <div class="faq-item" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+      <h3 itemprop="name">[Q3 — style/room/occasion question in [LANG]]</h3>
+      <div itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+        <p itemprop="text">[A3 — 40–60 words, generic, no invented specs]</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Quality metadata — include in output for QA, hidden by CSS -->
+  <script type="application/ld+json" class="seo-qa-meta" style="display:none">
+  {"type":"collection-longues-qa","no_hallucinated_specs":true,"anti_llm_pass":true,"semantic_density_ok":true,"keyword_coverage_ok":true,"internal_links_present":true}
+  </script>
+
+</div>
+
+────────────────────────────────────────────────────────────────────────────
+SPECIAL CASES
+────────────────────────────────────────────────────────────────────────────
+
+SALE / CLEARANCE pages: Keep text short (200–300 words). Only generic discount framing. No invented percentages.
+
+BRAND collection pages: Mention brand only if in collection name. No invented brand attributes.
+
+ROOM-SPECIFIC collections (ex: "Chambre", "Cuisine"): Lead with the room context. H2s focus on: why this room needs this product type / what to consider for this specific room / style integration.
+
+STYLE-SPECIFIC collections (ex: "Industriel", "Scandinave"): Lead with style definition in target market. H2s: what defines this style locally / key attributes / how to combine with other décor.
+
+TECHNICAL collections (ex: "LED", "Rechargeable"): Lead with functional benefit. H2s: how to choose based on specs / installation context / energy/compatibility considerations (generic only, no invented specs).
+
+────────────────────────────────────────────────────────────────────────────
+INPUT FORMAT
+────────────────────────────────────────────────────────────────────────────
+
+collection_name_fr: [French collection name — single name]
+pays: [PAYS]
+langue: [LANG]
+taxonomy_level: [hub / mid / leaf — if known; else infer]
+
+────────────────────────────────────────────────────────────────────────────
+OUTPUT
+────────────────────────────────────────────────────────────────────────────
+
+Return ONLY the complete HTML block as defined in the skeleton above.
+No explanation. No markdown outside HTML. No text before or after the <div>.
+
+END PROMPT`,
+
+  homepage: `SYSTEM ROLE — ECOMMERCE HOMEPAGE CONTENT GENERATOR (APPLIQUE-TENDANCE SKELETON)
+
+You are a senior e-commerce copywriter and SEO specialist.
+You generate complete homepage content in [LANG] for the [PAYS] market.
+Reference structure: applique-tendance.com (French e-commerce lighting store).
+Output: a complete HTML skeleton with all sections filled — ready for the theme to take over.
+
+You write 100% in [LANG]. Cultural localization for [PAYS], not literal French translation.
+You do NOT invent: prices, promotions percentages, certifications, shipping times, brand names.
+
+────────────────────────────────────────────────────────────────────────────
+TONE BY MARKET
+────────────────────────────────────────────────────────────────────────────
+
+de/at/ch: direct, functional, Qualität-focused, no hype, formal Sie
+en (UK/AU): friendly, benefit-driven, conversational
+en (US): energetic, direct, benefit-first
+es/it/pt: warm, relationship-oriented, slightly aspirational
+nl/sv/da/no/fi: minimalist, honest, quality + sustainability cues
+pl/ro/cs/sk/hr/sl/bg: practical, value-for-money, concrete
+el/lt/et: straightforward, factual, no fluff
+
+────────────────────────────────────────────────────────────────────────────
+HOMEPAGE SKELETON — GENERATE ALL SECTIONS
+────────────────────────────────────────────────────────────────────────────
+
+INPUT provides: niche (product category), shop name (optional), main collections (optional).
+You fill every section with content adapted to the niche and [PAYS] market.
+
+SECTION 1 — HERO
+- H1: keyword-first in [LANG], max 60 chars, primary niche keyword as first word or phrase
+  Ex: "Wandleuchten für jedes Zuhause – Stil trifft Funktion" (NOT "Beleuchten Sie Ihr...")
+- Subtitle (p.hero-subtitle): 1 sentence, secondary keyword, explains value proposition
+- CTA button: action verb + niche keyword (e.g., "Découvrir nos appliques", "Shop Wandleuchten")
+
+SECTION 2 — TRUST BENEFITS (3 columns)
+3 short benefit labels adapted to [PAYS] expectations:
+- Col 1: design/style benefit
+- Col 2: quality/material benefit
+- Col 3: service/support benefit
+Each: icon placeholder + short label (3–5 words max)
+
+SECTION 3 — BESTSELLERS
+- H2: "Nos meilleures ventes" equivalent in [LANG] — keyword-enriched
+  Ex: "Unsere meistverkauften Wandleuchten", "Our Best-Selling Wall Lights"
+- Subtitle (optional, 1 sentence): why these are popular, niche-specific
+
+SECTION 4 — ABOUT (À PROPOS)
+- Label: "À PROPOS" equivalent in [LANG] (e.g., "ÜBER UNS", "ABOUT US", "SOBRE NOSOTROS")
+- H2: value proposition — niche-specific, keyword-enriched, max 70 chars
+  Ex: "Ein Wandleuchten-Stil für jeden Raum"
+- Paragraph (80–120 words): brand story style — what the shop specializes in, niche depth, quality commitment, range variety. Informative, not salesy. Include 2–3 niche keywords naturally.
+- CTA: "See [main category]" equivalent in [LANG]
+
+SECTION 5 — CATEGORIES (4 visual cards)
+4 style/sub-category names for the niche, adapted to [PAYS] aesthetics:
+Each card: style name in [LANG] (2–3 words)
+Ex for lighting: Modern, Industriel, Scandinave, Bohème → adapt naming to [PAYS] style culture
+
+SECTION 6 — NEW ARRIVALS
+- H2: "Nouveautés" equivalent in [LANG] — keyword-enriched
+  Ex: "Neue Wandleuchten-Trends", "New Arrivals in Wall Lighting"
+- Subtitle (1 sentence): what's new or trending this season in [PAYS]
+
+SECTION 7 — SOCIAL PROOF / REVIEWS
+- H2: customer trust heading in [LANG]
+  Ex: "Ils nous font confiance" → "Das sagen unsere Kunden", "What Our Customers Say"
+- Intro sentence: generic trust statement (no invented review counts, no fake stars)
+
+SECTION 8 — NEWSLETTER
+- H2: newsletter heading in [LANG]
+- Paragraph (30–40 words): benefit of subscribing — news, trends, exclusive offers (generic, no invented % discount unless already in source)
+- CTA label for submit button
+
+SECTION 9 — FAQ (4 questions)
+Generate 4 FAQ questions and answers relevant to the niche AND [PAYS] market:
+- Q1: Order tracking / how to order
+- Q2: Shipping to [PAYS] — generic timeframe (do NOT invent exact days unless in source)
+- Q3: Returns policy — generic (do NOT invent duration unless in source)
+- Q4: Payment security / methods common in [PAYS]
+Each answer: 2–3 sentences, concrete, reassuring, no invented details.
+
+SECTION 10 — TRUST BADGES (4 icons)
+4 commercial guarantees adapted to [PAYS] buyer expectations:
+- Badge 1: free shipping threshold (generic: "Free shipping from X€/£/..." — use "X" if unknown)
+- Badge 2: returns policy (generic)
+- Badge 3: secure payment
+- Badge 4: customer support availability
+
+────────────────────────────────────────────────────────────────────────────
+SEO RULES
+────────────────────────────────────────────────────────────────────────────
+
+- H1: primary keyword (highest volume, local phrasing for [PAYS])
+- H2s: secondary keywords + intent signals
+- About paragraph: 2–3 niche LSI terms naturally
+- FAQ: voice-search queries for [PAYS] (PAA format)
+- No keyword stuffing. Max 2× same keyword per section.
+
+────────────────────────────────────────────────────────────────────────────
+ANTI-LLM BLACKLIST
+────────────────────────────────────────────────────────────────────────────
+
+NEVER open H1 with: "Discover/Explore/Welcome/Bienvenue/Willkommen/Bienvenidos"
+NEVER use: premium/ultimate/best/top-quality/game-changing/cutting-edge
+NEVER invent: exact prices, exact shipping days, exact discount %, brand names, certifications
+NEVER use three-adjective stacks
+
+────────────────────────────────────────────────────────────────────────────
+MANDATORY HTML OUTPUT SKELETON
+────────────────────────────────────────────────────────────────────────────
+
+<div class="homepage-content" lang="[LANG]" data-country="[PAYS]" data-type="homepage">
+
+  <!-- SECTION 1: HERO -->
+  <section class="hero-section">
+    <h1 class="hero-title">[keyword-first H1 in [LANG]]</h1>
+    <p class="hero-subtitle">[value proposition sentence]</p>
+    <a href="/collections" class="hero-cta btn-primary">[CTA label]</a>
+  </section>
+
+  <!-- SECTION 2: TRUST BENEFITS -->
+  <section class="benefits-bar">
+    <div class="benefit-item">
+      <span class="benefit-icon">✦</span>
+      <span class="benefit-label">[Benefit 1 — 3-5 words]</span>
+    </div>
+    <div class="benefit-item">
+      <span class="benefit-icon">✦</span>
+      <span class="benefit-label">[Benefit 2 — 3-5 words]</span>
+    </div>
+    <div class="benefit-item">
+      <span class="benefit-icon">✦</span>
+      <span class="benefit-label">[Benefit 3 — 3-5 words]</span>
+    </div>
+  </section>
+
+  <!-- SECTION 3: BESTSELLERS -->
+  <section class="bestsellers-section">
+    <h2 class="section-title">[Bestsellers H2 in [LANG]]</h2>
+    <p class="section-subtitle">[optional 1 sentence]</p>
+    <!-- product grid rendered by theme -->
+  </section>
+
+  <!-- SECTION 4: ABOUT -->
+  <section class="about-section">
+    <span class="about-label">[À PROPOS equivalent in [LANG]]</span>
+    <h2 class="about-title">[value proposition H2 — keyword-enriched]</h2>
+    <p class="about-text">[80–120 word brand/niche paragraph]</p>
+    <a href="/collections" class="about-cta">[See main category CTA]</a>
+  </section>
+
+  <!-- SECTION 5: CATEGORIES -->
+  <section class="categories-section">
+    <h2 class="section-title">[Categories H2 in [LANG]]</h2>
+    <div class="category-grid">
+      <div class="category-card"><span class="cat-name">[Style 1]</span></div>
+      <div class="category-card"><span class="cat-name">[Style 2]</span></div>
+      <div class="category-card"><span class="cat-name">[Style 3]</span></div>
+      <div class="category-card"><span class="cat-name">[Style 4]</span></div>
+    </div>
+  </section>
+
+  <!-- SECTION 6: NEW ARRIVALS -->
+  <section class="new-arrivals-section">
+    <h2 class="section-title">[New arrivals H2 in [LANG]]</h2>
+    <p class="section-subtitle">[1 sentence on current trends in [PAYS]]</p>
+    <!-- product grid rendered by theme -->
+  </section>
+
+  <!-- SECTION 7: REVIEWS -->
+  <section class="reviews-section">
+    <h2 class="section-title">[Customer trust H2 in [LANG]]</h2>
+    <p class="reviews-intro">[Generic trust intro sentence]</p>
+    <!-- review carousel rendered by theme -->
+  </section>
+
+  <!-- SECTION 8: NEWSLETTER -->
+  <section class="newsletter-section">
+    <h2 class="newsletter-title">[Newsletter H2 in [LANG]]</h2>
+    <p class="newsletter-text">[30-40 word subscription benefit]</p>
+    <span class="newsletter-cta-label">[Submit CTA label]</span>
+    <!-- form rendered by theme -->
+  </section>
+
+  <!-- SECTION 9: FAQ -->
+  <section class="faq-section" itemscope itemtype="https://schema.org/FAQPage">
+    <h2 class="faq-title">[FAQ heading in [LANG]]</h2>
+    <div class="faq-item" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+      <h3 class="faq-question" itemprop="name">[Q1]</h3>
+      <div class="faq-answer" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+        <p itemprop="text">[A1 — 2-3 sentences]</p>
+      </div>
+    </div>
+    <div class="faq-item" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+      <h3 class="faq-question" itemprop="name">[Q2]</h3>
+      <div class="faq-answer" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+        <p itemprop="text">[A2]</p>
+      </div>
+    </div>
+    <div class="faq-item" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+      <h3 class="faq-question" itemprop="name">[Q3]</h3>
+      <div class="faq-answer" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+        <p itemprop="text">[A3]</p>
+      </div>
+    </div>
+    <div class="faq-item" itemscope itemprop="mainEntity" itemtype="https://schema.org/Question">
+      <h3 class="faq-question" itemprop="name">[Q4]</h3>
+      <div class="faq-answer" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
+        <p itemprop="text">[A4]</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECTION 10: TRUST BADGES -->
+  <section class="trust-badges">
+    <div class="badge"><span class="badge-label">[Free shipping label]</span></div>
+    <div class="badge"><span class="badge-label">[Returns label]</span></div>
+    <div class="badge"><span class="badge-label">[Secure payment label]</span></div>
+    <div class="badge"><span class="badge-label">[Support label]</span></div>
+  </section>
+
+</div>
+
+────────────────────────────────────────────────────────────────────────────
+INPUT FORMAT
+────────────────────────────────────────────────────────────────────────────
+
+niche_fr: [French niche/product category — ex: "appliques murales", "arbres à chats"]
+shop_name: [optional]
+main_collections: [optional — comma-separated list of main collections]
+pays: [PAYS]
+langue: [LANG]
+
+────────────────────────────────────────────────────────────────────────────
+OUTPUT
+────────────────────────────────────────────────────────────────────────────
+
+Return ONLY the complete HTML skeleton with all 10 sections filled.
+No explanation. No markdown. No text outside the HTML div.
+
+END PROMPT`,
+
+  blog: `SYSTEM ROLE — MULTILINGUAL E-COMMERCE BLOG WRITER (SEO SENIOR)
+
+You are a senior SEO content strategist and native-level copywriter for the [PAYS] market.
+You write e-commerce blog articles that rank on Google AND convert readers into buyers.
+You write 100% in [LANG]. Never mix languages. Never translate literally from French — localize culturally.
+
+========================
+MISSION
+========================
+
+Transform a French blog topic/title into a complete, publish-ready HTML blog article for [PAYS].
+The article must:
+- Rank for informational + commercial intent queries in [LANG]
+- Build topical authority within the niche
+- Drive traffic from People Also Ask (PAA) boxes
+- Convert organically (no aggressive CTAs, no fake urgency)
+
+========================
+SEO ARCHITECTURE (MANDATORY)
+========================
+
+1. H1 — keyword-first, max 60 chars, matches real search query in [LANG] (not a literal FR translation)
+2. INTRO (150–200 words) — hook in first sentence, state the problem/need clearly, no "Bienvenue/Welcome/Bienvenido" opener
+3. H2 SECTIONS (4–6 sections, 150–250 words each):
+   - Each H2 = a real question people ask on Google in [LANG] (PAA format: "Comment...", "Quelle...", "Pourquoi...", "How to...", "What is...", etc.)
+   - Each section answers the question directly in paragraph 1, then expands
+   - Natural keyword integration — no stuffing
+4. PRODUCT INTEGRATION (1–2 sections) — mention relevant product types naturally within advice context, no salesy language
+5. CONCLUSION (100–150 words) — summarize key points, 1 soft CTA linking to the relevant collection
+6. FAQ SCHEMA-READY (3–5 Q&A) — formatted as HTML definition list, answerable in 40–60 words each
+
+========================
+ANTI-LLM RULES (ABSOLUTE)
+========================
+
+NEVER use: "Discover/Explore/Find the perfect", "In conclusion/In summary", "Did you know?", "Are you looking for?", "We offer/We have", "premium/ultimate/top-quality", "game-changing/cutting-edge"
+NEVER start paragraphs with: "It is important to note", "First of all", "Last but not least"
+NEVER write 3-adjective stacks: "comfortable, durable and stylish"
+NEVER invent stats, studies, percentages, brand names, certifications, or prices.
+
+========================
+MANDATORY HTML OUTPUT FORMAT
+========================
+
+<article class="blog-post" lang="[LANG]" data-country="[PAYS]">
+  <header>
+    <h1>KEYWORD-FIRST TITLE IN [LANG]</h1>
+    <p class="intro">...</p>
+  </header>
+
+  <section>
+    <h2>PAA-STYLE QUESTION IN [LANG]?</h2>
+    <p>Direct answer first. Then expansion.</p>
+  </section>
+
+  <!-- repeat 3–5 more <section> blocks -->
+
+  <section class="product-context">
+    <h2>NATURAL PRODUCT MENTION H2</h2>
+    <p>Advice-first, product mention embedded naturally.</p>
+  </section>
+
+  <footer class="blog-conclusion">
+    <h2>CONCLUSION H2 IN [LANG]</h2>
+    <p>Summary + soft CTA.</p>
+  </footer>
+
+  <section class="faq" itemscope itemtype="https://schema.org/FAQPage">
+    <h2>FAQ</h2>
+    <dl>
+      <dt itemprop="name">Question 1?</dt>
+      <dd itemprop="text">Answer in 40–60 words.</dd>
+      <!-- repeat 2–4 more Q&A -->
+    </dl>
+  </section>
+</article>
+
+========================
+KEYWORD STRATEGY
+========================
+
+- H1: primary keyword (highest search volume, matches intent)
+- H2s: secondary keywords + PAA variants + long-tail questions
+- Body: LSI terms, semantic co-occurrences natural to the niche in [LANG]
+- FAQ: voice-search queries, zero-click featured snippets
+
+========================
+CONTENT QUALITY
+========================
+
+- Minimum 1200 words total
+- Sentence variety: mix short punchy sentences with longer analytical ones
+- No bullet-list abuse: max 1 list per section, only when truly a list of items
+- Every claim must be generic and plausible — no invented facts
+- Tone: expert peer, not salesperson, not teacher, not robot
+
+========================
+INPUT FORMAT
+========================
+
+topic_fr: [French blog topic/title]
+pays: [PAYS]
+langue: [LANG]
+niche: [optional niche context]
+
+========================
+OUTPUT
+========================
+
+Return ONLY the complete HTML article. No explanation. No markdown. No text outside the HTML.
+
+END PROMPT`,
+};
+
+let _prompts = {};
+try {
+  _prompts = JSON.parse(localStorage.getItem(PROMPTS_LS_KEY) || '{}');
+  // Merge with defaults for missing types
+  for (const [k,v] of Object.entries(DEFAULT_PROMPTS)) {
+    if (!_prompts[k]) _prompts[k] = v;
+  }
+} catch(e) { _prompts = { ...DEFAULT_PROMPTS }; }
+
+let _currentPromptType = 'titres_h1';
+
+window.switchPromptTab = function(type, btn) {
+  // Save current before switching
+  _prompts[_currentPromptType] = document.getElementById('prompt-editor').value;
+  _currentPromptType = type;
+
+  document.querySelectorAll('#prompt-tabs .lang-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  document.getElementById('prompt-editor').value = _prompts[type] || '';
+  document.getElementById('prompt-type-label').textContent = type;
+
+  const provider = vault.route(type);
+  const chip = document.getElementById('prompt-provider-label');
+  chip.textContent = provider;
+  chip.className = `route-chip ${provider}`;
+};
+
+window.savePrompts = function() {
+  _prompts[_currentPromptType] = document.getElementById('prompt-editor').value;
+  localStorage.setItem(PROMPTS_LS_KEY, JSON.stringify(_prompts));
+  toast('Prompts sauvegardés', 'success');
+  log('Bibliothèque de prompts sauvegardée', 'ok');
+};
+
+window.injectPromptsInTemplate = function() {
+  _prompts[_currentPromptType] = document.getElementById('prompt-editor').value;
+  localStorage.setItem(PROMPTS_LS_KEY, JSON.stringify(_prompts));
+  downloadTemplate();
+};
+
+// Init prompt editor
+document.getElementById('prompt-editor').value = _prompts[_currentPromptType] || '';
+
+// ── Lang toggle ───────────────────────────────────────────────────────────────
+function updateLangCount() {
+  const n = document.querySelectorAll('#lang-grid .lang-btn.active').length;
+  document.getElementById('lang-count').textContent = `${n} sélectionné(s)`;
+}
+document.getElementById('lang-grid').addEventListener('click', e => {
+  const btn = e.target.closest('.lang-btn');
+  if (!btn) return;
+  btn.classList.toggle('active');
+  updateLangCount();
+});
+window.selectAllLangs = function(all) {
+  document.querySelectorAll('#lang-grid .lang-btn').forEach(b => b.classList.toggle('active', all));
+  updateLangCount();
+};
+updateLangCount();
+
+// ── Drop zone ─────────────────────────────────────────────────────────────────
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('drag-over'); handleFile(e.dataTransfer.files[0]); });
+
+window.handleFile = function(file) {
+  if (!file) return;
+  dz.classList.add('has-file');
+  document.getElementById('drop-label').innerHTML = `<div style="font-size:24px">✅</div><div style="font-weight:600">${file.name}</div>`;
+  document.getElementById('file-info').textContent = `${(file.size/1024).toFixed(1)} KB`;
+  log(`Fichier: ${file.name} (${(file.size/1024).toFixed(1)} KB)`, 'info');
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    _wb = XLSX.read(new Uint8Array(e.target.result), { type:'array' });
+    _sheets = {};
+    _wb.SheetNames.forEach(n => { _sheets[n] = XLSX.utils.sheet_to_json(_wb.Sheets[n], { header:1, defval:'' }); });
+    renderColSelector();
+    checkReady();
+    log(`${_wb.SheetNames.length} feuille(s): ${_wb.SheetNames.join(', ')}`, 'ok');
+  };
+  reader.readAsArrayBuffer(file);
+};
+
+// V35 column detection
+function detectV35Cols(headers) {
+  const h = headers.map(x => String(x).toLowerCase().trim());
+  return {
+    element_type:  h.findIndex(x => /element.?type|type.?contenu/.test(x)),
+    source_fr:     h.findIndex(x => /source.?fr|source|contenu.?fr|texte.?fr|fr$/.test(x)),
+    title_local:   h.findIndex(x => /title.?local|titre.?local|titre.?traduit|translated.?title/.test(x)),
+    prompt_text:   h.findIndex(x => /prompt.?text|prompt/.test(x)),
+    seo_keywords:  h.findIndex(x => /seo|keyword|mot.?cl/.test(x)),
+  };
+}
+
+function renderColSelector() {
+  const name = _wb.SheetNames[0];
+  const rows = _sheets[name] || [];
+  if (!rows.length) return;
+
+  const cols = detectV35Cols(rows[0]);
+  const found = Object.entries(cols).filter(([,v])=>v>=0).map(([k])=>k);
+  const missing = Object.entries(cols).filter(([,v])=>v<0).map(([k])=>k);
+
+  document.getElementById('col-card').style.display = '';
+  document.getElementById('col-hint').textContent =
+    `— ${rows.length-1} ligne(s) · colonnes: ${found.join(', ')}${missing.length ? ' · manquantes: '+missing.join(', ') : ''}`;
+
+  // Build preview table (first 5 rows)
+  const preview = rows.slice(0, 6);
+  const NICHE_COLORS = {homepage:'#6366f1',titres_h1:'#8b5cf6',collections:'#ec4899',collection_intro:'#f59e0b',collection_longues:'#f97316',descriptions_produits:'#14b8a6',blog:'#22c55e'};
+  const tr = (cells, isHead=false) => `<tr>${cells.map(c=>`<${isHead?'th':'td'} style="border:1px solid var(--border);padding:4px 8px;font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c}</th>`).join('')}</tr>`;
+
+  const tbody = preview.slice(1).map(row => {
+    const et = cols.element_type >= 0 ? String(row[cols.element_type]||'') : '';
+    const color = NICHE_COLORS[et] || '#6b7280';
+    const provider = vault.route(et);
+    const cells = rows[0].map((_,i) => {
+      let v = String(row[i]||'').slice(0,60);
+      if (i === cols.element_type) v = `<span style="background:${color};color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">${v}</span> <span style="font-size:10px;color:var(--muted)">${provider}</span>`;
+      if (i === cols.prompt_text && v.length > 40) v = v.slice(0,40)+'…';
+      return v;
+    });
+    return tr(cells);
+  }).join('');
+
+  document.getElementById('col-select-wrap').innerHTML =
+    `<table style="border-collapse:collapse;min-width:100%"><thead>${tr(rows[0], true)}</thead><tbody>${tbody}</tbody></table>`;
+}
+
+// ── Translation V35 (batch for titres_h1/collections, row-by-row for others) ──
+window.startTranslation = async function() {
+  if (!_wb) return toast('Aucun fichier', 'error');
+  const langs = [...document.querySelectorAll('.lang-btn.active')].map(b=>b.dataset.lang);
+  if (!langs.length) return toast('Sélectionnez une langue', 'error');
+
+  const model    = document.getElementById('gemini-model').value;
+  const keepHtml = document.getElementById('keep-html').checked;
+
+  document.getElementById('btn-translate').disabled = true;
+  document.getElementById('btn-download').style.display = 'none';
+  document.getElementById('progress-wrap').style.display = '';
+
+  _resultWb = XLSX.utils.book_new();
+
+  const allRows = _sheets[_wb.SheetNames[0]] || [];
+  if (allRows.length < 2) { toast('Fichier vide', 'error'); return; }
+
+  const cols = detectV35Cols(allRows[0]);
+  const dataRows = allRows.slice(1).filter(r => {
+    const src = cols.source_fr >= 0 ? String(r[cols.source_fr]||'').trim() : '';
+    return src.length > 0;
+  });
+
+  // Estimate total calls: batch types count as 1 per batch of BATCH_SIZE per lang
+  const BATCH_SIZE = 50;
+  let totalEstimate = 0;
+  for (const lang of langs) {
+    const byType = groupByType(dataRows, cols);
+    for (const [et, rows] of Object.entries(byType)) {
+      if (BATCH_TYPES[et]) totalEstimate += Math.ceil(rows.length / BATCH_SIZE);
+      else totalEstimate += rows.length;
+    }
+  }
+  let done = 0;
+
+  log(`${dataRows.length} lignes · ${langs.length} langue(s) · ~${totalEstimate} appels LLM`, 'info');
+
+  for (const lang of langs) {
+    const pays     = LANG_TO_PAYS[lang] || lang;
+    const langName = LANG_NAMES[lang]   || lang;
+
+    // Map original row index → result string
+    const results = new Array(dataRows.length).fill('');
+
+    const byType = groupByType(dataRows, cols);
+
+    for (const [et, idxRows] of Object.entries(byType)) {
+      const batchCfg = BATCH_TYPES[et];
+
+      if (batchCfg) {
+        // ── BATCH MODE ────────────────────────────────────────────────────────
+        const systemPrompt = (_prompts[et] || DEFAULT_PROMPTS[et] || '')
+          .replace(/\[LANG\]/gi, langName).replace(/\[PAYS\]/gi, pays);
+
+        // Split into chunks of BATCH_SIZE
+        for (let offset = 0; offset < idxRows.length; offset += BATCH_SIZE) {
+          const chunk = idxRows.slice(offset, offset + BATCH_SIZE);
+
+          let inputBlock;
+          if (batchCfg.mode === 'json_products') {
+            // descriptions_produits: {TITLE_LOCAL (translated), DESC_FR_RAW (source text)}
+            // title_local col = already-translated title from a prior titres_h1 run (optional)
+            // source_fr col   = French raw description text
+            const products = chunk.map(({ row }) => ({
+              TITLE_LOCAL: cols.title_local >= 0
+                ? String(row[cols.title_local] || row[cols.source_fr] || '').trim()
+                : String(row[cols.source_fr] || '').trim(),
+              DESC_FR_RAW: cols.title_local >= 0
+                ? String(row[cols.source_fr] || '').trim()
+                : '',
+            }));
+            inputBlock = `COUNTRY_TARGET: ${pays}\nLANGUAGE_TARGET: ${lang}\n\nPRODUCTS:\n${JSON.stringify(products, null, 2)}`;
+          } else {
+            // titres_h1 / collections: plain list
+            const titles = chunk.map(({ row }) => String(row[cols.source_fr] || '').trim());
+            inputBlock = `${batchCfg.inputCmd}\npays: ${pays}\nlangue: ${lang}\n${batchCfg.listKey}:\n` +
+              titles.map(t => `- "${t}"`).join('\n');
+          }
+
+          const fullPrompt = `${systemPrompt}\n\n${inputBlock}`;
+
+          log(`[${lang.toUpperCase()}] ${et} — batch ${Math.floor(offset/BATCH_SIZE)+1} (${chunk.length} items) → LLM…`, 'info');
+
+          let raw = '';
+          try {
+            raw = await router.call(et, fullPrompt, { model, maxTokens: Math.max(4096, chunk.length * (batchCfg.tokensPerItem || 80)) });
+          } catch(e) {
+            log(`[${lang.toUpperCase()}] ${et} batch ERR: ${e.message}`, 'err');
+            done++;
+            setProgress(done, totalEstimate);
+            continue;
+          }
+
+          // Parse JSON response
+          let parsed = null;
+          try {
+            const jsonStr = raw.replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'').trim();
+            parsed = JSON.parse(jsonStr);
+          } catch(e) {
+            log(`[${lang.toUpperCase()}] ${et} JSON parse ERR — raw: ${raw.slice(0,200)}`, 'err');
+          }
+
+          if (parsed) {
+            const arr = parsed[batchCfg.arrayKey] || [];
+            for (const { idx, row } of chunk) {
+              const srcFr = String(row[cols.source_fr] || '').trim();
+              let match;
+              if (batchCfg.mode === 'json_products') {
+                match = arr.find(x => x.title?.trim() === srcFr);
+              } else {
+                match = arr.find(x => x.original_fr?.trim() === srcFr);
+              }
+              results[idx] = match ? (match[batchCfg.valueKey] || '') : '';
+              if (!match) log(`[${lang.toUpperCase()}] no match: ${srcFr.slice(0,40)}`, 'warn');
+            }
+            log(`[${lang.toUpperCase()}] ${et} batch ✓ (${arr.length}/${chunk.length} matched)`, 'ok');
+          }
+
+          done++;
+          setProgress(done, totalEstimate);
+          await sleep(800);
+        }
+
+      } else {
+        // ── ROW-BY-ROW MODE ──────────────────────────────────────────────────
+        for (const { idx, row } of idxRows) {
+          const sourceFr   = String(row[cols.source_fr]   || '').trim();
+          const promptText = cols.prompt_text >= 0 ? String(row[cols.prompt_text] || '').trim() : '';
+          const keywords   = cols.seo_keywords >= 0 ? String(row[cols.seo_keywords] || '').trim() : '';
+
+          log(`[${lang.toUpperCase()}] ${et} → LLM…`, 'info');
+          try {
+            const prompt = buildPromptFromRow(sourceFr, promptText, keywords, lang, et, keepHtml);
+            results[idx] = await router.call(et, prompt, { model, maxTokens: ROW_MAX_TOKENS[et] || ROW_MAX_TOKENS.default });
+            log(`[${lang.toUpperCase()}] ${et} ✓`, 'ok');
+          } catch(e) {
+            log(`[${lang.toUpperCase()}] ${et} ERR: ${e.message}`, 'err');
+          }
+
+          done++;
+          setProgress(done, totalEstimate);
+          await sleep(400);
+        }
+      }
+    }
+
+    // Build output sheet with results column
+    const outputRows = [[...allRows[0], `result_${lang}`],
+      ...dataRows.map((row, i) => [...row, results[i] || ''])
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(outputRows);
+    ws['!cols'] = outputRows[0].map((_,i) => ({
+      wch: Math.min(80, Math.max(12, ...outputRows.map(r=>String(r[i]||'').length)))
+    }));
+    XLSX.utils.book_append_sheet(_resultWb, ws, lang.toUpperCase().slice(0,31));
+  }
+
+  document.getElementById('btn-translate').disabled = false;
+  document.getElementById('btn-download').style.display = '';
+  log(`Terminé — ${langs.length} langue(s), ${dataRows.length} lignes`, 'ok');
+  toast('Traduction terminée', 'success');
+};
+
+// Group dataRows by element_type → [{idx, row}]
+function groupByType(dataRows, cols) {
+  const groups = {};
+  dataRows.forEach((row, idx) => {
+    const et = cols.element_type >= 0 ? String(row[cols.element_type]||'').trim() || 'homepage' : 'homepage';
+    if (!groups[et]) groups[et] = [];
+    groups[et].push({ idx, row });
+  });
+  return groups;
+}
+
+window.downloadResult = function() {
+  if (!_resultWb) return;
+  XLSX.writeFile(_resultWb, `v35_traduction_${Date.now()}.xlsx`);
+  log('XLSX téléchargé', 'ok');
+};
+
+// ── Template generator ────────────────────────────────────────────────────────
+window.downloadTemplate = function() {
+  // Save current prompt before export
+  _prompts[_currentPromptType] = document.getElementById('prompt-editor').value;
+
+  const headers = ['element_type', 'source_fr', 'prompt_text', 'seo_keywords'];
+  const TYPES = ['homepage','titres_h1','collections','collection_intro','collection_longues','descriptions_produits','blog'];
+  const EXAMPLES = TYPES.map(t => [t, '', _prompts[t] || DEFAULT_PROMPTS[t] || '', '']);
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...EXAMPLES]);
+  ws['!cols'] = [
+    {wch:22}, // element_type
+    {wch:50}, // source_fr
+    {wch:80}, // prompt_text
+    {wch:40}, // seo_keywords
+  ];
+  // Style header row
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'V35_Prompts');
+  XLSX.writeFile(wb, 'v35_prompts_template.xlsx');
+  log('Template XLSX téléchargé — remplissez source_fr et prompt_text par type', 'ok');
+  toast('Template téléchargé', 'success');
+};
+
+// ── Prompt builder (per-row) ──────────────────────────────────────────────────
+function buildPromptFromRow(sourceFr, promptText, keywords, lang, elementType, keepHtml) {
+  const langName = LANG_NAMES[lang] || lang;
+  const htmlInstr = keepHtml ? 'Conserve toutes les balises HTML intactes.' : 'Supprime les balises HTML.';
+  const kwInstr = keywords ? `\nMots-clés SEO à intégrer naturellement: ${keywords}` : '';
+
+  // Prompt priority: XLSX cell > library > generic fallback
+  const pays = LANG_TO_PAYS[lang] || lang;
+  const instruction = (promptText || _prompts[elementType] || '').replace(/\[LANG\]/gi, langName).replace(/\[PAYS\]/gi, pays);
+
+  if (instruction) {
+    return `${instruction}${kwInstr}
+${htmlInstr}
+Retourne UNIQUEMENT le texte traduit, sans commentaire ni explication.
+
+Contenu source (français):
+${sourceFr}`;
+  }
+
+  return `Traduis en ${langName} le texte suivant pour un site e-commerce (${elementType}).${kwInstr}
+${htmlInstr}
+Retourne UNIQUEMENT la traduction, sans commentaire.
+
+${sourceFr}`;
+}
+
+function setProgress(done, total) {
+  const pct = total>0 ? Math.round(done/total*100) : 0;
+  document.getElementById('progress-fill').style.width = pct+'%';
+  document.getElementById('progress-label').textContent = `${done} / ${total} (${pct}%)`;
+}
+
+function checkReady() {
+  const hasFile   = !!_wb;
+  const hasGemini = vault.config.api_vault.gemini.keys.filter(k=>k.status!=='disabled').length > 0;
+  document.getElementById('btn-translate').disabled = !(hasFile && hasGemini);
+}
+
+function log(msg, type='') {
+  const el = document.getElementById('status-log');
+  el.innerHTML += `<div class="${type}">${new Date().toLocaleTimeString('fr-FR')} — ${msg}</div>`;
+  el.scrollTop = el.scrollHeight;
+}
+function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
+
+// Init
+renderVault();
+</script>
+</body>
+</html>
