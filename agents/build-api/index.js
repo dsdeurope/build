@@ -40,7 +40,8 @@ async function kvList(env, key) {
       .filter(b => !deltas[b.id]?._deleted)
       .map(b => deltas[b.id] ? {...b, ...deltas[b.id]} : b);
     for (const [id, b] of Object.entries(deltas)) { if (!seedIds.has(id) && !b._deleted) merged.unshift(b); }
-    return merged.filter(b => b.aliexpress_pct !== null && (b.aliexpress_pct ?? -1) >= 80);
+    const DELETED_IDS = new Set(['7dc08b86']); // bitiba.fr supprimé manuellement (quota KV)
+    return merged.filter(b => !DELETED_IDS.has(b.id) && b.aliexpress_pct !== null && (b.aliexpress_pct ?? -1) >= 80);
   }
   try { const r = await env.KV.get(key); return r ? JSON.parse(r) : []; } catch { return []; }
 }
