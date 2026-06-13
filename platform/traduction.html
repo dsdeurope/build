@@ -1514,7 +1514,7 @@ function renderColSelector() {
 // ── Translation V35 (batch for titres_h1/collections, row-by-row for others) ──
 window.startTranslation = async function() {
   if (!_wb) return toast('Aucun fichier', 'error');
-  const langs = [...document.querySelectorAll('.lang-btn.active')].map(b=>b.dataset.lang);
+  const langs = [...document.querySelectorAll('#lang-grid .lang-btn.active')].map(b=>b.dataset.lang).filter(Boolean);
   if (!langs.length) return toast('Sélectionnez une langue', 'error');
   const _enableBtn = () => { document.getElementById('btn-translate').disabled = false; };
 
