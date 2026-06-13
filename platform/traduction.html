@@ -56,6 +56,7 @@
             <div style="display:flex;align-items:center;gap:6px">
               <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="btn btn-sm" style="font-size:11px">+ Créer une clé →</a>
               <button class="btn btn-sm" onclick="window._testAllKeys()" style="font-size:11px">⚡ Tester tout</button>
+              <button class="btn btn-sm btn-danger" onclick="window._purgeInvalid()" style="font-size:11px">🧹 Purger invalides</button>
               <span id="gemini-count" class="badge badge-info" style="font-size:10px">0 clé(s)</span>
             </div>
           </div>
@@ -294,6 +295,16 @@ window._testAllKeys = async function() {
   const ok  = vault.config.api_vault.gemini.keys.filter(k => !k.last_error).length;
   const bad = vault.config.api_vault.gemini.keys.filter(k =>  k.last_error).length;
   log(`Résultat : ${ok} valide(s) ✓ · ${bad} invalide(s) ✗`, ok === keys.length ? 'ok' : 'err');
+};
+
+window._purgeInvalid = function() {
+  const before = vault.config.api_vault.gemini.keys.length;
+  vault.config.api_vault.gemini.keys = vault.config.api_vault.gemini.keys.filter(k => !k.last_error);
+  vault.config.api_vault.gemini.active_index = 0;
+  vault.save();
+  const after = vault.config.api_vault.gemini.keys.length;
+  log(`Purge : ${before - after} clé(s) supprimée(s) · ${after} valide(s) conservée(s)`, 'ok');
+  renderVault();
 };
 
 window._removeKey = function(idx) {

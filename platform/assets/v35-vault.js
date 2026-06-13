@@ -194,13 +194,21 @@ export class V35Router {
         return result;
       } catch(e) {
         lastErr = e;
-        const is429 = /429|quota|RESOURCE_EXHAUSTED|rate.?limit/i.test(e.message);
+        const is429  = /429|quota|RESOURCE_EXHAUSTED|rate.?limit/i.test(e.message);
+        const is403  = /403|suspended|denied|permission/i.test(e.message);
 
         this.log(`[${provider.toUpperCase()}] Tentative ${attempt+1}/${cfg.max_retries+1}: ${e.message}`, 'err');
 
-        if (is429 && cfg.switch_on_429 && provider === 'gemini') {
-          const rotated = this.vault.rotateGemini(e.message);
-          this.log(`429 → rotation clé Gemini (${rotated ? 'ok' : 'une seule clé'})`, 'warn');
+        if (provider === 'gemini') {
+          if (is429 && cfg.switch_on_429) {
+            const rotated = this.vault.rotateGemini(e.message);
+            this.log(`429 → rotation clé Gemini (${rotated ? 'ok' : 'épuisé'})`, 'warn');
+          }
+          // 403 suspended or no keys left → fallback OpenRouter Gemini
+          if (is403 || (!this.vault.getActiveGeminiKey())) {
+            this.log('Clé(s) Gemini suspendues → fallback OpenRouter Gemini…', 'warn');
+            return await this._callGeminiViaOpenRouter(prompt, opts);
+          }
         }
 
         if (attempt < cfg.max_retries) {
@@ -237,6 +245,34 @@ export class V35Router {
     this.vault.trackCall('gemini');
     const d = await r.json();
     return d.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+  }
+
+  async _callGeminiViaOpenRouter(prompt, opts = {}) {
+    const qwen = this.vault.config.api_vault.qwen;
+    if (!qwen?.key) throw new Error('Clé OpenRouter absente — impossible de router Gemini');
+    const model = opts.model || this.vault.config.proxy_settings?.target_model || 'gemini-2.5-flash';
+    const orModel = `google/${model}`;
+    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${qwen.key}`,
+        'HTTP-Referer': 'https://build.zenithlab.net',
+      },
+      body: JSON.stringify({
+        model: orModel,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: opts.maxTokens || 2048,
+        temperature: opts.temperature || 0.4,
+      }),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: { message: r.statusText } }));
+      throw new Error(`[OR-Gemini ${r.status}] ${err.error?.message || r.statusText}`);
+    }
+    this.vault.trackCall('qwen');
+    const d = await r.json();
+    return d.choices?.[0]?.message?.content?.trim() || '';
   }
 
   async _callQwen(prompt, opts = {}) {
