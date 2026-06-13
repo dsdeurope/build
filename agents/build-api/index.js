@@ -758,8 +758,7 @@ export default {
 
     // ── /api/cron/auto-purge — exécuté à 00:05 UTC par GitHub Actions ────────
     if (resource === 'cron' && id === 'auto-purge' && method === 'POST') {
-      const secret = request.headers.get('X-Cron-Secret');
-      if (!env.SEED_SECRET || secret !== env.SEED_SECRET) return err('Forbidden', 403);
+      const authErr = requireAuth(request, env); if (authErr) return authErr;
       const allBoutiques = await kvList(env, 'plt:boutiques'); // déjà filtré >= 80 par code
       // Charger les deltas bruts pour y ajouter les _deleted sans perdre les autres entrées
       let deltas = {};
