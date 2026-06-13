@@ -1516,9 +1516,11 @@ window.startTranslation = async function() {
   if (!_wb) return toast('Aucun fichier', 'error');
   const langs = [...document.querySelectorAll('.lang-btn.active')].map(b=>b.dataset.lang);
   if (!langs.length) return toast('Sélectionnez une langue', 'error');
+  const _enableBtn = () => { document.getElementById('btn-translate').disabled = false; };
 
   const model    = document.getElementById('gemini-model').value;
   const keepHtml = document.getElementById('keep-html').checked;
+  try {
 
   document.getElementById('btn-translate').disabled = true;
   document.getElementById('btn-download').style.display = 'none';
@@ -1669,10 +1671,16 @@ window.startTranslation = async function() {
     XLSX.utils.book_append_sheet(_resultWb, ws, lang.toUpperCase().slice(0,31));
   }
 
-  document.getElementById('btn-translate').disabled = false;
-  document.getElementById('btn-download').style.display = '';
-  log(`Terminé — ${langs.length} langue(s), ${dataRows.length} lignes`, 'ok');
-  toast('Traduction terminée', 'success');
+    _enableBtn();
+    document.getElementById('btn-download').style.display = '';
+    log(`Terminé — ${langs.length} langue(s), ${dataRows.length} lignes`, 'ok');
+    toast('Traduction terminée', 'success');
+  } catch(e) {
+    _enableBtn();
+    log(`Erreur fatale: ${e.message}`, 'err');
+    toast('Erreur traduction', 'error');
+    console.error(e);
+  }
 };
 
 // Group dataRows by element_type → [{idx, row}]
