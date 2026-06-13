@@ -87,8 +87,8 @@
               <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Clé sur <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--accent)">platform.openai.com/api-keys</a> — $5 crédit = des milliers de traductions</div>
               <div style="display:flex;gap:6px">
                 <input id="openai-key" class="form-input key-input" type="password" placeholder="sk-…" style="flex:1">
-                <button id="btn-save-openai" class="btn btn-sm" onclick="saveOpenAI()">Sauvegarder</button>
-                <button id="btn-test-openai" class="btn btn-sm" onclick="testOpenAI()">Tester</button>
+                <button id="btn-save-openai" class="btn btn-sm" onclick="saveOpenAI(this)">Sauvegarder</button>
+                <button id="btn-test-openai" class="btn btn-sm" onclick="testOpenAI(this)">Tester</button>
               </div>
             </div>
 
@@ -335,57 +335,42 @@ window.addGeminiKey = function() {
   }
 };
 
-window.saveOpenAI = function() {
+window.saveOpenAI = function(btn) {
   const k = document.getElementById('openai-key').value.trim();
   if (!k) { log('Clé OpenAI vide', 'err'); return; }
   vault.config.api_vault.openai = { key: k, status: 'active', calls_count: 0 };
   vault.save();
-  const btn = document.getElementById('btn-save-openai');
-  btn.textContent = '✅ Sauvegardé';
-  btn.style.background = '#22c55e';
-  setTimeout(() => { btn.textContent = 'Sauvegarder'; btn.style.background = ''; }, 3000);
+  if (btn) { btn.textContent = '✅ Sauvegardé'; btn.style.background = '#22c55e'; setTimeout(() => { btn.textContent = 'Sauvegarder'; btn.style.background = ''; }, 3000); }
   log(`Clé OpenAI sauvegardée (${k.slice(0,12)}…)`, 'ok');
   renderVault();
 };
 
-window.testOpenAI = async function() {
+window.testOpenAI = async function(btn) {
   const k = document.getElementById('openai-key').value.trim()
     || vault.config.api_vault.openai?.key;
   if (!k) { log('Clé OpenAI absente — cliquez Sauvegarder d\'abord', 'err'); return; }
-  const btn = document.getElementById('btn-test-openai');
-  btn.textContent = '⏳ Test…';
-  btn.disabled = true;
+  if (btn) { btn.textContent = '⏳ Test…'; btn.disabled = true; }
   log(`Test GPT-4o en cours… (${k.slice(0,12)}…)`, 'info');
+  const reset = () => { if (btn) { btn.textContent = 'Tester'; btn.style.background = ''; btn.disabled = false; } };
   try {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${k}` },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [{ role: 'user', content: 'Réponds "OK" en un mot.' }],
-        max_tokens: 5,
-      }),
+      body: JSON.stringify({ model: 'gpt-4o', messages: [{ role: 'user', content: 'Réponds "OK" en un mot.' }], max_tokens: 5 }),
       signal: AbortSignal.timeout(15000),
     });
     const d = await r.json();
     if (d.choices?.[0]?.message?.content) {
-      btn.textContent = '✅ GPT-4o OK';
-      btn.style.background = '#22c55e';
-      setTimeout(() => { btn.textContent = 'Tester'; btn.style.background = ''; btn.disabled = false; }, 4000);
+      if (btn) { btn.textContent = '✅ GPT-4o OK'; btn.style.background = '#22c55e'; setTimeout(reset, 4000); }
       log(`GPT-4o OK ✓ — réponse: "${d.choices[0].message.content.trim()}"`, 'ok');
       vault.config.api_vault.openai.status = 'active';
-      vault.save();
-      renderVault();
+      vault.save(); renderVault();
     } else {
-      btn.textContent = '❌ Erreur';
-      btn.style.background = '#ef4444';
-      setTimeout(() => { btn.textContent = 'Tester'; btn.style.background = ''; btn.disabled = false; }, 4000);
+      if (btn) { btn.textContent = '❌ Erreur'; btn.style.background = '#ef4444'; setTimeout(reset, 4000); }
       log(`GPT-4o erreur: ${d.error?.message || JSON.stringify(d)}`, 'err');
     }
   } catch(e) {
-    btn.textContent = '❌ Erreur';
-    btn.style.background = '#ef4444';
-    setTimeout(() => { btn.textContent = 'Tester'; btn.style.background = ''; btn.disabled = false; }, 4000);
+    if (btn) { btn.textContent = '❌ Erreur'; btn.style.background = '#ef4444'; setTimeout(reset, 4000); }
     log(`GPT-4o exception: ${e.message}`, 'err');
   }
 };
