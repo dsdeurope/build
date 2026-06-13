@@ -271,6 +271,19 @@ export default {
     // ── /api/boutiques ───────────────────────────────────────────────────────
     if (resource === 'boutiques' || resource === 'footprints') {
       const isFootprint = resource === 'footprints';
+      // ── POST /api/boutiques/purge — bulk delete, une seule écriture KV ──────
+      if (id === 'purge' && method === 'POST') {
+        const authErr = requireAuth(request, env); if (authErr) return authErr;
+        const ids = new Set(body.ids || []);
+        if (!ids.size) return err('ids[] requis');
+        const list = await kvList(env,'plt:boutiques');
+        const kept = list.filter(b => !ids.has(b.id));
+        const removed = list.length - kept.length;
+        const saved = await kvSetSafe(env, 'plt:boutiques', kept);
+        if (!saved) return err('KV write failed', 503);
+        return ok({ removed, kept: kept.length });
+      }
+
       if (!id) {
         if (method === 'GET') {
           let list = await kvList(env,'plt:boutiques');

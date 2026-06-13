@@ -294,24 +294,20 @@ window.purgeNonAli100 = async function() {
   console.groupEnd();
 
   if (!toDelete.length) return toast('Aucune boutique < 80% à supprimer', 'warning');
-  toast(`Suppression de ${toDelete.length} boutiques…`, 'warning');
+  toast(`Suppression de ${toDelete.length} boutiques… (1 requête)`, 'warning');
 
-  const BATCH = 3;
-  for (let i = 0; i < toDelete.length; i += BATCH) {
-    await Promise.all(toDelete.slice(i, i + BATCH).map(async ({ id, domain, pct }) => {
-      try {
-        await apiDelete('/boutiques/' + id);
-        console.log(`[PURGE] ✅ supprimé ${domain} (${pct}%)`);
-        deleted++;
-      } catch(e) {
-        console.error(`[PURGE] ❌ erreur suppression ${domain} (${pct}%):`, e);
-        errors++;
-      }
-    }));
+  let lastErr = null;
+  try {
+    const r = await apiPost('/boutiques/purge', { ids: toDelete.map(b => b.id) });
+    deleted = r.removed;
+    console.log(`[PURGE] ✅ ${deleted} supprimées, ${r.kept} conservées`);
+  } catch(e) {
+    console.error('[PURGE] ❌ erreur purge bulk:', e);
+    errors = toDelete.length; lastErr = e;
   }
 
   console.log(`[PURGE] Résultat: ${deleted} supprimées, ${errors} erreurs`);
-  toast(`✅ ${deleted} supprimée(s)${errors ? ` — ⚠️ ${errors} erreur(s), voir console` : ''} — seules les Ali 80–100% restent`, errors ? 'warning' : 'success');
+  toast(errors ? `⚠️ Erreur: ${lastErr?.message}` : `✅ ${deleted} supprimée(s) — seules les Ali 80–100% restent`, errors ? 'warning' : 'success');
   load(1);
 };
 
