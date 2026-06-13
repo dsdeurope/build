@@ -13,6 +13,9 @@
     <header class="topbar">
       <span id="topbar-title">Boutiques</span>
       <div class="topbar-right">
+        <button class="btn btn-sm" onclick="openModal('modal-discover')" title="Découvrir de nouveaux sites via IA + AliExpress">🔍 Découvrir des sites</button>
+        <button class="btn btn-sm" onclick="openModal('modal-batch')" title="Coller une liste d'URLs à qualifier">📋 Importer liste</button>
+        <button class="btn btn-sm btn-danger" onclick="purgeNonAli100()" title="Supprimer toutes les boutiques avec AliExpress < 80%">🗑 Garder Ali 80–100%</button>
         <button class="btn btn-sm" onclick="resolveAll()" title="Résoudre fournisseur pour toutes les boutiques sans source">📦 Résoudre fournisseurs</button>
         <button class="btn btn-primary" onclick="openModal('modal-add')">+ Nouvelle boutique</button>
       </div>
@@ -44,6 +47,11 @@
           <option value="ca">Tri: CA/mois</option>
           <option value="traffic">Tri: trafic</option>
         </select>
+        <select id="f-ali" onchange="load(1)" class="filter-select">
+          <option value="">Tous AliExpress %</option>
+          <option value="80">80–100%</option>
+          <option value="100">100% uniquement</option>
+        </select>
         <span class="text-muted" id="total-label"></span>
       </div>
 
@@ -60,6 +68,83 @@
       <div id="pagination"></div>
 
     </div>
+  </div>
+</div>
+
+<!-- Discover modal — OpenAI web search depuis le navigateur -->
+<div class="modal" id="modal-discover">
+  <div class="modal-box" style="max-width:520px">
+    <div class="modal-header"><span>🔍 Découvrir des boutiques</span><button class="modal-close" onclick="closeModal('modal-discover')">✕</button></div>
+    <div class="modal-body">
+      <p class="text-muted" style="font-size:12px;margin-bottom:12px">OpenAI cherche des boutiques .fr par niche → le worker vérifie CMS + AliExpress + score → enregistrement auto.</p>
+      <label class="form-label">Niches à scanner</label>
+      <div id="disc-niches" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+        <label style="font-size:13px"><input type="checkbox" value="bijoux" checked> bijoux</label>
+        <label style="font-size:13px"><input type="checkbox" value="mode" checked> mode</label>
+        <label style="font-size:13px"><input type="checkbox" value="beaute" checked> beauté</label>
+        <label style="font-size:13px"><input type="checkbox" value="maison" checked> maison</label>
+        <label style="font-size:13px"><input type="checkbox" value="sport"> sport</label>
+        <label style="font-size:13px"><input type="checkbox" value="animaux"> animaux</label>
+        <label style="font-size:13px"><input type="checkbox" value="enfant"> enfant</label>
+        <label style="font-size:13px"><input type="checkbox" value="electronique"> électronique</label>
+      </div>
+      <div style="display:flex;gap:12px;margin-bottom:10px">
+        <div style="flex:1">
+          <label class="form-label" style="margin-bottom:4px">Boutiques / niche</label>
+          <input id="disc-count" class="form-input" type="number" value="10" min="5" max="30">
+        </div>
+        <div style="flex:1">
+          <label class="form-label" style="margin-bottom:4px">Score min</label>
+          <input id="disc-score-min" class="form-input" type="number" value="5" min="0" max="10" step="0.5">
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px">
+        <input type="checkbox" id="disc-autosave" checked> Enregistrer dans Boutiques
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-discover')">Annuler</button>
+      <button class="btn btn-primary" id="disc-btn" onclick="runDiscover()">🚀 Lancer</button>
+    </div>
+    <div id="disc-status" style="padding:10px 16px;font-size:12px;display:none"></div>
+  </div>
+</div>
+
+<!-- Batch import modal -->
+<div class="modal" id="modal-batch">
+  <div class="modal-box" style="max-width:580px">
+    <div class="modal-header"><span>📋 Importer une liste de sites</span><button class="modal-close" onclick="closeModal('modal-batch')">✕</button></div>
+    <div class="modal-body">
+      <p class="text-muted" style="font-size:12px;margin-bottom:10px">Colle des URLs (une par ligne). Le worker détecte CMS, score AliExpress et sauvegarde les sites qualifiés.</p>
+      <textarea id="batch-urls" class="form-input" style="width:100%;height:160px;font-size:12px;font-family:monospace;resize:vertical" placeholder="https://sambottes.fr&#10;https://ateliermocassin.com&#10;..."></textarea>
+      <div style="display:flex;gap:12px;margin-top:10px">
+        <div style="flex:1">
+          <label class="form-label" style="margin-bottom:4px">Niche par défaut</label>
+          <select id="batch-niche" class="form-input">
+            <option value="mode">mode</option>
+            <option value="maison">maison</option>
+            <option value="bijoux">bijoux</option>
+            <option value="beaute">beauté</option>
+            <option value="sport">sport</option>
+            <option value="enfant">enfant</option>
+            <option value="animaux">animaux</option>
+            <option value="electronique">électronique</option>
+          </select>
+        </div>
+        <div style="flex:1">
+          <label class="form-label" style="margin-bottom:4px">Score min</label>
+          <input id="batch-score-min" class="form-input" type="number" value="4" min="0" max="10" step="0.5">
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:10px">
+        <input type="checkbox" id="batch-autosave" checked> Enregistrer les sites qualifiés dans Boutiques
+      </label>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-batch')">Annuler</button>
+      <button class="btn btn-primary" id="batch-btn" onclick="runBatchImport()">📥 Qualifier et importer</button>
+    </div>
+    <div id="batch-status" style="padding:10px 16px;font-size:12px;display:none"></div>
   </div>
 </div>
 
@@ -133,6 +218,7 @@ async function load(p = _page) {
   const niche = document.getElementById('f-niche').value; if (niche) params.niche = niche;
   const status = document.getElementById('f-status').value; if (status) params.status = status;
   const sort = document.getElementById('f-sort').value; if (sort) params.sort = sort;
+  const ali = document.getElementById('f-ali').value; if (ali) params.ali_min = ali;
 
   try {
     const d = await apiGet('/boutiques', params);
@@ -186,6 +272,33 @@ window.addBoutique = async function() {
   } catch(e) { toast(e.message,'error'); }
 };
 
+window.purgeNonAli100 = async function() {
+  if (!confirm('Supprimer toutes les boutiques avec AliExpress < 80% ?')) return;
+  let page = 1, deleted = 0, toDelete = [];
+
+  // Collecte tous les IDs à supprimer (toutes pages)
+  while (true) {
+    const d = await apiGet('/boutiques', { page, per: 100 }).catch(() => null);
+    if (!d?.list?.length) break;
+    for (const b of d.list) {
+      if ((b.aliexpress_pct || 0) < 80) toDelete.push(b.id);
+    }
+    if (page >= d.pages) break;
+    page++;
+  }
+
+  if (!toDelete.length) return toast('Aucune boutique < 80% à supprimer', 'warning');
+  toast(`Suppression de ${toDelete.length} boutiques…`, 'warning');
+
+  for (const id of toDelete) {
+    await apiDelete('/boutiques/' + id).catch(() => {});
+    deleted++;
+  }
+
+  toast(`✅ ${deleted} boutique(s) supprimée(s) — seules les Ali 80–100% restent`, 'success');
+  load(1);
+};
+
 window.del = async function(id, domain) {
   if (!confirm(`Supprimer ${domain} ?`)) return;
   try {
@@ -227,6 +340,174 @@ window.resolveAll = async function() {
     toast(`${d.processed} boutiques résolues`, 'success');
     load(_page);
   } catch(e) { toast(e.message, 'error'); }
+};
+
+// Lit la clé OpenAI depuis le vault localStorage
+function getOpenAIKey() {
+  try {
+    const cfg = JSON.parse(localStorage.getItem('v35_vault_config') || '{}');
+    return cfg.api_vault?.openai?.key || '';
+  } catch { return ''; }
+}
+
+const NICHES_CFG = {
+  bijoux:      { cpc:0.65, kw:['bague femme dorée','collier pendentif femme','bracelet acier','boucle oreille fantaisie'] },
+  mode:        { cpc:0.45, kw:['robe femme tendance','pull oversize femme','veste femme casual','jupe midi femme'] },
+  beaute:      { cpc:0.55, kw:['sérum visage antiâge','crème hydratante femme','masque soin peau','huile visage naturelle'] },
+  maison:      { cpc:0.70, kw:['décoration maison tendance','coussin déco salon','bougie parfumée','vase décoratif moderne'] },
+  sport:       { cpc:0.60, kw:['legging sport femme','brassière sport yoga','sac sport fitness','accessoire yoga'] },
+  animaux:     { cpc:0.50, kw:['accessoire chien tendance','collier chat original','jouet chien interactif','manteau chien'] },
+  enfant:      { cpc:0.55, kw:['jouet enfant éveil éducatif','vêtement bébé original','peluche enfant doux','accessoire poussette'] },
+  electronique:{ cpc:0.80, kw:['gadget électronique tendance','accessoire smartphone','écouteurs sans fil','chargeur rapide usb'] },
+};
+
+async function aiDiscoverNiche(niche_id, count, openai_key) {
+  const cfg = NICHES_CFG[niche_id];
+  const prompt = `Tu es expert e-commerce dropshipping France.
+Trouve ${count} boutiques françaises actives vendant "${niche_id}" (${cfg.kw.slice(0,3).join(', ')}).
+Critères : CMS Shopify/WooCommerce/PrestaShop, produits disponibles sur AliExpress, domaine .fr.
+Réponds UNIQUEMENT avec un tableau JSON de domaines .fr valides, sans explication :
+["domaine1.fr","domaine2.fr",...]`;
+
+  // Essai API Responses (web_search_preview — OpenAI 2025+)
+  try {
+    const r = await fetch('https://api.openai.com/v1/responses', {
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':`Bearer ${openai_key}`},
+      body: JSON.stringify({ model:'gpt-4o', tools:[{type:'web_search_preview'}], input: prompt }),
+    });
+    if (r.ok) {
+      const j = await r.json();
+      const text = j.output?.find(o=>o.type==='message')?.content?.[0]?.text || '';
+      const m = text.match(/\[[\s\S]*?\]/);
+      if (m) return JSON.parse(m[0]).filter(d=>typeof d==='string'&&d.endsWith('.fr'));
+    }
+  } catch {}
+
+  // Fallback : chat completions (sans web search)
+  const r2 = await fetch('https://api.openai.com/v1/chat/completions', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':`Bearer ${openai_key}`},
+    body: JSON.stringify({ model:'gpt-4o', messages:[{role:'user',content:prompt}], temperature:0.4 }),
+  });
+  if (r2.ok) {
+    const j2 = await r2.json();
+    const text = j2.choices?.[0]?.message?.content || '';
+    const m = text.match(/\[[\s\S]*?\]/);
+    if (m) return JSON.parse(m[0]).filter(d=>typeof d==='string'&&d.endsWith('.fr'));
+  }
+  return [];
+}
+
+window.runDiscover = async function() {
+  const openai_key = getOpenAIKey();
+  if (!openai_key) return toast('Clé OpenAI absente — configure-la dans le Vault', 'error');
+
+  const niches = [...document.querySelectorAll('#disc-niches input:checked')].map(el=>el.value);
+  if (!niches.length) return toast('Sélectionne au moins une niche', 'error');
+
+  const count     = parseInt(document.getElementById('disc-count').value) || 10;
+  const score_min = parseFloat(document.getElementById('disc-score-min').value) || 5;
+  const auto_save = document.getElementById('disc-autosave').checked;
+
+  const btn = document.getElementById('disc-btn');
+  const status = document.getElementById('disc-status');
+  btn.disabled = true; btn.textContent = '⏳ En cours…';
+  status.style.display = 'block'; status.style.color = 'var(--muted)';
+
+  let total_found = 0, total_qualified = 0;
+
+  for (const niche of niches) {
+    status.textContent = `🤖 OpenAI cherche des boutiques "${niche}"…`;
+    let domains = [];
+    try { domains = await aiDiscoverNiche(niche, count, openai_key); } catch(e) { toast('OpenAI: ' + e.message, 'error'); continue; }
+
+    status.textContent = `🔍 Qualification de ${domains.length} domaines "${niche}"…`;
+    total_found += domains.length;
+
+    for (let i = 0; i < domains.length; i++) {
+      const domain = domains[i].replace(/^https?:\/\/(www\.)?/,'').split('/')[0].toLowerCase();
+      status.textContent = `[${i+1}/${domains.length}] ${domain} (${niche})…`;
+      try {
+        const r = await fetch('https://v35-site-discover.ernestpedanou.workers.dev/api/qualify', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ domain, niche }),
+        });
+        const d = await r.json();
+        if (d.ok && d.score >= score_min) {
+          total_qualified++;
+          if (auto_save) {
+            await apiPost('/boutiques', {
+              domain: d.domain, type: d.cms || 'unknown', niche,
+              traffic: d.traffic || 0, cpc: NICHES_CFG[niche]?.cpc || 0, score: d.score,
+              collections: d.collections || 0, products: d.products || 0,
+              aliexpress_pct: d.ali_pct || 0,
+              aliexpress_detail: { keywords_checked: NICHES_CFG[niche]?.kw || [] },
+              domain_age_years: d.domain_age_years || 0,
+              importStatus: d.score >= 7.5 ? 'cloner' : d.score >= 6 ? 'qualified' : 'watch',
+              comment: `🤖 OpenAI | AliExpress ${d.ali_pct}% | ${d.cms} | score ${d.score}`,
+            }).catch(()=>{});
+          }
+        }
+      } catch {}
+    }
+  }
+
+  btn.disabled = false; btn.textContent = '🚀 Lancer';
+  status.style.color = total_qualified > 0 ? '#22c55e' : 'var(--muted)';
+  status.textContent = `✅ ${total_qualified} boutique(s) qualifiée(s) sur ${total_found} trouvées`;
+  toast(`${total_qualified} boutique(s) enregistrée(s)`, total_qualified ? 'success' : 'warning');
+  if (auto_save && total_qualified > 0) setTimeout(() => { closeModal('modal-discover'); load(1); }, 2000);
+};
+
+window.runBatchImport = async function() {
+  const raw = document.getElementById('batch-urls').value.trim();
+  if (!raw) return toast('Colle des URLs à importer', 'error');
+  const niche     = document.getElementById('batch-niche').value;
+  const score_min = parseFloat(document.getElementById('batch-score-min').value) || 4;
+  const auto_save = document.getElementById('batch-autosave').checked;
+
+  const urls = raw.split(/[\n,]+/).map(u => u.trim()).filter(Boolean);
+  if (!urls.length) return toast('Aucune URL valide', 'error');
+
+  const btn    = document.getElementById('batch-btn');
+  const status = document.getElementById('batch-status');
+  btn.disabled = true; btn.textContent = '⏳ En cours…';
+  status.style.display = 'block'; status.style.color = 'var(--muted)';
+
+  const WORKER = 'https://v35-site-discover.ernestpedanou.workers.dev';
+  const BATCH  = 20; // max par appel worker
+  let total_qualified = 0, total_done = 0;
+
+  for (let i = 0; i < urls.length; i += BATCH) {
+    const chunk = urls.slice(i, i + BATCH);
+    status.textContent = `[${i+1}–${Math.min(i+BATCH, urls.length)}/${urls.length}] Qualification en cours…`;
+    try {
+      const r = await fetch(`${WORKER}/api/qualify-batch`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domains: chunk, niche, min_score: score_min }),
+      });
+      const data = await r.json();
+      if (!data.ok) { status.textContent = '❌ Erreur worker: ' + data.error; continue; }
+
+      for (const res of data.results || []) {
+        total_done++;
+        if (!res.ok || res.score < score_min) continue;
+        total_qualified++;
+        if (auto_save && res.boutique) {
+          await apiPost('/boutiques', res.boutique).catch(() => {});
+        }
+        status.textContent = `✅ ${total_qualified} qualifiée(s) — ${res.domain} (score ${res.score})`;
+      }
+    } catch(e) { status.textContent = '❌ ' + e.message; }
+    if (i + BATCH < urls.length) await new Promise(r => setTimeout(r, 800));
+  }
+
+  btn.disabled = false; btn.textContent = '📥 Qualifier et importer';
+  status.style.color = total_qualified > 0 ? '#22c55e' : 'var(--muted)';
+  status.textContent = `✅ ${total_qualified} boutique(s) qualifiée(s) sur ${total_done} testées`;
+  toast(`${total_qualified} boutique(s) importée(s)`, total_qualified ? 'success' : 'warning');
+  if (auto_save && total_qualified > 0) setTimeout(() => { closeModal('modal-batch'); load(1); }, 2000);
 };
 
 window.load = load;

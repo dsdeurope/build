@@ -279,6 +279,8 @@ export default {
           if (q.get('niche')) list=list.filter(b=>b.niche===q.get('niche'));
           if (q.get('status')) list=list.filter(b=>b.importStatus===q.get('status'));
           if (q.get('q')) { const s=q.get('q').toLowerCase(); list=list.filter(b=>b.domain?.includes(s)); }
+          if (q.get('ali_min')) list=list.filter(b=>(b.aliexpress_pct||0)>=+q.get('ali_min'));
+          if (q.get('ali_max')) list=list.filter(b=>(b.aliexpress_pct||0)<=+q.get('ali_max'));
           const BASKET_CA = { bijoux:85, mode:55, beaute:45, sport:65, maison:75, electronique:120, nutrition:40, animaux:35, sante:50, luxe:200, auto:80, jardin:45, enfant:40 };
           const caMonthly = b => Math.round((b.traffic||0)*0.02*(BASKET_CA[b.niche]||50));
           if (q.get('sort')==='traffic') list.sort((a,b)=>(b.traffic||0)-(a.traffic||0));
@@ -326,8 +328,9 @@ export default {
           if (deltas[id]) { delete deltas[id]; await kvSetSafe(env, 'plt:boutique_deltas', deltas); }
           // Remove scrape data
           try { await env.KV.delete(`plt:scrape:${id}`); } catch {}
-          // Note: BOUTIQUES_SEED is immutable; deletion is tracked via delta with _deleted flag
-          // Add _deleted marker in deltas so kvList filters it out
+          // Remove from plt:boutiques (main list read by GET)
+          await kvSet(env, 'plt:boutiques', list.filter(b => b.id !== id));
+          // Mark deleted in deltas for delta-merge code path
           deltas[id] = { _deleted: true };
           await kvSetSafe(env, 'plt:boutique_deltas', deltas);
           return ok({deleted:id});
