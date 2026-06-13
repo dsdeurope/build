@@ -272,25 +272,23 @@ function renderVault() {
 
   // Vault status badge
   const hasGemini = keys.filter(k=>k.status!=='disabled').length > 0;
-  const hasQwen    = !!vault.config.api_vault.qwen?.key;
-  const hasMistral = !!vault.config.api_vault.mistral?.key;
-  const hasGroq    = !!vault.config.api_vault.groq?.key;
+  const hasOpenAI = !!vault.config.api_vault.openai?.key;
   const badge = document.getElementById('vault-status');
-  const providers = [hasGemini&&'Gemini', hasMistral&&'Mistral', hasGroq&&'Groq', hasQwen&&'Qwen'].filter(Boolean);
-  if (providers.length >= 2) { badge.textContent=`Vault OK (${providers.join(' + ')})`; badge.className='badge badge-success'; }
-  else if (providers.length === 1) { badge.textContent=`Vault OK (${providers[0]})`; badge.className='badge badge-info'; }
+  const providers = [hasOpenAI&&'GPT-4o', hasGemini&&'Gemini'].filter(Boolean);
+  if (providers.length >= 1) { badge.textContent=`Vault OK (${providers.join(' + ')})`; badge.className='badge badge-success'; }
   else { badge.textContent='Vault non configuré'; badge.className='badge badge-warn'; }
+
   // Restore inputs
-  if (vault.config.api_vault.openai?.key)  document.getElementById('openai-key').value  = vault.config.api_vault.openai.key;
+  if (vault.config.api_vault.openai?.key) document.getElementById('openai-key').value = vault.config.api_vault.openai.key;
   const proxyUrl = vault.config.proxy_settings?.gemini_proxy_url;
   if (proxyUrl) document.getElementById('proxy-url').value = proxyUrl;
 
   // Routing display
   const r = vault.config.routing_rules;
   document.getElementById('routing-display').innerHTML =
-    (r.gemini_targets||[]).map(t=>`<span class="route-chip gemini">⚡ ${t}</span>`).join('') +
-    (r.qwen_targets||[]).map(t=>`<span class="route-chip qwen">🔶 ${t}</span>`).join('') +
-    `<span style="font-size:11px;color:var(--muted);margin-left:8px">Rotation 429 auto · ${vault.config.error_handling.max_retries} retries</span>`;
+    (r.openai_pro_targets||[]).map(t=>`<span class="route-chip gemini">🤖 ${t} → GPT-4o</span>`).join('') +
+    (r.openai_mini_targets||[]).map(t=>`<span class="route-chip qwen">⚡ ${t} → GPT-4o-mini</span>`).join('') +
+    `<span style="font-size:11px;color:var(--muted);margin-left:8px">Fallback auto · ${vault.config.error_handling.max_retries} retries</span>`;
 
   checkReady();
 }
@@ -1745,8 +1743,9 @@ function setProgress(done, total) {
 
 function checkReady() {
   const hasFile   = !!_wb;
+  const hasOpenAI = !!vault.config.api_vault.openai?.key;
   const hasGemini = vault.config.api_vault.gemini.keys.filter(k=>k.status!=='disabled').length > 0;
-  document.getElementById('btn-translate').disabled = !(hasFile && hasGemini);
+  document.getElementById('btn-translate').disabled = !(hasFile && (hasOpenAI || hasGemini));
 }
 
 function log(msg, type='') {
