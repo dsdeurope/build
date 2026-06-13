@@ -37,9 +37,11 @@ async function kvList(env, key) {
     if (!Object.keys(deltas).length) return BOUTIQUES_SEED;
     const seedIds = new Set(BOUTIQUES_SEED.map(b => b.id));
     const merged = BOUTIQUES_SEED
-      .filter(b => !deltas[b.id]?._deleted)
+      .filter(b => !deltas[b.id]?._deleted && b.aliexpress_pct !== null && (b.aliexpress_pct ?? -1) >= 80)
       .map(b => deltas[b.id] ? {...b, ...deltas[b.id]} : b);
-    for (const [id, b] of Object.entries(deltas)) { if (!seedIds.has(id) && !b._deleted) merged.unshift(b); }
+    for (const [id, b] of Object.entries(deltas)) {
+      if (!seedIds.has(id) && !b._deleted && b.aliexpress_pct !== null && (b.aliexpress_pct ?? -1) >= 80) merged.unshift(b);
+    }
     return merged;
   }
   try { const r = await env.KV.get(key); return r ? JSON.parse(r) : []; } catch { return []; }
