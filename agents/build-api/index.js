@@ -285,16 +285,32 @@ export default {
               body:JSON.stringify({domain:boutique.domain}), signal:AbortSignal.timeout(25000)
             });
             const d = await r.json();
-            if (d.collections?.length) {
-              boutique.collections = d.collections.length;
-              boutique.products = d.collections.reduce((s,c)=>s+(c.products||0),0);
+            let cols = d.collections?.length || 0, prods = 0;
+            // Fallback direct pour Shopify si scraper ne renvoie rien
+            if (!cols) {
+              try {
+                const rs = await fetch(`https://${boutique.domain}/collections.json?limit=250`, { signal:AbortSignal.timeout(10000) });
+                const ds = await rs.json();
+                cols = ds.collections?.length || 0;
+              } catch {}
+            }
+            if (!cols) {
+              try {
+                const rp = await fetch(`https://${boutique.domain}/wp-json/wc/v3/products/categories?per_page=100`, { signal:AbortSignal.timeout(10000) });
+                const dp = await rp.json();
+                cols = Array.isArray(dp) ? dp.length : 0;
+              } catch {}
+            }
+            if (cols > 0) {
+              boutique.collections = d.collections?.length ? d.collections.length : cols;
+              boutique.products = d.collections?.length ? d.collections.reduce((s,c)=>s+(c.products||0),0) : prods;
               boutique.importStatus = 'scraped';
-              boutique.blueprint = {source:boutique.domain, collections:d.collections, totalCollections:d.collections.length};
+              if (d.collections?.length) boutique.blueprint = {source:boutique.domain, collections:d.collections, totalCollections:d.collections.length};
               boutique.updatedAt = Date.now();
               await saveBoutique(env, list, boutique);
               results.push({domain:boutique.domain, collections:boutique.collections, products:boutique.products, ok:true});
             } else {
-              results.push({domain:boutique.domain, collections:0, products:0, ok:false, error:d.error||'no collections'});
+              results.push({domain:boutique.domain, collections:0, products:0, ok:false, error:d.error||'no collections found'});
             }
           } catch(e) {
             results.push({domain:boutique.domain, ok:false, error:e.message});
@@ -372,18 +388,13 @@ export default {
         }
         if (method==='DELETE') {
           const authErr = await requireAuth(request, env); if (authErr) return authErr;
-          // Remove from deltas
+          // 1 seule écriture KV : marquer _deleted dans les deltas (kvList filtre déjà _deleted)
           let deltas = {};
           try { const r = await env.KV.get('plt:boutique_deltas'); if (r) deltas = JSON.parse(r); } catch {}
-          if (deltas[id]) { delete deltas[id]; await kvSetSafe(env, 'plt:boutique_deltas', deltas); }
-          // Remove scrape data
-          try { await env.KV.delete(`plt:scrape:${id}`); } catch {}
-          // Remove from plt:boutiques (main list read by GET)
-          const saved = await kvSetSafe(env, 'plt:boutiques', list.filter(b => b.id !== id));
-          if (!saved) return err('KV write failed — retry', 503);
-          // Mark deleted in deltas for delta-merge code path
           deltas[id] = { _deleted: true };
-          await kvSetSafe(env, 'plt:boutique_deltas', deltas);
+          const saved = await kvSetSafe(env, 'plt:boutique_deltas', deltas);
+          if (!saved) return err('KV write limit reached — retry after midnight UTC', 503);
+          try { await env.KV.delete(`plt:scrape:${id}`); } catch {}
           return ok({deleted:id});
         }
       }
