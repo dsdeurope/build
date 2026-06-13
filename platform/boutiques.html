@@ -111,7 +111,7 @@ function expiredDomain(b) {
 }
 function aliPct(b) {
   const p = b.aliexpress_pct;
-  const detail = b.aliexpress_detail ? JSON.parse(b.aliexpress_detail) : null;
+  const detail = typeof b.aliexpress_detail === 'string' ? JSON.parse(b.aliexpress_detail) : (b.aliexpress_detail || null);
   const supplierName = detail?.supplier || 'aliexpress';
   const icons = { aliexpress:'🛒', cjdropshipping:'📦', dhgate:'🏪', '1688':'🇨🇳' };
   const icon = icons[supplierName] || '🛒';
