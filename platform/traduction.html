@@ -1599,7 +1599,7 @@ window.startTranslation = async function() {
 
           let raw = '';
           try {
-            raw = await router.call(et, fullPrompt, { model, maxTokens: Math.max(4096, chunk.length * (batchCfg.tokensPerItem || 80)) });
+            raw = await router.call(et, fullPrompt, { model, maxTokens: Math.max(4096, chunk.length * (batchCfg.tokensPerItem || 80)), forceJson: true });
           } catch(e) {
             log(`[${lang.toUpperCase()}] ${et} batch ERR: ${e.message}`, 'err');
             done++;

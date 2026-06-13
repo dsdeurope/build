@@ -335,6 +335,7 @@ export class V35Router {
         messages: [{ role: 'user', content: prompt }],
         max_tokens: opts.maxTokens || 4096,
         temperature: opts.temperature || 0.4,
+        ...(opts.forceJson ? { response_format: { type: 'json_object' } } : {}),
       }),
       signal: AbortSignal.timeout(60000),
     });
