@@ -16,6 +16,7 @@
         <button class="btn btn-sm" onclick="openModal('modal-discover')" title="Découvrir de nouveaux sites via IA + AliExpress">🔍 Découvrir des sites</button>
         <button class="btn btn-sm" onclick="openModal('modal-batch')" title="Coller une liste d'URLs à qualifier">📋 Importer liste</button>
         <button class="btn btn-sm btn-danger" onclick="purgeNonAli100()" title="Supprimer toutes les boutiques avec AliExpress < 80%">🗑 Garder Ali 80–100%</button>
+        <button class="btn btn-sm" onclick="scrapeAllCollections()" title="Récupérer collections et produits pour toutes les boutiques">🗂 Scraper collections</button>
         <button class="btn btn-sm" onclick="resolveAll()" title="Résoudre fournisseur pour toutes les boutiques sans source">📦 Résoudre fournisseurs</button>
         <button class="btn btn-primary" onclick="openModal('modal-add')">+ Nouvelle boutique</button>
       </div>
@@ -334,6 +335,16 @@ window.resolveOne = async function(id, domain, niche) {
     } else {
       toast(`Aucun fournisseur trouvé pour ${domain}`, 'warning');
     }
+    load(_page);
+  } catch(e) { toast(e.message, 'error'); }
+};
+
+window.scrapeAllCollections = async function() {
+  toast('Scraping collections en cours…', 'warning');
+  try {
+    const r = await apiPost('/boutiques/scrape-all', {});
+    toast(`✅ ${r.scraped} scrapées, ${r.failed} échecs`, r.failed ? 'warning' : 'success');
+    console.log('[SCRAPE-ALL]', r.results);
     load(_page);
   } catch(e) { toast(e.message, 'error'); }
 };

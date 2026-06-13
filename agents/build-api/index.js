@@ -272,6 +272,37 @@ export default {
     if (resource === 'boutiques' || resource === 'footprints') {
       const isFootprint = resource === 'footprints';
       // ── POST /api/boutiques/purge — bulk delete, une seule écriture KV ──────
+      // ── POST /api/boutiques/scrape-all — scrape collections+produits pour toutes les boutiques sans collections
+      if (id === 'scrape-all' && method === 'POST') {
+        const authErr = requireAuth(request, env); if (authErr) return authErr;
+        const list = await kvList(env,'plt:boutiques');
+        const targets = list.filter(b => !b.collections || b.collections === 0);
+        const results = [];
+        for (const boutique of targets) {
+          try {
+            const r = await fetch(WORKERS.SCRAPER+'/api/scrape', {
+              method:'POST', headers:{'Content-Type':'application/json'},
+              body:JSON.stringify({domain:boutique.domain}), signal:AbortSignal.timeout(25000)
+            });
+            const d = await r.json();
+            if (d.collections?.length) {
+              boutique.collections = d.collections.length;
+              boutique.products = d.collections.reduce((s,c)=>s+(c.products||0),0);
+              boutique.importStatus = 'scraped';
+              boutique.blueprint = {source:boutique.domain, collections:d.collections, totalCollections:d.collections.length};
+              boutique.updatedAt = Date.now();
+              await saveBoutique(env, list, boutique);
+              results.push({domain:boutique.domain, collections:boutique.collections, products:boutique.products, ok:true});
+            } else {
+              results.push({domain:boutique.domain, collections:0, products:0, ok:false, error:d.error||'no collections'});
+            }
+          } catch(e) {
+            results.push({domain:boutique.domain, ok:false, error:e.message});
+          }
+        }
+        return ok({ scraped: results.filter(r=>r.ok).length, failed: results.filter(r=>!r.ok).length, results });
+      }
+
       if (id === 'purge' && method === 'POST') {
         const authErr = requireAuth(request, env); if (authErr) return authErr;
         const ids = new Set(body.ids || []);
