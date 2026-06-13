@@ -30,10 +30,12 @@ const DEFAULT_CONFIG = {
     switch_on_429: true,
   },
   proxy_settings: {
-    target_model:     'gemini-2.5-flash',
-    mistral_model:    'mistral-large-latest',
-    groq_model:       'llama-3.3-70b-versatile',
-    translation_mode: 'anthropic_to_google_api',
+    target_model:      'gemini-2.5-flash',
+    mistral_model:     'mistral-large-latest',
+    groq_model:        'llama-3.3-70b-versatile',
+    translation_mode:  'anthropic_to_google_api',
+    gemini_proxy_url:  'https://v35-gemini-proxy.ernestpedanou.workers.dev/generate',
+    proxy_auth_secret: '',   // laisser vide = pas d'auth requise
   },
 };
 
@@ -100,7 +102,7 @@ export class V35Vault {
     // Rules + error handling
     if (c.routing_rules) this.config.routing_rules = c.routing_rules;
     if (c.error_handling) this.config.error_handling = { ...this.config.error_handling, ...c.error_handling };
-    if (c.proxy_settings?.target_model) this.config.proxy_settings.target_model = c.proxy_settings.target_model;
+    if (c.proxy_settings) this.config.proxy_settings = { ...this.config.proxy_settings, ...c.proxy_settings };
 
     this.save();
     return this.config.api_vault.gemini.keys.length;
@@ -227,14 +229,35 @@ export class V35Router {
   }
 
   async _callGemini(prompt, opts = {}) {
+    const model = opts.model || this.vault.config.proxy_settings?.target_model || 'gemini-2.5-flash';
+    const proxyUrl = this.vault.config.proxy_settings?.gemini_proxy_url;
+
+    // Priorité 1 : CF Worker proxy (clés sécurisées, IP Cloudflare = jamais suspendu)
+    if (proxyUrl) {
+      const headers = { 'Content-Type': 'application/json' };
+      const authSecret = this.vault.config.proxy_settings?.proxy_auth_secret;
+      if (authSecret) headers['X-Auth'] = authSecret;
+
+      const r = await fetch(proxyUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ prompt, model, temperature: opts.temperature, maxTokens: opts.maxTokens }),
+        signal: AbortSignal.timeout(55000),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: 'proxy error' }));
+        throw new Error(`[Proxy ${r.status}] ${err.error || r.statusText}`);
+      }
+      this.vault.trackCall('gemini');
+      const d = await r.json();
+      return d.text || '';
+    }
+
+    // Priorité 2 : clé locale (vault browser) — fallback si pas de proxy configuré
     const keyObj = this.vault.getActiveGeminiKey();
-    if (!keyObj) throw new Error('Aucune clé Gemini active dans le vault');
+    if (!keyObj) throw new Error('Aucune clé Gemini — configurez le proxy CF ou ajoutez une clé');
 
-    const model = opts.model || this.vault.config.proxy_settings?.target_model || 'gemini-2.0-flash';
-
-    // Both AIza and AQ key types work with the standard REST endpoint
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${keyObj.key}`;
-
     const body = buildGeminiBody(prompt, opts);
     const r = await fetch(url, {
       method: 'POST',

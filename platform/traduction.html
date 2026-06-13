@@ -83,6 +83,17 @@
           <div class="card-header">Providers gratuits</div>
           <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
 
+            <!-- Gemini CF Proxy -->
+            <div>
+              <div style="font-size:11px;font-weight:600;margin-bottom:4px">🔐 Gemini CF Proxy <span style="color:#22c55e;font-size:10px">RECOMMANDE · clés protégées · IP Cloudflare</span></div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Worker v35-gemini-proxy — les clés GCP restent dans le Worker (jamais suspendues)</div>
+              <div style="display:flex;gap:6px">
+                <input id="proxy-url" class="form-input key-input" type="text" placeholder="https://v35-gemini-proxy.ernestpedanou.workers.dev/generate" style="flex:1">
+                <button class="btn btn-sm" onclick="saveProxyUrl()">Sauvegarder</button>
+                <button class="btn btn-sm" onclick="testProxy()">Tester</button>
+              </div>
+            </div>
+
             <!-- Mistral -->
             <div>
               <div style="font-size:11px;font-weight:600;margin-bottom:4px">🇫🇷 Mistral Large <span style="color:#22c55e;font-size:10px">GRATUIT · natif FR · fallback Gemini</span></div>
@@ -288,6 +299,8 @@ function renderVault() {
   else if (providers.length === 1) { badge.textContent=`Vault OK (${providers[0]})`; badge.className='badge badge-info'; }
   else { badge.textContent='Vault non configuré'; badge.className='badge badge-warn'; }
   // Restore inputs
+  const proxyUrl = vault.config.proxy_settings?.gemini_proxy_url;
+  if (proxyUrl) document.getElementById('proxy-url').value = proxyUrl;
   if (vault.config.api_vault.mistral?.key) document.getElementById('mistral-key').value = vault.config.api_vault.mistral.key;
   if (vault.config.api_vault.groq?.key)    document.getElementById('groq-key').value    = vault.config.api_vault.groq.key;
 
@@ -356,6 +369,33 @@ window.addGeminiKey = function() {
   } else {
     toast('Clé déjà présente ou invalide', 'error');
   }
+};
+
+window.saveProxyUrl = function() {
+  const url = document.getElementById('proxy-url').value.trim();
+  if (!url) return toast('URL vide', 'error');
+  vault.config.proxy_settings = vault.config.proxy_settings || {};
+  vault.config.proxy_settings.gemini_proxy_url = url;
+  vault.save();
+  toast('Proxy CF sauvegardé', 'success');
+};
+
+window.testProxy = async function() {
+  const url = document.getElementById('proxy-url').value.trim()
+    || vault.config.proxy_settings?.gemini_proxy_url;
+  if (!url) return toast('Configurez d\'abord l\'URL du proxy', 'error');
+  toast('Test proxy…', 'info');
+  try {
+    const r = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'Réponds "OK" en un mot.', model: 'gemini-2.5-flash' }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const d = await r.json();
+    if (d.ok && d.text) toast(`Proxy OK — ${d.keys_total} clé(s) GCP · "${d.text.slice(0,40)}"`, 'success');
+    else toast(`Proxy KO: ${d.error || r.status}`, 'error');
+  } catch(e) { toast(`Erreur proxy: ${e.message}`, 'error'); }
 };
 
 window.saveMistral = function() {
