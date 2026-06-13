@@ -222,18 +222,7 @@ import { V35Vault, V35Router }       from '/assets/v35-vault.js';
 checkAuth(); buildNav();
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-const vault  = new V35Vault();
-const router = new V35Router(vault, log);
-
-// Auto-configure Qwen/OpenRouter key on first load
-(function() {
-  const OR_KEY = window.__OR_KEY__ || '';
-  if (OR_KEY && !vault.config.api_vault.qwen?.key) {
-    vault.config.api_vault.qwen.key = OR_KEY;
-    vault.config.api_vault.qwen.status = 'active';
-    vault.save();
-  }
-})();
+const vault = new V35Vault();
 
 let _wb = null, _sheets = {}, _selectedCols = new Set(), _resultWb = null;
 
@@ -916,7 +905,7 @@ MANDATORY HTML OUTPUT SKELETON
   <!-- Quality metadata — include in output for QA, hidden by CSS -->
   <script type="application/ld+json" class="seo-qa-meta" style="display:none">
   {"type":"collection-longues-qa","no_hallucinated_specs":true,"anti_llm_pass":true,"semantic_density_ok":true,"keyword_coverage_ok":true,"internal_links_present":true}
-  </script>
+  <\/script>
 
 </div>
 
@@ -1693,6 +1682,18 @@ function log(msg, type='') {
 function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
 
 // Init
+const router = new V35Router(vault, log);
+
+// Auto-configure OR key on first load
+const _orKey = window.__OR_KEY__ || '';
+console.log('[vault-init] OR_KEY=' + (_orKey?'SET':'EMPTY') + ' qwen.key=' + (vault.config.api_vault.qwen?.key||'EMPTY'));
+if (_orKey && !vault.config.api_vault.qwen?.key) {
+  vault.config.api_vault.qwen.key = _orKey;
+  vault.config.api_vault.qwen.status = 'active';
+  vault.save();
+  console.log('[vault-init] saved OK');
+}
+
 renderVault();
 </script>
 </body>
