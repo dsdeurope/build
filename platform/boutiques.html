@@ -296,15 +296,18 @@ window.purgeNonAli100 = async function() {
   if (!toDelete.length) return toast('Aucune boutique < 80% à supprimer', 'warning');
   toast(`Suppression de ${toDelete.length} boutiques…`, 'warning');
 
-  for (const { id, domain, pct } of toDelete) {
-    try {
-      await apiDelete('/boutiques/' + id);
-      console.log(`[PURGE] ✅ supprimé ${domain} (${pct}%)`);
-      deleted++;
-    } catch(e) {
-      console.error(`[PURGE] ❌ erreur suppression ${domain} (${pct}%):`, e);
-      errors++;
-    }
+  const BATCH = 3;
+  for (let i = 0; i < toDelete.length; i += BATCH) {
+    await Promise.all(toDelete.slice(i, i + BATCH).map(async ({ id, domain, pct }) => {
+      try {
+        await apiDelete('/boutiques/' + id);
+        console.log(`[PURGE] ✅ supprimé ${domain} (${pct}%)`);
+        deleted++;
+      } catch(e) {
+        console.error(`[PURGE] ❌ erreur suppression ${domain} (${pct}%):`, e);
+        errors++;
+      }
+    }));
   }
 
   console.log(`[PURGE] Résultat: ${deleted} supprimées, ${errors} erreurs`);

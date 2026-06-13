@@ -108,6 +108,7 @@ export default {
     }
   },
   async fetch(request, env) {
+    try {
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
     const url = new URL(request.url);
     const [,, resource, id, sub] = url.pathname.split('/');
@@ -329,7 +330,8 @@ export default {
           // Remove scrape data
           try { await env.KV.delete(`plt:scrape:${id}`); } catch {}
           // Remove from plt:boutiques (main list read by GET)
-          await kvSet(env, 'plt:boutiques', list.filter(b => b.id !== id));
+          const saved = await kvSetSafe(env, 'plt:boutiques', list.filter(b => b.id !== id));
+          if (!saved) return err('KV write failed — retry', 503);
           // Mark deleted in deltas for delta-merge code path
           deltas[id] = { _deleted: true };
           await kvSetSafe(env, 'plt:boutique_deltas', deltas);
@@ -699,5 +701,8 @@ export default {
     }
 
     return err('Not found',404);
+    } catch(e) {
+      return Response.json({ ok:false, error: e?.message || 'Internal error' }, { status:500, headers:CORS });
+    }
   }
 };
