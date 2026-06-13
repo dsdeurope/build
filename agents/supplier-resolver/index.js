@@ -211,7 +211,7 @@ async function cronResolve(env) {
   });
   if (!r.ok) return { error: 'fetch_failed', status: r.status };
 
-  const { boutiques = [] } = await r.json();
+  const { list: boutiques = [] } = await r.json();
 
   // Filter: not resolved or pct < 30 and not checked in last 24h
   const now = Date.now();
@@ -291,7 +291,7 @@ export default {
       });
       if (!r.ok) return fail('boutique not found', 404);
 
-      const { boutiques = [] } = await r.json();
+      const { list: boutiques = [] } = await r.json();
       const b = boutiques.find(x => x.domain === domain);
       if (!b) return fail('boutique not found', 404);
 

@@ -138,7 +138,7 @@ async function load(p = _page) {
     const d = await apiGet('/boutiques', params);
     document.getElementById('total-label').textContent = `${d.total} boutiques`;
     const tb = document.getElementById('tbody');
-    if (!d.list?.length) { tb.innerHTML='<tr><td colspan="11" class="text-center text-muted">Aucune boutique</td></tr>'; return; }
+    if (!d.list?.length) { tb.innerHTML='<tr><td colspan="12" class="text-center text-muted">Aucune boutique</td></tr>'; return; }
     tb.innerHTML = d.list.map(b=>{
       const ca = caMonth(b);
       const traffic = b.traffic_monthly || b.traffic || 0;
