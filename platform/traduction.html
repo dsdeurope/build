@@ -311,9 +311,6 @@ window._testKey = async function(idx) {
 
 window.resetVault = function() {
   localStorage.removeItem('v35_vault_config');
-  document.getElementById('log-content').innerHTML = '';
-  document.getElementById('openai-key').value = '';
-  document.getElementById('proxy-url').value = '';
   location.reload();
 };
 
@@ -337,17 +334,18 @@ window.addGeminiKey = function() {
 
 window.saveOpenAI = function() {
   const k = document.getElementById('openai-key').value.trim();
-  if (!k) return toast('Clé vide', 'error');
+  if (!k) { log('Clé OpenAI vide', 'err'); return; }
   vault.config.api_vault.openai = { key: k, status: 'active', calls_count: 0 };
   vault.save();
-  toast('Clé OpenAI sauvegardée', 'success');
+  log(`Clé OpenAI sauvegardée (${k.slice(0,12)}…)`, 'ok');
+  renderVault();
 };
 
 window.testOpenAI = async function() {
   const k = document.getElementById('openai-key').value.trim()
     || vault.config.api_vault.openai?.key;
-  if (!k) return toast('Ajoutez d\'abord une clé OpenAI', 'error');
-  toast('Test GPT-4o…', 'info');
+  if (!k) { log('Clé OpenAI absente — cliquez Sauvegarder d\'abord', 'err'); return; }
+  log(`Test GPT-4o en cours… (${k.slice(0,12)}…)`, 'info');
   try {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -361,11 +359,16 @@ window.testOpenAI = async function() {
     });
     const d = await r.json();
     if (d.choices?.[0]?.message?.content) {
-      toast(`GPT-4o OK — "${d.choices[0].message.content.trim()}"`, 'success');
+      log(`GPT-4o OK ✓ — réponse: "${d.choices[0].message.content.trim()}"`, 'ok');
+      vault.config.api_vault.openai.status = 'active';
+      vault.save();
+      renderVault();
     } else {
-      toast(`Erreur: ${d.error?.message || 'réponse inattendue'}`, 'error');
+      log(`GPT-4o erreur: ${d.error?.message || JSON.stringify(d)}`, 'err');
     }
-  } catch(e) { toast(`Erreur: ${e.message}`, 'error'); }
+  } catch(e) {
+    log(`GPT-4o exception: ${e.message}`, 'err');
+  }
 };
 
 window.saveProxyUrl = function() {
