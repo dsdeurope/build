@@ -27,6 +27,9 @@
         <div class="kpi-card skeleton-loading"><div class="kpi-value">—</div><div class="kpi-label">Jobs contenu</div></div>
         <div class="kpi-card skeleton-loading"><div class="kpi-value">—</div><div class="kpi-label">Domaines trouvés</div></div>
         <div class="kpi-card skeleton-loading"><div class="kpi-value">—</div><div class="kpi-label">Workers actifs</div></div>
+        <a href="/scrapping.html" class="kpi-card skeleton-loading" style="display:block;text-decoration:none"><div class="kpi-value" id="kpi-ali-ok">—</div><div class="kpi-label">🛒 Sourcées AliEx ≥95%</div></a>
+        <a href="/aliexpress.html" class="kpi-card skeleton-loading" style="display:block;text-decoration:none"><div class="kpi-value" id="kpi-ali-ko" style="color:var(--red)">—</div><div class="kpi-label">⚠ Sans fournisseur</div></a>
+        <div class="kpi-card skeleton-loading" id="kpi-dead-wrap"><div class="kpi-value" id="kpi-dead" style="color:var(--red)">—</div><div class="kpi-label">Sites hors ligne</div></div>
       </div>
 
       <div class="grid-2col">
@@ -193,7 +196,24 @@ async function loadMonitoring() {
   } catch(e) {}
 }
 
-loadStats(); loadBoutiques(); loadActivity(); loadMonitoring();
+async function loadAliStats() {
+  try {
+    const d = await apiGet('/boutiques', {per:300});
+    const list = d.list || [];
+    const ok = list.filter(b => b.aliexpress_pct >= 95).length;
+    const ko = list.filter(b => !b.aliexpress_supplier_url && (!b.aliexpress_pct || b.aliexpress_pct < 95)).length;
+    const dead = list.filter(b => b.online === false || b.http_status >= 400).length;
+    ['kpi-ali-ok','kpi-ali-ko','kpi-dead'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.closest('.kpi-card')?.classList.remove('skeleton-loading'); }
+    });
+    document.getElementById('kpi-ali-ok').textContent = ok;
+    document.getElementById('kpi-ali-ko').textContent = ko;
+    document.getElementById('kpi-dead').textContent = dead;
+  } catch(e) {}
+}
+
+loadStats(); loadBoutiques(); loadActivity(); loadMonitoring(); loadAliStats();
 setInterval(loadMonitoring, 30000);
 </script>
 </body>

@@ -149,6 +149,11 @@ function renderCard(b) {
         <div style="font-size:10px;color:var(--muted)">${hasData ? `${b.aliexpress_detail?.found||'?'}/${b.aliexpress_detail?.total||'?'} requêtes trouvées${checkedAt ? ` · ${checkedAt}` : ''}` : 'Non vérifié — lancez l\'agent'}</div>
       </div>
     </div>
+    <div style="margin-top:8px;display:flex;gap:4px">
+      <input class="supplier-input" id="sup-${esc(b.id)}" placeholder="URL fournisseur AliExpress…"
+        value="${esc(b.aliexpress_supplier_url||'')}" style="flex:1">
+      <button class="btn btn-sm" onclick="saveSupplier('${esc(b.id)}')" title="Enregistrer le fournisseur">💾</button>
+    </div>
     <div class="card-actions">
       <button class="btn btn-sm btn-primary" onclick="scrapeCard('${esc(b.id)}','${esc(b.domain)}','${esc(b.type||'')}')">🕷 Scrapper</button>
       <button class="btn btn-sm btn-danger" onclick="deleteCard('${esc(b.id)}','${esc(b.domain)}')">✕ Supprimer</button>
@@ -214,6 +219,15 @@ async function load() {
     document.getElementById('btn-refresh').textContent = '↻ Actualiser';
   }
 }
+
+window.saveSupplier = async function(id) {
+  const url = document.getElementById('sup-' + id)?.value?.trim();
+  if (!url) return;
+  try {
+    await apiPut('/boutiques/' + id, { aliexpress_supplier_url: url });
+    toast('Fournisseur enregistré', 'success');
+  } catch(e) { toast(e.message, 'error'); }
+};
 
 window.scrapeCard = function(id, domain, type) {
   const supportsApi = ['shopify','woocommerce'].includes(type);

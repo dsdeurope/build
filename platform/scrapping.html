@@ -337,26 +337,19 @@ window.toggleImgPanel = function() {
 
 window.showScrapCmd = function(id, domain, type) {
   const supportsApi = ['shopify','woocommerce'].includes(type);
-  if (!supportsApi) {
-    toast(`${type || 'Ce CMS'} n'a pas d'API publique — scrapping HTML non supporté pour le moment`, 'error');
-    return;
-  }
-  // Show the exact command to run for this specific domain
-  const cmd = `python3 /tmp/deep_scrape.py --domain ${domain}`;
-  // Create a small floating tooltip / modal
-  const note = `Pour scrapper uniquement ${domain}, modifiez temporairement main() dans /tmp/deep_scrape.py\nou filtrez avec:\n\npython3 -c "\nimport subprocess\n# Lance le scrapper sur ${domain} uniquement\n"`;
+  const cmd = supportsApi
+    ? `python3 /tmp/deep_scrape.py --domain ${domain}`
+    : `# ${type||'Ce CMS'} non supporté`;
   openModal('modal-run');
   document.getElementById('priority-list').innerHTML = `
-    <div style="background:var(--surface-2);border-radius:6px;padding:12px;font-family:monospace;font-size:12px">
-      <div style="color:var(--muted);margin-bottom:4px"># Scrapper uniquement: ${esc(domain)}</div>
-      <div style="color:var(--green)">python3 /tmp/deep_scrape.py</div>
-      <div style="color:var(--muted);margin-top:8px;font-family:sans-serif;font-size:11px">
-        Le scrapper traitera tous les sites en queue. Pour cibler un seul site, supprimez les autres de la liste, scrapez, puis re-importez.</div>
+    <div style="background:var(--surface-2);border-radius:6px;padding:12px;font-family:monospace;font-size:13px;display:flex;align-items:center;gap:10px;cursor:pointer"
+         onclick="navigator.clipboard.writeText(${JSON.stringify(cmd)}).then(()=>toast('Commande copiée ✓','success'))">
+      <span style="flex:1;color:${supportsApi?'var(--green)':'var(--red)'}">${esc(cmd)}</span>
+      <span title="Copier" style="font-size:18px">📋</span>
     </div>
     <div style="margin-top:10px;font-size:12px;color:var(--muted)">
-      <strong>Site:</strong> <a href="https://${esc(domain)}" target="_blank" class="link">${esc(domain)}</a> |
-      <strong>CMS:</strong> ${esc(type)} |
-      <strong>API:</strong> ${type==='shopify'?'✓ Shopify JSON API':'✓ WooCommerce REST'}
+      Cliquez sur la ligne pour copier. Collez dans le terminal ou tapez <code>! python3 /tmp/deep_scrape.py --domain ${esc(domain)}</code> ici.<br>
+      <strong>CMS:</strong> ${esc(type||'?')} · <strong>API:</strong> ${supportsApi?(type==='shopify'?'✓ Shopify JSON':'✓ WooCommerce REST'):'✕ Non supporté'}
     </div>`;
 };
 

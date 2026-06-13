@@ -51,7 +51,7 @@
           <thead><tr>
             <th>Domaine</th><th>Type</th><th>Niche</th>
             <th>Score</th><th>CPC</th><th>Trafic/mois</th><th>CA/mois est.</th>
-            <th>Âge</th><th>Statut</th><th>Actions</th>
+            <th>AliExpress</th><th>Âge</th><th>Statut</th><th>Actions</th>
           </tr></thead>
           <tbody id="tbody"></tbody>
         </table>
@@ -104,6 +104,12 @@ function caMonth(b) {
 }
 function fmtEur(n) { return n >= 1000 ? `${(n/1000).toFixed(1)}k€` : `${n}€`; }
 function scoreColor(s) { return s>=8?'badge-success':s>=6.5?'badge-info':s>=5?'badge-warn':'badge-err'; }
+function aliPct(b) {
+  const p = b.aliexpress_pct;
+  if (p === undefined || p === null) return '<span style="color:var(--muted);font-size:11px">—</span>';
+  const cls = p>=95?'badge-success':p>=40?'badge-warn':'badge-err';
+  return `<span class="badge ${cls}" style="font-size:11px">${p}%</span>`;
+}
 
 let _page = 1;
 
@@ -137,6 +143,7 @@ async function load(p = _page) {
       <td class="text-muted">${b.cpc ? b.cpc.toFixed(2)+'€' : '—'}</td>
       <td>${traffic ? fmt(traffic)+'/mois' : '—'}</td>
       <td style="font-weight:600;color:${ca>5000?'#22c55e':ca>1000?'#f59e0b':'inherit'}">${ca ? fmtEur(ca)+'/mois' : '—'}</td>
+      <td>${aliPct(b)}</td>
       <td class="text-muted">${b.reg_year ? `${b.reg_year} <span style="font-size:10px">(${b.domain_age_years}a)</span>` : '—'}</td>
       <td>${badge(b.importStatus)}</td>
       <td class="actions">
