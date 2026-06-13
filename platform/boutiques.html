@@ -274,28 +274,41 @@ window.addBoutique = async function() {
 
 window.purgeNonAli100 = async function() {
   if (!confirm('Supprimer toutes les boutiques avec AliExpress < 80% ?')) return;
-  let page = 1, deleted = 0, toDelete = [];
+  let page = 1, deleted = 0, errors = 0, toDelete = [];
 
-  // Collecte tous les IDs à supprimer (toutes pages)
+  console.group('[PURGE] Collecte boutiques < 80%');
   while (true) {
-    const d = await apiGet('/boutiques', { page, per: 100 }).catch(() => null);
-    if (!d?.list?.length) break;
+    const d = await apiGet('/boutiques', { page, per: 100 }).catch(e => { console.error('[PURGE] apiGet page', page, e); return null; });
+    if (!d?.list?.length) { console.log('[PURGE] page', page, '→ vide ou erreur, arrêt'); break; }
+    console.log(`[PURGE] page ${page}/${d.pages} — ${d.list.length} boutiques`);
     for (const b of d.list) {
-      if ((b.aliexpress_pct || 0) < 80) toDelete.push(b.id);
+      const pct = b.aliexpress_pct ?? null;
+      console.log(`  ${b.domain} | aliexpress_pct=${pct}`);
+      if (pct !== null && pct >= 80) continue;
+      toDelete.push({ id: b.id, domain: b.domain, pct });
     }
     if (page >= d.pages) break;
     page++;
   }
+  console.log('[PURGE] À supprimer:', toDelete);
+  console.groupEnd();
 
   if (!toDelete.length) return toast('Aucune boutique < 80% à supprimer', 'warning');
   toast(`Suppression de ${toDelete.length} boutiques…`, 'warning');
 
-  for (const id of toDelete) {
-    await apiDelete('/boutiques/' + id).catch(() => {});
-    deleted++;
+  for (const { id, domain, pct } of toDelete) {
+    try {
+      await apiDelete('/boutiques/' + id);
+      console.log(`[PURGE] ✅ supprimé ${domain} (${pct}%)`);
+      deleted++;
+    } catch(e) {
+      console.error(`[PURGE] ❌ erreur suppression ${domain} (${pct}%):`, e);
+      errors++;
+    }
   }
 
-  toast(`✅ ${deleted} boutique(s) supprimée(s) — seules les Ali 80–100% restent`, 'success');
+  console.log(`[PURGE] Résultat: ${deleted} supprimées, ${errors} erreurs`);
+  toast(`✅ ${deleted} supprimée(s)${errors ? ` — ⚠️ ${errors} erreur(s), voir console` : ''} — seules les Ali 80–100% restent`, errors ? 'warning' : 'success');
   load(1);
 };
 
