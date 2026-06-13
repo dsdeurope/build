@@ -1618,7 +1618,9 @@ window.startTranslation = async function() {
 
           if (parsed) {
             const arr = parsed[batchCfg.arrayKey] || [];
-            for (const { idx, row } of chunk) {
+            let matched = 0;
+            for (let ci = 0; ci < chunk.length; ci++) {
+              const { idx, row } = chunk[ci];
               const srcFr = String(row[cols.source_fr] || '').trim();
               let match;
               if (batchCfg.mode === 'json_products') {
@@ -1626,10 +1628,13 @@ window.startTranslation = async function() {
               } else {
                 match = arr.find(x => x.original_fr?.trim() === srcFr);
               }
+              // Fallback : 1 item in / 1 item out → prendre directement
+              if (!match && arr.length === chunk.length) match = arr[ci];
               results[idx] = match ? (match[batchCfg.valueKey] || '') : '';
-              if (!match) log(`[${lang.toUpperCase()}] no match: ${srcFr.slice(0,40)}`, 'warn');
+              if (match) matched++;
+              else log(`[${lang.toUpperCase()}] no match: ${srcFr.slice(0,40)}`, 'warn');
             }
-            log(`[${lang.toUpperCase()}] ${et} batch ✓ (${arr.length}/${chunk.length} matched)`, 'ok');
+            log(`[${lang.toUpperCase()}] ${et} batch ✓ (${matched}/${chunk.length} matched)`, 'ok');
           }
 
           done++;
