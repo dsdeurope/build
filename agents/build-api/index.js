@@ -75,10 +75,37 @@ function requireAuth(request, env) {
 
 export default {
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(fetch('https://v35-build-api.ernestpedanou.workers.dev/api/pipeline/run', {
+    const base = 'https://v35-build-api.ernestpedanou.workers.dev/api';
+    const h = new Date().getUTCHours();
+    // Every run: pipeline
+    ctx.waitUntil(fetch(`${base}/pipeline/run`, {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({trigger:'cron', secret: env.SEED_SECRET})
     }));
+    // Every 6h (0,6,12,18): health check sweep (lightweight — just fetch each domain HEAD)
+    if (h % 6 === 0) {
+      ctx.waitUntil((async () => {
+        try {
+          const r = await fetch(`${base}/boutiques?per=300`);
+          const data = await r.json();
+          const now = Date.now();
+          for (const b of (data.list || []).slice(0, 30)) { // batch of 30 per cron
+            if (b.last_checked && now - b.last_checked < 6*3600000) continue;
+            try {
+              const res = await fetch(`https://${b.domain}`, { method: 'HEAD', redirect:'follow',
+                headers:{'User-Agent':'V35HealthBot/1.0'}, signal: AbortSignal.timeout(5000) });
+              await fetch(`${base}/boutiques/${b.id}`, {
+                method:'PUT', headers:{'Content-Type':'application/json','Authorization':`Bearer ${env.API_TOKEN}`},
+                body: JSON.stringify({ online: res.status < 400, http_status: res.status, last_checked: now })
+              });
+            } catch { await fetch(`${base}/boutiques/${b.id}`, {
+              method:'PUT', headers:{'Content-Type':'application/json','Authorization':`Bearer ${env.API_TOKEN}`},
+              body: JSON.stringify({ online: false, http_status: 0, last_checked: now })
+            }); }
+          }
+        } catch {}
+      })());
+    }
   },
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
@@ -285,7 +312,7 @@ export default {
         if (method==='GET') return ok({boutique});
         if (method==='PUT') {
           const authErr = await requireAuth(request, env); if (authErr) return authErr;
-          const BOUTIQUE_FIELDS = ['domain','type','niche','traffic','comment','importStatus','blueprint','collections','products','profitable_collections','footprint','keywords','images','sites','jobs','score','cpc','traffic_monthly','online','http_status','last_checked','redirect_url','clone_days','ca_monthly','aliexpress_pct','aliexpress_detail','aliexpress_checked_at','aliexpress_supplier_url'];
+          const BOUTIQUE_FIELDS = ['domain','type','niche','traffic','comment','importStatus','blueprint','collections','products','profitable_collections','footprint','keywords','images','sites','jobs','score','cpc','traffic_monthly','online','http_status','last_checked','redirect_url','clone_days','ca_monthly','aliexpress_pct','aliexpress_detail','aliexpress_checked_at','aliexpress_supplier_url','expired_domain'];
           for (const k of BOUTIQUE_FIELDS) if (k in body) boutique[k] = body[k];
           boutique.updatedAt = Date.now();
           await saveBoutique(env, list, boutique);
@@ -544,6 +571,73 @@ export default {
       return err('Not found', 404);
     }
 
+
+    // ── /api/expired-domains ─────────────────────────────────────────────────
+    if (resource === 'expired-domains') {
+      const authErr = method !== 'GET' ? await requireAuth(request, env) : null;
+      if (authErr) return authErr;
+
+      if (!id && method === 'GET') {
+        const list = await kvList(env, 'plt:expired_domains');
+        const niche = url.searchParams.get('niche');
+        const tld   = url.searchParams.get('tld');
+        const per   = parseInt(url.searchParams.get('per') || '200');
+        let filtered = list;
+        if (niche) filtered = filtered.filter(d => d.niche === niche);
+        if (tld)   filtered = filtered.filter(d => d.domain.endsWith('.' + tld));
+        filtered.sort((a,b) => (b.score||0)-(a.score||0));
+        return ok({ list: filtered.slice(0, per), total: filtered.length });
+      }
+
+      if (!id && method === 'POST') {
+        const domains = Array.isArray(body) ? body : [body];
+        let list = await kvList(env, 'plt:expired_domains');
+        const existing = new Set(list.map(d => d.domain));
+        let added = 0;
+        for (const d of domains) {
+          if (!d.domain || existing.has(d.domain)) continue;
+          d.id = d.domain.replace(/\./g, '-') + '-' + Date.now();
+          d.found_at = Date.now();
+          list.unshift(d);
+          existing.add(d.domain);
+          added++;
+        }
+        // Keep max 2000 domains
+        list = list.slice(0, 2000);
+        await kvSetSafe(env, 'plt:expired_domains', list);
+        return ok({ added, total: list.length });
+      }
+
+      if (id === 'match' && sub) {
+        // GET /api/expired-domains/match/:boutique_id — best expired domain for a boutique
+        const blist = await kvList(env, 'plt:boutiques');
+        const b = blist.find(x => x.id === sub);
+        if (!b) return err('Boutique not found', 404);
+        const dlist = await kvList(env, 'plt:expired_domains');
+        const matches = dlist
+          .filter(d => d.niche === b.niche && !d.linked_boutique_id)
+          .sort((a,b) => (b.score||0)-(a.score||0));
+        return ok({ matches: matches.slice(0, 5) });
+      }
+
+      if (id && method === 'PUT') {
+        let list = await kvList(env, 'plt:expired_domains');
+        const idx = list.findIndex(d => d.id === id || d.domain === id);
+        if (idx < 0) return err('Not found', 404);
+        Object.assign(list[idx], body);
+        await kvSetSafe(env, 'plt:expired_domains', list);
+        return ok({ domain: list[idx] });
+      }
+
+      if (id && method === 'DELETE') {
+        let list = await kvList(env, 'plt:expired_domains');
+        list = list.filter(d => d.id !== id && d.domain !== id);
+        await kvSetSafe(env, 'plt:expired_domains', list);
+        return ok({ deleted: id });
+      }
+
+      return err('Not found', 404);
+    }
 
     return err('Not found',404);
   }

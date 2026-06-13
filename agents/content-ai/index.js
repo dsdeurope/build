@@ -1,5 +1,5 @@
-// V35 Content AI — Gemini multi-key rotation + prompts SEO professionnels
-// Secrets: GEMINI_KEYS (comma-separated API keys), KV binding
+// V35 Content AI — OpenRouter + Gemini multi-key rotation, prompts SEO pro
+// Secrets: OPENROUTER_KEYS (comma-sep), GEMINI_KEYS (comma-sep, fallback), KV binding
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -10,10 +10,36 @@ const CORS = {
 function ok(d) { return Response.json({ ok:true, ...d }, { headers:CORS }); }
 function err(msg, s=400) { return Response.json({ ok:false, error:msg }, { status:s, headers:CORS }); }
 
-// ── Gemini client ──────────────────────────────────────────────────────────
+// ── OpenRouter client (primary — no IP restrictions) ──────────────────────
+const OR_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OR_MODEL_PRIMARY  = 'google/gemini-2.5-flash';
+const OR_MODEL_FALLBACK = 'google/gemini-2.0-flash';
+
+async function callOpenRouter(prompt, apiKey, model = OR_MODEL_PRIMARY) {
+  const r = await fetch(OR_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      messages: [{ role:'user', content: prompt }],
+      temperature: 0.2,
+      max_tokens: 8192,
+    }),
+    signal: AbortSignal.timeout(120000),
+  });
+  if (r.status === 429) throw Object.assign(new Error('RATE_LIMITED'), { code:429 });
+  if (r.status === 401 || r.status === 403) throw Object.assign(new Error('QUOTA_EXHAUSTED'), { code:r.status });
+  if (!r.ok) throw new Error(`OpenRouter ${r.status}: ${await r.text()}`);
+  const d = await r.json();
+  const text = d.choices?.[0]?.message?.content?.trim();
+  if (!text) throw new Error('Empty response from OpenRouter');
+  return text;
+}
+
+// ── Gemini direct client (fallback) ──────────────────────────────────────
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent';
-const MODEL_PRIMARY  = 'gemini-2.5-pro-preview-06-05';
-const MODEL_FALLBACK = 'gemini-2.5-flash-preview-05-20';
+const MODEL_PRIMARY  = 'gemini-2.5-flash';
+const MODEL_FALLBACK = 'gemini-2.0-flash';
 
 async function callGemini(prompt, apiKey, model = MODEL_PRIMARY) {
   const url = GEMINI_URL.replace('{model}', model) + `?key=${apiKey}`;
@@ -35,23 +61,52 @@ async function callGemini(prompt, apiKey, model = MODEL_PRIMARY) {
   return text;
 }
 
-// ── Key rotation (round-robin, skip rate-limited) ──────────────────────────
+// ── Key rotation (OpenRouter primary, Gemini fallback) ────────────────────
 // State: KV stores per-key status: {exhausted:bool, coolUntil:number}
 class KeyRotator {
-  constructor(keys, kv) {
-    this.keys = keys; // string[]
+  constructor(orKeys, geminiKeys, kv) {
+    this.orKeys = orKeys;       // OpenRouter keys (primary)
+    this.geminiKeys = geminiKeys; // Gemini keys (fallback)
     this.kv = kv;
-    this.idx = 0;
+    this.orIdx = 0;
+    this.gIdx = 0;
   }
 
-  async callWithRotation(prompt, model = MODEL_PRIMARY) {
-    const n = this.keys.length;
+  async callWithRotation(prompt) {
     const now = Date.now();
-    for (let attempt = 0; attempt < n * 2; attempt++) {
-      const key = this.keys[this.idx % n];
-      this.idx = (this.idx + 1) % n;
 
-      // Check cooldown in KV
+    // 1. Try OpenRouter keys first
+    const orN = this.orKeys.length;
+    for (let attempt = 0; attempt < orN * 2; attempt++) {
+      const key = this.orKeys[this.orIdx % orN];
+      this.orIdx = (this.orIdx + 1) % orN;
+      const stateRaw = await this.kv?.get(`or:key:${key.slice(-8)}`).catch(() => null);
+      if (stateRaw) {
+        const s = JSON.parse(stateRaw);
+        if (s.exhausted) continue;
+        if (s.coolUntil && now < s.coolUntil) continue;
+      }
+      try {
+        return await callOpenRouter(prompt, key, OR_MODEL_PRIMARY);
+      } catch(e) {
+        if (e.code === 429) {
+          await this.kv?.put(`or:key:${key.slice(-8)}`, JSON.stringify({ coolUntil: now + 60000 }), { expirationTtl: 120 }).catch(() => {});
+          continue;
+        }
+        if (e.code === 401 || e.code === 403) {
+          await this.kv?.put(`or:key:${key.slice(-8)}`, JSON.stringify({ exhausted: true }), { expirationTtl: 86400 }).catch(() => {});
+          continue;
+        }
+        // Try fallback model on non-auth errors
+        try { return await callOpenRouter(prompt, key, OR_MODEL_FALLBACK); } catch {}
+      }
+    }
+
+    // 2. Fallback: Gemini direct keys
+    const gN = this.geminiKeys.length;
+    for (let attempt = 0; attempt < gN * 2; attempt++) {
+      const key = this.geminiKeys[this.gIdx % gN];
+      this.gIdx = (this.gIdx + 1) % gN;
       const stateRaw = await this.kv?.get(`gemini:key:${key.slice(-8)}`).catch(() => null);
       if (stateRaw) {
         const state = JSON.parse(stateRaw);
@@ -60,10 +115,9 @@ class KeyRotator {
       }
 
       try {
-        return await callGemini(prompt, key, model);
+        return await callGemini(prompt, key, MODEL_PRIMARY);
       } catch(e) {
         if (e.code === 429) {
-          // Cool down this key for 60s
           await this.kv?.put(`gemini:key:${key.slice(-8)}`,
             JSON.stringify({ coolUntil: now + 60000 }),
             { expirationTtl: 120 }
@@ -71,21 +125,17 @@ class KeyRotator {
           continue;
         }
         if (e.code === 403 || e.code === 401) {
-          // Mark exhausted for the day
           await this.kv?.put(`gemini:key:${key.slice(-8)}`,
             JSON.stringify({ exhausted: true }),
             { expirationTtl: 86400 }
           ).catch(() => {});
           continue;
         }
-        if (model === MODEL_PRIMARY) {
-          // Fallback to flash
-          try { return await callGemini(prompt, key, MODEL_FALLBACK); } catch {}
-        }
+        try { return await callGemini(prompt, key, MODEL_FALLBACK); } catch {}
         throw e;
       }
     }
-    throw new Error('All Gemini keys exhausted or rate-limited');
+    throw new Error('All AI keys exhausted or rate-limited');
   }
 }
 
@@ -290,10 +340,11 @@ export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { headers:CORS });
 
-    // Setup key rotator
+    // Setup key rotator — OpenRouter primary, Gemini fallback
+    const orKeys = (env.OPENROUTER_KEYS || '').split(',').map(k => k.trim()).filter(Boolean);
     const geminiKeys = (env.GEMINI_KEYS || '').split(',').map(k => k.trim()).filter(Boolean);
-    if (!geminiKeys.length) return err('GEMINI_KEYS secret not set', 500);
-    const rotator = new KeyRotator(geminiKeys, env.KV);
+    if (!orKeys.length && !geminiKeys.length) return err('No AI keys configured', 500);
+    const rotator = new KeyRotator(orKeys, geminiKeys, env.KV);
 
     const url = new URL(request.url);
     const [,, resource] = url.pathname.split('/');
@@ -302,7 +353,7 @@ export default {
 
     // ── /api/health ──────────────────────────────────────────────────────────
     if (resource === 'health') {
-      return ok({ status:'ok', keys: geminiKeys.length, model: MODEL_PRIMARY });
+      return ok({ status:'ok', or_keys: orKeys.length, gemini_keys: geminiKeys.length, model: OR_MODEL_PRIMARY });
     }
 
     // ── /api/collection-titles ───────────────────────────────────────────────
@@ -367,25 +418,31 @@ export default {
 
     // ── /api/homepage ────────────────────────────────────────────────────────
     // body: { domain, niche, lang, country, collections:string[], langs:string[] }
-    // Generates homepage content for ALL requested languages in parallel
+    // Single lang per request to avoid OpenRouter concurrent rate limits
     if (resource === 'homepage') {
-      const { domain='', niche='mode', lang='fr', langs=['fr','de','es'], country, collections=[] } = body;
+      const { domain='', niche='mode', lang='fr', langs=[], country, collections=[] } = body;
       if (!domain) return err('domain required');
+      // If langs array given, generate sequentially and return all
       const targetLangs = langs.length ? langs : [lang];
       const results = {};
-      await Promise.all(targetLangs.map(async l => {
+      // Check consolidated cache first (plt:homepages written by seed script)
+      const allHomes = await env.KV?.get('plt:homepages').then(v => v ? JSON.parse(v) : null).catch(() => null);
+      if (allHomes?.[domain]) {
+        const cached = allHomes[domain].langs || allHomes[domain];
+        for (const l of targetLangs) { if (cached[l]) results[l] = cached[l]; }
+      }
+      // Generate missing langs
+      for (const l of targetLangs) {
+        if (results[l]) continue;
         const tgt = country || COUNTRIES[l] || l;
-        const cacheKey = `ai:home:${l}:${domain}`;
-        results[l] = await cached(env.KV, cacheKey, async () => {
+        try {
           const prompt = buildHomepagePrompt(domain, niche, l, tgt, collections);
           const text = await rotator.callWithRotation(prompt);
-          try { return extractJSON(text); }
-          catch { return { hero:{ title:niche, subtitle:'', cta:'Voir' }, meta:{title:domain,description:''} }; }
-        }, 43200); // 12h cache for homepage
-      }));
-      // Store in KV for skeleton builder to retrieve
-      if (env.KV) {
-        await env.KV.put(`home:${domain}`, JSON.stringify(results), { expirationTtl: 86400 }).catch(() => {});
+          try { results[l] = extractJSON(text); }
+          catch { results[l] = { hero:{ title:niche, subtitle:'', cta:'Voir' }, meta:{title:domain,description:''} }; }
+        } catch(e) {
+          results[l] = { error: e.message };
+        }
       }
       return ok({ results, domain, langs: targetLangs });
     }
@@ -436,17 +493,18 @@ export default {
 
     // ── /api/key-status ──────────────────────────────────────────────────────
     if (resource === 'key-status') {
-      const statuses = await Promise.all(geminiKeys.map(async key => {
+      const orStatuses = await Promise.all(orKeys.map(async key => {
+        const stateRaw = await env.KV?.get(`or:key:${key.slice(-8)}`).catch(() => null);
+        const state = stateRaw ? JSON.parse(stateRaw) : {};
+        return { type:'openrouter', suffix:`***${key.slice(-8)}`, exhausted:state.exhausted||false, coolUntil:state.coolUntil||null, active:!state.exhausted&&(!state.coolUntil||Date.now()>state.coolUntil) };
+      }));
+      const gStatuses = await Promise.all(geminiKeys.map(async key => {
         const stateRaw = await env.KV?.get(`gemini:key:${key.slice(-8)}`).catch(() => null);
         const state = stateRaw ? JSON.parse(stateRaw) : {};
-        return {
-          suffix: `***${key.slice(-8)}`,
-          exhausted: state.exhausted || false,
-          coolUntil: state.coolUntil || null,
-          active: !state.exhausted && (!state.coolUntil || Date.now() > state.coolUntil),
-        };
+        return { type:'gemini', suffix:`***${key.slice(-8)}`, exhausted:state.exhausted||false, coolUntil:state.coolUntil||null, active:!state.exhausted&&(!state.coolUntil||Date.now()>state.coolUntil) };
       }));
-      return ok({ keys: statuses, total: geminiKeys.length, active: statuses.filter(k=>k.active).length });
+      const all = [...orStatuses, ...gStatuses];
+      return ok({ keys: all, total: all.length, active: all.filter(k=>k.active).length });
     }
 
     return err('Not found', 404);
