@@ -55,6 +55,7 @@
             <span>Gemini API Vault</span>
             <div style="display:flex;align-items:center;gap:6px">
               <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="btn btn-sm" style="font-size:11px">+ Créer une clé →</a>
+              <button class="btn btn-sm" onclick="window._testAllKeys()" style="font-size:11px">⚡ Tester tout</button>
               <span id="gemini-count" class="badge badge-info" style="font-size:10px">0 clé(s)</span>
             </div>
           </div>
@@ -280,6 +281,19 @@ window._testKey = async function(idx) {
     log(`Clé ${idx+1} invalide: ${e.message}`, 'err');
     vault.save(); renderVault();
   }
+};
+
+window._testAllKeys = async function() {
+  const keys = vault.config.api_vault.gemini.keys;
+  if (!keys.length) return toast('Aucune clé à tester', 'error');
+  log(`Test de ${keys.length} clé(s) en cours…`, 'info');
+  for (let i = 0; i < keys.length; i++) {
+    await window._testKey(i);
+    if (i < keys.length - 1) await new Promise(r => setTimeout(r, 1200));
+  }
+  const ok  = vault.config.api_vault.gemini.keys.filter(k => !k.last_error).length;
+  const bad = vault.config.api_vault.gemini.keys.filter(k =>  k.last_error).length;
+  log(`Résultat : ${ok} valide(s) ✓ · ${bad} invalide(s) ✗`, ok === keys.length ? 'ok' : 'err');
 };
 
 window._removeKey = function(idx) {
