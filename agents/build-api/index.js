@@ -639,6 +639,62 @@ export default {
       return err('Not found', 404);
     }
 
+    // ── /api/proxy/search — proxy DDG Lite search (contourne firewall local) ──
+    if (resource === 'proxy' && id === 'search') {
+      const q = url.searchParams.get('q');
+      if (!q) return err('Missing q', 400);
+      try {
+        const ddgUrl = `https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(q)}`;
+        const r = await fetch(ddgUrl, {
+          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0.0.0 Safari/537.36', 'Accept': 'text/html,*/*' },
+          redirect: 'follow',
+        });
+        const text = await r.text();
+        const count = (text.match(/aliexpress\.com/g) || []).length;
+        return new Response(JSON.stringify({ ok: true, count, status: r.status }), {
+          headers: { ...CORS, 'Content-Type': 'application/json' }
+        });
+      } catch(e) {
+        return new Response(JSON.stringify({ ok: false, count: 0, error: String(e) }), {
+          headers: { ...CORS, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // ── /api/cron/health — endpoint déclenché par cron-job.org (gratuit) ─────
+    if (resource === 'cron' && id === 'health') {
+      const secret = url.searchParams.get('secret') || body.secret;
+      if (secret !== env.SEED_SECRET) return err('Unauthorized', 401);
+      // Health sweep: check up to 20 boutiques not checked in last 6h
+      const list = await kvList(env, 'plt:boutiques');
+      const now = Date.now();
+      const stale = list.filter(b => !b.last_checked || now - b.last_checked > 6*3600*1000).slice(0, 20);
+      const results = [];
+      for (const b of stale) {
+        try {
+          const r = await fetch(`https://${b.domain}`, {
+            method: 'HEAD', redirect: 'follow',
+            headers: { 'User-Agent': 'V35HealthBot/1.0' },
+            signal: AbortSignal.timeout(5000),
+          });
+          const up = r.status < 400;
+          await fetch(`https://v35-build-api.ernestpedanou.workers.dev/api/boutiques/${b.id}`, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${env.API_TOKEN}` },
+            body: JSON.stringify({ online: up, http_status: r.status, last_checked: now }),
+          });
+          results.push({ domain: b.domain, status: r.status, online: up });
+        } catch {
+          results.push({ domain: b.domain, status: 0, online: false });
+        }
+      }
+      return ok({ checked: results.length, results });
+    }
+
+    // ── /api/cron/status — healthcheck pour cron-job.org monitoring ──────────
+    if (resource === 'cron' && id === 'status') {
+      return ok({ ok: true, ts: Date.now(), version: 'v35-build-api' });
+    }
+
     return err('Not found',404);
   }
 };
