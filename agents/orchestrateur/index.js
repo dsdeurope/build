@@ -9,11 +9,12 @@ const CORS = {
 };
 
 const WORKERS = {
-  SEQ:     'https://v35-sequenceur.ernestpedanou.workers.dev',
-  HEALTH:  'https://v35-domain-health-checker.ernestpedanou.workers.dev',
-  SKELETON:'https://v35-skeleton-builder.ernestpedanou.workers.dev',
-  AGED:    'https://v35-aged-domain-finder.ernestpedanou.workers.dev',
-  PALETTE: 'https://v35-color-palette.ernestpedanou.workers.dev',
+  SEQ:      'https://v35-sequenceur.ernestpedanou.workers.dev',
+  HEALTH:   'https://v35-domain-health-checker.ernestpedanou.workers.dev',
+  SKELETON: 'https://v35-skeleton-builder.ernestpedanou.workers.dev',
+  AGED:     'https://v35-aged-domain-finder.ernestpedanou.workers.dev',
+  PALETTE:  'https://v35-color-palette.ernestpedanou.workers.dev',
+  SUPPLIER: 'https://v35-supplier-resolver.ernestpedanou.workers.dev',
 };
 
 // Free image APIs — caller supplies API keys via env or body

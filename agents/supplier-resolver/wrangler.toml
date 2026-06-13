@@ -1,0 +1,9 @@
+name = "v35-supplier-resolver"
+compatibility_date = "2024-10-01"
+main = "index.js"
+account_id = "fe4415f3f3f3b64f651166d1a7ffe1a0"
+
+# Secrets (wrangler secret put SECRET_NAME):
+# API_TOKEN     — build-api bearer token
+# SEED_SECRET   — cron endpoint secret (same as build-api)
+# CRON_SECRET   — optional separate cron secret

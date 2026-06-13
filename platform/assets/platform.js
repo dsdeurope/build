@@ -1,5 +1,6 @@
 // V35 Platform — shared utilities
 const API = 'https://v35-build-api.ernestpedanou.workers.dev/api';
+const SUPPLIER_API = 'https://v35-supplier-resolver.ernestpedanou.workers.dev';
 const AUTH_KEY = 'v35_auth';
 const AUTH_HASH = 'c0e1ef644e74252419e56e7818885cbeaf7bd35bec04b0dfda954678e4f16354';
 
@@ -82,6 +83,7 @@ const NAV_ITEMS = [
   { href: '/scrapping.html',            icon: '🕷', label: 'Scrapping' },
   { href: '/aliexpress.html',           icon: '🛒', label: 'Aliexpress' },
   { href: '/expired-domains.html',      icon: '🔥', label: 'Domaines Exp.' },
+  { href: '/traduction.html',           icon: '🌐', label: 'Traduction' },
   { href: '/domaines-footprints.html',   icon: '◎', label: 'Footprints' },
   { href: '/dorks.html',                 icon: '🔍', label: 'Dorks' },
   { href: '/sites.html',                 icon: '✦', label: 'Sites' },
@@ -153,6 +155,30 @@ export function paginationHtml(page, pages, onPage) {
 }
 
 // ── Stats mini-chart ─────────────────────────────────────────────────────────
+// ── Supplier resolver ────────────────────────────────────────────────────────
+export async function resolveSupplier(boutiqueId, domain, niche, keywords = []) {
+  const res = await fetch(`${SUPPLIER_API}/resolve`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ domain, niche, keywords, boutique_id: boutiqueId }),
+  });
+  return res.json();
+}
+
+export function supplierBadge(result) {
+  if (!result?.resolved) return `<span class="badge badge-err">Aucun fournisseur</span>`;
+  const icons = { aliexpress: '🛒', cjdropshipping: '📦', dhgate: '🏪', '1688': '🇨🇳' };
+  const icon = icons[result.supplier] || '✓';
+  return `<a href="${result.supplier_url}" target="_blank" class="badge badge-success">${icon} ${result.supplier_name} ${result.supplier_pct}%</a>`;
+}
+
+export function supplierChainHtml(chain = []) {
+  return chain.map(p => {
+    const cls = p.pct >= 30 ? 'badge-success' : p.pct >= 10 ? 'badge-warn' : 'badge-err';
+    return `<span class="badge ${cls}">${p.name}: ${p.pct}%</span>`;
+  }).join(' ');
+}
+
 export function sparkline(values, maxVal) {
   const max = maxVal || Math.max(...values, 1);
   return values.map(v => {
