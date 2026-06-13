@@ -20,10 +20,13 @@ const DEFAULT_CONFIG = {
     mistral: { key: '', status: 'inactive', calls_count: 0 },
   },
   routing_rules: {
-    // GPT-4o : contenu premium visible (qualité culturelle maximale)
-    openai_pro_targets:  ['homepage', 'titres_h1', 'collection_longues', 'blog'],
-    // GPT-4o-mini : volume (800 produits, collections courtes)
-    openai_mini_targets: ['descriptions_produits', 'collections', 'collection_intro'],
+    // GPT-4o : contenu premium, copywriting long, stratégie
+    openai_pro_targets:  ['homepage', 'titres_h1', 'collection_longues', 'blog',
+                          'backlinks', 'collections_long_seo', 'blog_pillar'],
+    // GPT-4o-mini : volume, outils CRO produit, SEO technique
+    openai_mini_targets: ['descriptions_produits', 'collections', 'collection_intro',
+                          'bulletpoints', 'slogan', 'cro', 'blocks', 'avis', 'faq_produit', 'comparatif',
+                          'slugs', 'descriptions_seo', 'collections_intro_seo'],
     // Fallback si OpenAI absent
     fallback_order: ['openai_pro', 'openai_mini', 'gemini', 'mistral', 'groq'],
   },
