@@ -310,6 +310,7 @@ function renderVault() {
   else if (providers.length === 1) { badge.textContent=`Vault OK (${providers[0]})`; badge.className='badge badge-info'; }
   else { badge.textContent='Vault non configuré'; badge.className='badge badge-warn'; }
   // Restore inputs
+  if (vault.config.api_vault.openai?.key)  document.getElementById('openai-key').value  = vault.config.api_vault.openai.key;
   const proxyUrl = vault.config.proxy_settings?.gemini_proxy_url;
   if (proxyUrl) document.getElementById('proxy-url').value = proxyUrl;
   if (vault.config.api_vault.mistral?.key) document.getElementById('mistral-key').value = vault.config.api_vault.mistral.key;
