@@ -83,6 +83,17 @@
           <div class="card-header">Providers gratuits</div>
           <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
 
+            <!-- OpenAI GPT-4o -->
+            <div>
+              <div style="font-size:11px;font-weight:600;margin-bottom:4px">🤖 OpenAI GPT-4o <span style="color:#22c55e;font-size:10px">RECOMMANDE · traduction culturelle profonde · 20 pays</span></div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Clé sur <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--accent)">platform.openai.com/api-keys</a> — $5 crédit = des milliers de traductions</div>
+              <div style="display:flex;gap:6px">
+                <input id="openai-key" class="form-input key-input" type="password" placeholder="sk-…" style="flex:1">
+                <button class="btn btn-sm" onclick="saveOpenAI()">Sauvegarder</button>
+                <button class="btn btn-sm" onclick="testOpenAI()">Tester</button>
+              </div>
+            </div>
+
             <!-- Gemini CF Proxy -->
             <div>
               <div style="font-size:11px;font-weight:600;margin-bottom:4px">🔐 Gemini CF Proxy <span style="color:#22c55e;font-size:10px">RECOMMANDE · clés protégées · IP Cloudflare</span></div>
@@ -369,6 +380,39 @@ window.addGeminiKey = function() {
   } else {
     toast('Clé déjà présente ou invalide', 'error');
   }
+};
+
+window.saveOpenAI = function() {
+  const k = document.getElementById('openai-key').value.trim();
+  if (!k) return toast('Clé vide', 'error');
+  vault.config.api_vault.openai = { key: k, status: 'active', calls_count: 0 };
+  vault.save();
+  toast('Clé OpenAI sauvegardée', 'success');
+};
+
+window.testOpenAI = async function() {
+  const k = document.getElementById('openai-key').value.trim()
+    || vault.config.api_vault.openai?.key;
+  if (!k) return toast('Ajoutez d\'abord une clé OpenAI', 'error');
+  toast('Test GPT-4o…', 'info');
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${k}` },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: 'Réponds "OK" en un mot.' }],
+        max_tokens: 5,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const d = await r.json();
+    if (d.choices?.[0]?.message?.content) {
+      toast(`GPT-4o OK — "${d.choices[0].message.content.trim()}"`, 'success');
+    } else {
+      toast(`Erreur: ${d.error?.message || 'réponse inattendue'}`, 'error');
+    }
+  } catch(e) { toast(`Erreur: ${e.message}`, 'error'); }
 };
 
 window.saveProxyUrl = function() {

@@ -53,7 +53,7 @@ async function callGemini(key, model, prompt, opts = {}) {
 
   const r = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Referer': 'https://aistudio.google.com/' },
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(55000),
   });

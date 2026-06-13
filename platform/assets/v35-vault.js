@@ -14,15 +14,18 @@ const DEFAULT_CONFIG = {
       keys: [],           // [{id, key, type, status, calls_count, last_error}]
       active_index: 0,
     },
+    openai:  { key: '', status: 'inactive', calls_count: 0 },   // GPT-4o — traduction culturelle
     qwen:    { key: '', status: 'inactive', calls_count: 0 },
-    groq:    { key: '', status: 'inactive', calls_count: 0 },    // gratuit, 14400 req/jour
-    mistral: { key: '', status: 'inactive', calls_count: 0 },    // gratuit, natif FR
+    groq:    { key: '', status: 'inactive', calls_count: 0 },
+    mistral: { key: '', status: 'inactive', calls_count: 0 },
   },
   routing_rules: {
-    gemini_targets:  ['homepage', 'titres_h1', 'collections', 'collection_intro', 'collection_longues', 'blog'],
-    qwen_targets:    ['descriptions_produits'],
-    // fallback_order: providers tentés en séquence si Gemini échoue
-    fallback_order:  ['gemini', 'mistral', 'groq'],
+    // GPT-4o : contenu premium visible (qualité culturelle maximale)
+    openai_pro_targets:  ['homepage', 'titres_h1', 'collection_longues', 'blog'],
+    // GPT-4o-mini : volume (800 produits, collections courtes)
+    openai_mini_targets: ['descriptions_produits', 'collections', 'collection_intro'],
+    // Fallback si OpenAI absent
+    fallback_order: ['openai_pro', 'openai_mini', 'gemini', 'mistral', 'groq'],
   },
   error_handling: {
     max_retries: 3,
@@ -30,12 +33,14 @@ const DEFAULT_CONFIG = {
     switch_on_429: true,
   },
   proxy_settings: {
+    openai_model:      'gpt-4o',        // premium : homepage, H1, blog
+    openai_mini_model: 'gpt-4o-mini',   // volume  : produits, collections
     target_model:      'gemini-2.5-flash',
     mistral_model:     'mistral-large-latest',
     groq_model:        'llama-3.3-70b-versatile',
     translation_mode:  'anthropic_to_google_api',
     gemini_proxy_url:  'https://v35-gemini-proxy.ernestpedanou.workers.dev/generate',
-    proxy_auth_secret: '',   // laisser vide = pas d'auth requise
+    proxy_auth_secret: '',
   },
 };
 
@@ -176,6 +181,13 @@ export class V35Vault {
 
   route(elementType) {
     const r = this.config.routing_rules;
+    const hasOpenAI = !!this.config.api_vault.openai?.key;
+    if (hasOpenAI) {
+      if (r.openai_pro_targets?.includes(elementType))  return 'openai_pro';
+      if (r.openai_mini_targets?.includes(elementType)) return 'openai_mini';
+      return 'openai_pro'; // défaut OpenAI
+    }
+    // Fallback sans OpenAI
     if (r.qwen_targets?.includes(elementType)) return 'qwen';
     return 'gemini';
   }
@@ -194,11 +206,15 @@ export class V35Router {
     const cfg = this.vault.config.error_handling;
     let lastErr;
 
+    this.log(`[ROUTE] ${elementType} → ${provider.toUpperCase()}`, 'info');
+
     for (let attempt = 0; attempt <= cfg.max_retries; attempt++) {
       try {
-        const result = provider === 'qwen'
-          ? await this._callQwen(prompt, opts)
-          : await this._callGemini(prompt, opts);
+        let result;
+        if      (provider === 'openai_pro')  result = await this._callOpenAI(prompt, opts);
+        else if (provider === 'openai_mini') result = await this._callOpenAI(prompt, { ...opts, mini: true });
+        else if (provider === 'qwen')        result = await this._callQwen(prompt, opts);
+        else                                 result = await this._callGemini(prompt, opts);
         return result;
       } catch(e) {
         lastErr = e;
@@ -212,7 +228,6 @@ export class V35Router {
             const rotated = this.vault.rotateGemini(e.message);
             this.log(`429 → rotation clé Gemini (${rotated ? 'ok' : 'épuisé'})`, 'warn');
           }
-          // 403/suspendu ou plus de clés → fallback chain gratuit
           if (is403 || !this.vault.getActiveGeminiKey()) {
             return await this._callFallbackChain(prompt, opts);
           }
@@ -277,23 +292,59 @@ export class V35Router {
 
   // Fallback chain : Mistral → Groq (tous gratuits, haute qualité FR)
   async _callFallbackChain(prompt, opts = {}) {
-    const order = this.vault.config.routing_rules.fallback_order || ['mistral', 'groq'];
+    const order = this.vault.config.routing_rules.fallback_order || ['openai_pro', 'mistral', 'groq'];
     for (const p of order) {
       if (p === 'gemini') continue;
+      if ((p === 'openai_pro' || p === 'openai_mini') && this.vault.config.api_vault.openai?.key) {
+        try {
+          const mini = p === 'openai_mini';
+          this.log(`Fallback → GPT-4o${mini ? '-mini' : ''} (traduction culturelle)…`, 'warn');
+          return await this._callOpenAI(prompt, { ...opts, mini });
+        } catch(e) { this.log(`OpenAI: ${e.message}`, 'err'); }
+      }
       if (p === 'mistral' && this.vault.config.api_vault.mistral?.key) {
         try {
-          this.log('Fallback → Mistral Large (gratuit, natif FR)…', 'warn');
+          this.log('Fallback → Mistral Large…', 'warn');
           return await this._callMistral(prompt, opts);
         } catch(e) { this.log(`Mistral: ${e.message}`, 'err'); }
       }
       if (p === 'groq' && this.vault.config.api_vault.groq?.key) {
         try {
-          this.log('Fallback → Groq Llama-3.3-70B (gratuit)…', 'warn');
+          this.log('Fallback → Groq Llama-3.3-70B…', 'warn');
           return await this._callGroq(prompt, opts);
         } catch(e) { this.log(`Groq: ${e.message}`, 'err'); }
       }
     }
-    throw new Error('Tous les providers gratuits échoués — ajoutez une clé Mistral ou Groq dans le vault');
+    throw new Error('Tous les providers échoués — ajoutez une clé OpenAI, Mistral ou Groq dans le vault');
+  }
+
+  async _callOpenAI(prompt, opts = {}) {
+    const k = this.vault.config.api_vault.openai?.key;
+    if (!k) throw new Error('Clé OpenAI absente');
+    const ps = this.vault.config.proxy_settings;
+    // opts.mini = true → gpt-4o-mini (volume/produits), sinon gpt-4o (premium)
+    const model = opts.mini
+      ? (ps?.openai_mini_model || 'gpt-4o-mini')
+      : (ps?.openai_model     || 'gpt-4o');
+    this.log(`[OpenAI] Modèle: ${model}`, 'info');
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${k}` },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: opts.maxTokens || 4096,
+        temperature: opts.temperature || 0.4,
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: { message: r.statusText } }));
+      throw new Error(`[OpenAI ${r.status}] ${err.error?.message || r.statusText}`);
+    }
+    this.vault.trackCall('openai');
+    const d = await r.json();
+    return d.choices?.[0]?.message?.content?.trim() || '';
   }
 
   async _callMistral(prompt, opts = {}) {
