@@ -87,8 +87,8 @@
               <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Clé sur <a href="https://platform.openai.com/api-keys" target="_blank" style="color:var(--accent)">platform.openai.com/api-keys</a> — $5 crédit = des milliers de traductions</div>
               <div style="display:flex;gap:6px">
                 <input id="openai-key" class="form-input key-input" type="password" placeholder="sk-…" style="flex:1">
-                <button class="btn btn-sm" onclick="saveOpenAI()">Sauvegarder</button>
-                <button class="btn btn-sm" onclick="testOpenAI()">Tester</button>
+                <button id="btn-save-openai" class="btn btn-sm" onclick="saveOpenAI()">Sauvegarder</button>
+                <button id="btn-test-openai" class="btn btn-sm" onclick="testOpenAI()">Tester</button>
               </div>
             </div>
 
@@ -102,6 +102,9 @@
                 <button class="btn btn-sm" onclick="testProxy()">Tester</button>
               </div>
             </div>
+
+            <!-- Vault log -->
+            <div id="vault-log" class="status-log" style="margin-top:8px;max-height:80px;display:none"></div>
 
             <!-- Reset -->
             <div style="border-top:1px solid var(--border);padding-top:8px">
@@ -252,7 +255,7 @@ const LANG_NAMES = { en:'anglais',es:'espagnol',de:'allemand',it:'italien',pt:'p
 
 // Restore persisted Qwen key display
 const qkey = vault.config.api_vault.qwen?.key;
-if (qkey) document.getElementById('qwen-key').value = qkey;
+if (qkey) { const el = document.getElementById('qwen-key'); if (el) el.value = qkey; }
 
 // ── Vault UI ──────────────────────────────────────────────────────────────────
 function renderVault() {
@@ -337,6 +340,10 @@ window.saveOpenAI = function() {
   if (!k) { log('Clé OpenAI vide', 'err'); return; }
   vault.config.api_vault.openai = { key: k, status: 'active', calls_count: 0 };
   vault.save();
+  const btn = document.getElementById('btn-save-openai');
+  btn.textContent = '✅ Sauvegardé';
+  btn.style.background = '#22c55e';
+  setTimeout(() => { btn.textContent = 'Sauvegarder'; btn.style.background = ''; }, 3000);
   log(`Clé OpenAI sauvegardée (${k.slice(0,12)}…)`, 'ok');
   renderVault();
 };
@@ -345,6 +352,9 @@ window.testOpenAI = async function() {
   const k = document.getElementById('openai-key').value.trim()
     || vault.config.api_vault.openai?.key;
   if (!k) { log('Clé OpenAI absente — cliquez Sauvegarder d\'abord', 'err'); return; }
+  const btn = document.getElementById('btn-test-openai');
+  btn.textContent = '⏳ Test…';
+  btn.disabled = true;
   log(`Test GPT-4o en cours… (${k.slice(0,12)}…)`, 'info');
   try {
     const r = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -359,14 +369,23 @@ window.testOpenAI = async function() {
     });
     const d = await r.json();
     if (d.choices?.[0]?.message?.content) {
+      btn.textContent = '✅ GPT-4o OK';
+      btn.style.background = '#22c55e';
+      setTimeout(() => { btn.textContent = 'Tester'; btn.style.background = ''; btn.disabled = false; }, 4000);
       log(`GPT-4o OK ✓ — réponse: "${d.choices[0].message.content.trim()}"`, 'ok');
       vault.config.api_vault.openai.status = 'active';
       vault.save();
       renderVault();
     } else {
+      btn.textContent = '❌ Erreur';
+      btn.style.background = '#ef4444';
+      setTimeout(() => { btn.textContent = 'Tester'; btn.style.background = ''; btn.disabled = false; }, 4000);
       log(`GPT-4o erreur: ${d.error?.message || JSON.stringify(d)}`, 'err');
     }
   } catch(e) {
+    btn.textContent = '❌ Erreur';
+    btn.style.background = '#ef4444';
+    setTimeout(() => { btn.textContent = 'Tester'; btn.style.background = ''; btn.disabled = false; }, 4000);
     log(`GPT-4o exception: ${e.message}`, 'err');
   }
 };
@@ -400,7 +419,7 @@ window.testProxy = async function() {
 
 
 window.saveVault = function() {
-  const qk = document.getElementById('qwen-key').value.trim();
+  const qk = (document.getElementById('qwen-key')?.value || '').trim();
   if (qk) {
     vault.config.api_vault.qwen.key = qk;
     vault.config.api_vault.qwen.status = 'active';
@@ -421,7 +440,7 @@ window.importConfig = function() {
     const n = vault.importConfig(raw);
     log(`Config V35 importée — ${n} clé(s) Gemini`, 'ok');
     const qk = vault.config.api_vault.qwen?.key;
-    if (qk) document.getElementById('qwen-key').value = qk;
+    if (qk) { const el = document.getElementById('qwen-key'); if (el) el.value = qk; }
     document.getElementById('import-json').value = '';
     renderVault(); toast('Config importée', 'success');
   } catch(e) { log(`Import échoué: ${e.message}`, 'err'); toast('JSON invalide', 'error'); }
@@ -1752,9 +1771,12 @@ function checkReady() {
 }
 
 function log(msg, type='') {
+  const line = `<div class="${type}">${new Date().toLocaleTimeString('fr-FR')} — ${msg}</div>`;
   const el = document.getElementById('status-log');
-  el.innerHTML += `<div class="${type}">${new Date().toLocaleTimeString('fr-FR')} — ${msg}</div>`;
+  el.innerHTML += line;
   el.scrollTop = el.scrollHeight;
+  const vl = document.getElementById('vault-log');
+  if (vl) { vl.style.display = 'block'; vl.innerHTML += line; vl.scrollTop = vl.scrollHeight; }
 }
 function sleep(ms) { return new Promise(r=>setTimeout(r,ms)); }
 
