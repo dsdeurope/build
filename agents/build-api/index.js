@@ -279,9 +279,14 @@ export default {
         const list = await kvList(env,'plt:boutiques');
         const kept = list.filter(b => !ids.has(b.id));
         const removed = list.length - kept.length;
-        const saved = await kvSetSafe(env, 'plt:boutiques', kept);
-        if (!saved) return err('KV write failed', 503);
-        return ok({ removed, kept: kept.length });
+        const payload = JSON.stringify(kept);
+        const bytes = new TextEncoder().encode(payload).length;
+        try {
+          await env.KV.put('plt:boutiques', payload);
+        } catch(e) {
+          return err(`KV write failed: ${e?.message} (${bytes} bytes, ${kept.length} items)`, 503);
+        }
+        return ok({ removed, kept: kept.length, bytes });
       }
 
       if (!id) {
