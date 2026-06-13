@@ -1617,7 +1617,8 @@ window.startTranslation = async function() {
           }
 
           if (parsed) {
-            const arr = parsed[batchCfg.arrayKey] || [];
+            log(`[${lang.toUpperCase()}] ${et} JSON keys: ${Object.keys(parsed).join(', ')} | arrayKey attendu: ${batchCfg.arrayKey}`, 'info');
+            const arr = parsed[batchCfg.arrayKey] || Object.values(parsed).find(v=>Array.isArray(v)) || [];
             let matched = 0;
             for (let ci = 0; ci < chunk.length; ci++) {
               const { idx, row } = chunk[ci];
