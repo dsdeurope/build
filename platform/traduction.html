@@ -55,8 +55,6 @@
             <span>Gemini API Vault</span>
             <div style="display:flex;align-items:center;gap:6px">
               <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" class="btn btn-sm" style="font-size:11px">+ Créer une clé →</a>
-              <button class="btn btn-sm" onclick="window._testAllKeys()" style="font-size:11px">⚡ Tester tout</button>
-              <button class="btn btn-sm btn-danger" onclick="window._purgeInvalid()" style="font-size:11px">🧹 Purger invalides</button>
               <span id="gemini-count" class="badge badge-info" style="font-size:10px">0 clé(s)</span>
             </div>
           </div>
@@ -105,36 +103,9 @@
               </div>
             </div>
 
-            <!-- Mistral -->
-            <div>
-              <div style="font-size:11px;font-weight:600;margin-bottom:4px">🇫🇷 Mistral Large <span style="color:#22c55e;font-size:10px">GRATUIT · natif FR · fallback Gemini</span></div>
-              <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Clé sur <a href="https://console.mistral.ai/api-keys/" target="_blank" style="color:var(--accent)">console.mistral.ai</a></div>
-              <div style="display:flex;gap:6px">
-                <input id="mistral-key" class="form-input key-input" type="password" placeholder="…" style="flex:1">
-                <button class="btn btn-sm" onclick="saveMistral()">Sauvegarder</button>
-                <button class="btn btn-sm" onclick="testMistral()">Tester</button>
-              </div>
-            </div>
-
-            <!-- Groq -->
-            <div>
-              <div style="font-size:11px;font-weight:600;margin-bottom:4px">⚡ Groq — Llama-3.3-70B <span style="color:#22c55e;font-size:10px">GRATUIT · 14400 req/jour</span></div>
-              <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Clé sur <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent)">console.groq.com</a></div>
-              <div style="display:flex;gap:6px">
-                <input id="groq-key" class="form-input key-input" type="password" placeholder="gsk_…" style="flex:1">
-                <button class="btn btn-sm" onclick="saveGroq()">Sauvegarder</button>
-                <button class="btn btn-sm" onclick="testGroq()">Tester</button>
-              </div>
-            </div>
-
-            <!-- Qwen -->
-            <div>
-              <div style="font-size:11px;font-weight:600;margin-bottom:4px">🔶 Qwen (descriptions produits)</div>
-              <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Via OpenRouter — routé auto pour <code>descriptions_produits</code></div>
-              <div style="display:flex;gap:6px">
-                <input id="qwen-key" class="form-input key-input" type="password" placeholder="sk-or-v1-…" style="flex:1">
-                <button class="btn btn-sm" onclick="testQwen()">Tester</button>
-              </div>
+            <!-- Reset -->
+            <div style="border-top:1px solid var(--border);padding-top:8px">
+              <button class="btn btn-sm btn-danger" style="width:100%" onclick="resetVault()">🔄 Reset complet du vault</button>
             </div>
             <div style="border-top:1px solid var(--border);padding-top:8px">
               <div style="font-size:12px;margin-bottom:4px">Import config JSON (V35 protocol):</div>
@@ -313,8 +284,6 @@ function renderVault() {
   if (vault.config.api_vault.openai?.key)  document.getElementById('openai-key').value  = vault.config.api_vault.openai.key;
   const proxyUrl = vault.config.proxy_settings?.gemini_proxy_url;
   if (proxyUrl) document.getElementById('proxy-url').value = proxyUrl;
-  if (vault.config.api_vault.mistral?.key) document.getElementById('mistral-key').value = vault.config.api_vault.mistral.key;
-  if (vault.config.api_vault.groq?.key)    document.getElementById('groq-key').value    = vault.config.api_vault.groq.key;
 
   // Routing display
   const r = vault.config.routing_rules;
@@ -342,27 +311,12 @@ window._testKey = async function(idx) {
   }
 };
 
-window._testAllKeys = async function() {
-  const keys = vault.config.api_vault.gemini.keys;
-  if (!keys.length) return toast('Aucune clé à tester', 'error');
-  log(`Test de ${keys.length} clé(s) en cours…`, 'info');
-  for (let i = 0; i < keys.length; i++) {
-    await window._testKey(i);
-    if (i < keys.length - 1) await new Promise(r => setTimeout(r, 1200));
-  }
-  const ok  = vault.config.api_vault.gemini.keys.filter(k => !k.last_error).length;
-  const bad = vault.config.api_vault.gemini.keys.filter(k =>  k.last_error).length;
-  log(`Résultat : ${ok} valide(s) ✓ · ${bad} invalide(s) ✗`, ok === keys.length ? 'ok' : 'err');
-};
-
-window._purgeInvalid = function() {
-  const before = vault.config.api_vault.gemini.keys.length;
-  vault.config.api_vault.gemini.keys = vault.config.api_vault.gemini.keys.filter(k => !k.last_error);
-  vault.config.api_vault.gemini.active_index = 0;
-  vault.save();
-  const after = vault.config.api_vault.gemini.keys.length;
-  log(`Purge : ${before - after} clé(s) supprimée(s) · ${after} valide(s) conservée(s)`, 'ok');
-  renderVault();
+window.resetVault = function() {
+  localStorage.removeItem('v35_vault_config');
+  document.getElementById('log-content').innerHTML = '';
+  document.getElementById('openai-key').value = '';
+  document.getElementById('proxy-url').value = '';
+  location.reload();
 };
 
 window._removeKey = function(idx) {
@@ -443,78 +397,6 @@ window.testProxy = async function() {
   } catch(e) { toast(`Erreur proxy: ${e.message}`, 'error'); }
 };
 
-window.saveMistral = function() {
-  const k = document.getElementById('mistral-key').value.trim();
-  if (!k) return toast('Clé vide', 'error');
-  vault.config.api_vault.mistral = { key: k, status: 'active', calls_count: 0 };
-  vault.save(); renderVault();
-  log('Clé Mistral sauvegardée ✓', 'ok');
-};
-
-window.testMistral = async function() {
-  const k = document.getElementById('mistral-key').value.trim() || vault.config.api_vault.mistral?.key;
-  if (!k) return toast('Clé Mistral absente', 'error');
-  log('Test Mistral…', 'info');
-  try {
-    const r = await fetch('https://api.mistral.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${k}` },
-      body: JSON.stringify({ model: 'mistral-small-latest', messages: [{ role: 'user', content: 'Reply: OK' }], max_tokens: 5 }),
-    });
-    if (!r.ok) throw new Error((await r.json().catch(()=>({}))).message || r.statusText);
-    vault.config.api_vault.mistral = { key: k, status: 'active', calls_count: 0 };
-    vault.save(); renderVault();
-    log('Mistral valide ✓', 'ok');
-  } catch(e) { log(`Mistral invalide: ${e.message}`, 'err'); }
-};
-
-window.saveGroq = function() {
-  const k = document.getElementById('groq-key').value.trim();
-  if (!k) return toast('Clé vide', 'error');
-  vault.config.api_vault.groq = { key: k, status: 'active', calls_count: 0 };
-  vault.save(); renderVault();
-  log('Clé Groq sauvegardée ✓', 'ok');
-};
-
-window.testGroq = async function() {
-  const k = document.getElementById('groq-key').value.trim() || vault.config.api_vault.groq?.key;
-  if (!k) return toast('Clé Groq absente', 'error');
-  log('Test Groq…', 'info');
-  try {
-    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${k}` },
-      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: 'Reply: OK' }], max_tokens: 5 }),
-    });
-    if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error?.message || r.statusText);
-    vault.config.api_vault.groq = { key: k, status: 'active', calls_count: 0 };
-    vault.save(); renderVault();
-    log('Groq valide ✓', 'ok');
-  } catch(e) { log(`Groq invalide: ${e.message}`, 'err'); }
-};
-
-window.saveQwen = function() {
-  const k = document.getElementById('qwen-key').value.trim();
-  if (!k) return;
-  vault.config.api_vault.qwen.key = k;
-  vault.config.api_vault.qwen.status = 'active';
-  vault.save(); renderVault();
-  log('Clé Qwen sauvegardée', 'ok');
-};
-
-window.testQwen = async function() {
-  const k = document.getElementById('qwen-key').value.trim();
-  vault.config.api_vault.qwen.key = k;
-  try {
-    const r = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${k}`},
-      body: JSON.stringify({ model:'qwen/qwen-2.5-7b-instruct', messages:[{role:'user',content:'Reply: OK'}], max_tokens:5 }),
-    });
-    if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error?.message || r.statusText);
-    log('Clé Qwen valide ✓', 'ok');
-    vault.save(); renderVault();
-  } catch(e) { log(`Qwen invalide: ${e.message}`, 'err'); }
-};
 
 window.saveVault = function() {
   const qk = document.getElementById('qwen-key').value.trim();
