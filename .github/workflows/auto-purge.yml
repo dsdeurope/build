@@ -1,0 +1,21 @@
+name: Auto-Purge Boutiques < 80%
+
+on:
+  schedule:
+    - cron: '5 0 * * *'  # 00:05 UTC chaque jour — quota KV reset à minuit
+  workflow_dispatch:      # déclenchable manuellement depuis GitHub Actions
+
+jobs:
+  purge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger auto-purge
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://v35-build-api.ernestpedanou.workers.dev/api/cron/auto-purge" \
+            -H "X-Cron-Secret: ${{ secrets.SEED_SECRET }}" \
+            -H "Content-Type: application/json")
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          CODE=$(echo "$RESPONSE" | tail -n 1)
+          echo "HTTP $CODE — $BODY"
+          if [ "$CODE" != "200" ]; then exit 1; fi

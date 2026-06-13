@@ -756,6 +756,37 @@ export default {
       return ok({ checked: results.length, results });
     }
 
+    // ── /api/cron/auto-purge — exécuté à 00:05 UTC par GitHub Actions ────────
+    if (resource === 'cron' && id === 'auto-purge' && method === 'POST') {
+      const secret = request.headers.get('X-Cron-Secret');
+      if (!env.SEED_SECRET || secret !== env.SEED_SECRET) return err('Forbidden', 403);
+      const allBoutiques = await kvList(env, 'plt:boutiques'); // déjà filtré >= 80 par code
+      // Charger les deltas bruts pour y ajouter les _deleted sans perdre les autres entrées
+      let deltas = {};
+      try { const r = await env.KV.get('plt:boutique_deltas'); if (r) deltas = JSON.parse(r); } catch {}
+      // Reconstruire la liste complète SEED (sans filtre) pour trouver les boutiques < 80
+      const rawMerged = (() => {
+        const seedIds = new Set(BOUTIQUES_SEED.map(b => b.id));
+        const m = BOUTIQUES_SEED
+          .filter(b => !deltas[b.id]?._deleted)
+          .map(b => deltas[b.id] ? {...b, ...deltas[b.id]} : b);
+        for (const [id, b] of Object.entries(deltas)) { if (!seedIds.has(id) && !b._deleted) m.unshift(b); }
+        return m;
+      })();
+      const toDelete = rawMerged.filter(b => b.aliexpress_pct === null || (b.aliexpress_pct ?? -1) < 80);
+      const FORCE_DELETE = new Set(['7dc08b86']); // bitiba.fr
+      const allToDelete = [...toDelete.map(b=>b.id), ...FORCE_DELETE];
+      let marked = 0;
+      for (const id of allToDelete) { if (!deltas[id]?._deleted) { deltas[id] = { _deleted: true }; marked++; } }
+      if (!marked) return ok({ skipped: true, reason: 'nothing to purge' });
+      try {
+        await env.KV.put('plt:boutique_deltas', JSON.stringify(deltas));
+        return ok({ purged: marked, total_deleted: allToDelete.length });
+      } catch(e) {
+        return err(`KV write failed: ${e?.message}`, 503);
+      }
+    }
+
     // ── /api/cron/status — healthcheck pour cron-job.org monitoring ──────────
     if (resource === 'cron' && id === 'status') {
       return ok({ ok: true, ts: Date.now(), version: 'v35-build-api' });
