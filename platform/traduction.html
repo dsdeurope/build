@@ -4,6 +4,7 @@
 <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>V35 Build — Traduction</title>
 <link rel="stylesheet" href="/assets/platform.css">
+<script src="/assets/vault-init.js" onerror="window.__OR_KEY__=''"></script>
 <style>
 .vault-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px; }
 .key-row { display:flex; align-items:center; gap:8px; padding:8px; background:var(--surface); border:1px solid var(--border); border-radius:6px; margin-bottom:6px; font-size:12px; }
@@ -224,7 +225,15 @@ checkAuth(); buildNav();
 const vault  = new V35Vault();
 const router = new V35Router(vault, log);
 
-// Configure your OpenRouter key via Settings → Vault
+// Auto-configure Qwen/OpenRouter key on first load
+(function() {
+  const OR_KEY = window.__OR_KEY__ || '';
+  if (OR_KEY && !vault.config.api_vault.qwen?.key) {
+    vault.config.api_vault.qwen.key = OR_KEY;
+    vault.config.api_vault.qwen.status = 'active';
+    vault.save();
+  }
+})();
 
 let _wb = null, _sheets = {}, _selectedCols = new Set(), _resultWb = null;
 

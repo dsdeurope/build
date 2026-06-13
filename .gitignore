@@ -4,3 +4,4 @@ node_modules/
 .wrangler/
 dist/
 .claude/
+platform/assets/vault-init.js
