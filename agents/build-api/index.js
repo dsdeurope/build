@@ -284,8 +284,8 @@ export default {
       if (!sub) {
         if (method==='GET') return ok({boutique});
         if (method==='PUT') {
-          const authErr = requireAuth(request, env); if (authErr) return authErr;
-          const BOUTIQUE_FIELDS = ['domain','type','niche','traffic','comment','importStatus','blueprint','collections','products','profitable_collections','footprint','keywords','images','sites','jobs','score','cpc','traffic_monthly','online','http_status','last_checked','redirect_url','clone_days','ca_monthly'];
+          const authErr = await requireAuth(request, env); if (authErr) return authErr;
+          const BOUTIQUE_FIELDS = ['domain','type','niche','traffic','comment','importStatus','blueprint','collections','products','profitable_collections','footprint','keywords','images','sites','jobs','score','cpc','traffic_monthly','online','http_status','last_checked','redirect_url','clone_days','ca_monthly','aliexpress_pct','aliexpress_detail','aliexpress_checked_at'];
           for (const k of BOUTIQUE_FIELDS) if (k in body) boutique[k] = body[k];
           boutique.updatedAt = Date.now();
           await saveBoutique(env, list, boutique);

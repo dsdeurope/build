@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Aliexpress</title>
+<link rel="stylesheet" href="/assets/platform.css">
+<style>
+.ali-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-top:14px}
+.ali-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px;position:relative;transition:border-color .2s}
+.ali-card:hover{border-color:var(--blue)}
+.ali-card.ali-low{border-left:3px solid var(--red)}
+.ali-card.ali-mid{border-left:3px solid #f59e0b}
+.ali-card.ali-none{border-left:3px solid var(--border)}
+.ali-domain{font-weight:700;font-size:13px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.ali-domain a{color:var(--text);text-decoration:none}
+.ali-domain a:hover{color:var(--blue)}
+.ali-meta{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.ali-pct-bar{height:6px;background:var(--border);border-radius:3px;margin:8px 0;overflow:hidden}
+.ali-pct-fill{height:100%;border-radius:3px;transition:width .4s}
+.pct-green{background:var(--green)}
+.pct-yellow{background:#f59e0b}
+.pct-red{background:var(--red)}
+.pct-badge{font-size:20px;font-weight:700;line-height:1}
+.overview-bar{display:flex;gap:20px;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px 18px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.ov-stat{text-align:center;min-width:80px}
+.ov-val{font-size:22px;font-weight:700;display:block;line-height:1.2}
+.ov-label{font-size:10px;color:var(--muted);text-transform:uppercase}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+.toolbar-sep{width:1px;height:24px;background:var(--border)}
+.card-actions{display:flex;gap:6px;margin-top:10px}
+.supplier-input{width:100%;margin-top:8px;padding:5px 8px;font-size:12px;background:var(--surface-2);border:1px solid var(--border);border-radius:4px;color:var(--text)}
+.supplier-input:focus{outline:none;border-color:var(--blue)}
+</style>
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Aliexpress — Sourçage</span>
+      <div class="topbar-right">
+        <button class="btn" id="btn-refresh" onclick="load()">↻ Actualiser</button>
+        <button class="btn btn-primary" onclick="showAgentCmd()">▶ Lancer l'agent</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <!-- Info banner -->
+      <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:6px;padding:10px 14px;margin-bottom:12px;font-size:12px">
+        <strong>🛒 Boutiques à sourcer</strong> — Ces boutiques ont moins de 95% de leurs produits disponibles sur AliExpress. Trouvez un fournisseur AliExpress, puis lancez le scrapping. Supprimez les boutiques sans fournisseur trouvé.
+      </div>
+
+      <!-- Overview stats -->
+      <div class="overview-bar">
+        <div class="ov-stat"><span class="ov-val" id="ov-total">—</span><span class="ov-label">Boutiques</span></div>
+        <div class="ov-stat"><span class="ov-val" id="ov-none" style="color:var(--muted)">—</span><span class="ov-label">Non vérifiées</span></div>
+        <div class="ov-stat"><span class="ov-val" id="ov-low" style="color:var(--red)">—</span><span class="ov-label">Faible &lt;40%</span></div>
+        <div class="ov-stat"><span class="ov-val" id="ov-mid" style="color:#f59e0b">—</span><span class="ov-label">Moyen 40-94%</span></div>
+        <div class="ov-stat"><span class="ov-val" id="ov-avg" style="color:var(--blue)">—</span><span class="ov-label">Moy. AliEx %</span></div>
+      </div>
+
+      <!-- Toolbar -->
+      <div class="toolbar">
+        <input type="search" id="q" placeholder="Rechercher domaine…" oninput="render()" class="filter-input" style="width:180px">
+        <select id="f-sort" onchange="render()" class="filter-select">
+          <option value="pct">Tri: % AliExpress</option>
+          <option value="score">Tri: score</option>
+          <option value="niche">Tri: niche</option>
+        </select>
+        <select id="f-pct" onchange="render()" class="filter-select">
+          <option value="">Tous</option>
+          <option value="none">Non vérifiés</option>
+          <option value="low">Faibles &lt;40%</option>
+          <option value="mid">Moyens 40-94%</option>
+        </select>
+        <div class="toolbar-sep"></div>
+        <span class="text-muted" id="count-label" style="font-size:12px"></span>
+      </div>
+
+      <!-- Cards grid -->
+      <div class="ali-grid" id="cards"></div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Agent command modal -->
+<div class="modal" id="modal-agent">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-header"><span>▶ Agent AliExpress</span><button class="btn btn-sm" onclick="closeModal('modal-agent')">✕</button></div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:12px">Lance l'agent de vérification AliExpress sur toutes les boutiques. Met à jour le % AliExpress via l'API Worker.</p>
+      <div style="background:var(--surface-2);border-radius:6px;padding:12px;font-family:monospace;font-size:12px;white-space:pre-wrap" id="agent-cmd-box"></div>
+      <div style="margin-top:12px;font-size:11px;color:var(--muted)">Temps estimé: ~3-8 min selon le nombre de boutiques. Requiert Python 3.10+ et le module <code>requests</code>.</div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { buildNav, buildSidebar, apiGet, apiPut, apiDelete, toast, openModal, closeModal, esc, fmt } from '/assets/platform.js';
+buildNav(); buildSidebar();
+
+window.openModal = openModal;
+window.closeModal = closeModal;
+
+let boutiques = [];
+
+function pctClass(b) {
+  if (!b.aliexpress_pct && b.aliexpress_pct !== 0) return 'ali-none';
+  if (b.aliexpress_pct < 40) return 'ali-low';
+  return 'ali-mid';
+}
+
+function pctFillClass(pct) {
+  if (pct >= 70) return 'pct-yellow';
+  if (pct >= 40) return 'pct-yellow';
+  return 'pct-red';
+}
+
+function renderCard(b) {
+  const pct = b.aliexpress_pct;
+  const hasData = pct !== undefined && pct !== null;
+  const pctVal = hasData ? pct : '—';
+  const pctColor = !hasData ? 'color:var(--muted)' : pct >= 70 ? 'color:#f59e0b' : 'color:var(--red)';
+  const barWidth = hasData ? pct : 0;
+  const barClass = hasData ? (pct >= 70 ? 'pct-yellow' : 'pct-red') : '';
+  const cls = pctClass(b);
+  const checkedAt = b.aliexpress_checked_at
+    ? new Date(b.aliexpress_checked_at).toLocaleDateString('fr-FR')
+    : null;
+
+  return `<div class="ali-card ${cls}" id="card-${esc(b.id)}">
+    <div class="ali-domain">
+      <a href="https://${esc(b.domain)}" target="_blank" rel="noopener">${esc(b.domain)}</a>
+      ${b.type ? `<span class="badge badge-info" style="font-size:9px">${esc(b.type)}</span>` : ''}
+    </div>
+    <div class="ali-meta">
+      ${b.niche ? `<span class="badge">${esc(b.niche)}</span>` : ''}
+      ${b.score ? `<span class="badge badge-info">score ${b.score.toFixed(1)}</span>` : ''}
+      ${b.products ? `<span class="badge badge-success">${fmt(b.products)} produits</span>` : ''}
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin:8px 0">
+      <span class="pct-badge" style="${pctColor}">${pctVal}${hasData ? '%' : ''}</span>
+      <div style="flex:1">
+        <div class="ali-pct-bar">
+          <div class="ali-pct-fill ${barClass}" style="width:${barWidth}%"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted)">${hasData ? `${b.aliexpress_detail?.found||'?'}/${b.aliexpress_detail?.total||'?'} requêtes trouvées${checkedAt ? ` · ${checkedAt}` : ''}` : 'Non vérifié — lancez l\'agent'}</div>
+      </div>
+    </div>
+    <div class="card-actions">
+      <button class="btn btn-sm btn-primary" onclick="scrapeCard('${esc(b.id)}','${esc(b.domain)}','${esc(b.type||'')}')">🕷 Scrapper</button>
+      <button class="btn btn-sm btn-danger" onclick="deleteCard('${esc(b.id)}','${esc(b.domain)}')">✕ Supprimer</button>
+    </div>
+  </div>`;
+}
+
+function updateOverview(list) {
+  document.getElementById('ov-total').textContent = list.length;
+  const none = list.filter(b => b.aliexpress_pct === undefined || b.aliexpress_pct === null);
+  const low = list.filter(b => b.aliexpress_pct !== undefined && b.aliexpress_pct !== null && b.aliexpress_pct < 40);
+  const mid = list.filter(b => b.aliexpress_pct !== undefined && b.aliexpress_pct !== null && b.aliexpress_pct >= 40);
+  const checked = list.filter(b => b.aliexpress_pct !== undefined && b.aliexpress_pct !== null);
+  const avg = checked.length ? Math.round(checked.reduce((s,b)=>s+b.aliexpress_pct,0)/checked.length) : '—';
+  document.getElementById('ov-none').textContent = none.length;
+  document.getElementById('ov-low').textContent = low.length;
+  document.getElementById('ov-mid').textContent = mid.length;
+  document.getElementById('ov-avg').textContent = checked.length ? avg + '%' : '—';
+}
+
+function render() {
+  const q = document.getElementById('q').value.toLowerCase().trim();
+  const sort = document.getElementById('f-sort').value;
+  const fp = document.getElementById('f-pct').value;
+
+  let list = boutiques.filter(b => {
+    if (q && !b.domain.toLowerCase().includes(q)) return false;
+    if (fp === 'none' && (b.aliexpress_pct !== undefined && b.aliexpress_pct !== null)) return false;
+    if (fp === 'low' && (b.aliexpress_pct === undefined || b.aliexpress_pct === null || b.aliexpress_pct >= 40)) return false;
+    if (fp === 'mid' && (b.aliexpress_pct === undefined || b.aliexpress_pct === null || b.aliexpress_pct < 40)) return false;
+    return true;
+  });
+
+  if (sort === 'pct') {
+    list.sort((a,b) => {
+      const ap = a.aliexpress_pct ?? -1, bp = b.aliexpress_pct ?? -1;
+      return ap - bp; // lowest % first (most problematic)
+    });
+  } else if (sort === 'score') {
+    list.sort((a,b) => (b.score||0)-(a.score||0));
+  } else if (sort === 'niche') {
+    list.sort((a,b) => (a.niche||'').localeCompare(b.niche||''));
+  }
+
+  document.getElementById('cards').innerHTML = list.map(renderCard).join('');
+  document.getElementById('count-label').textContent = `${list.length} boutiques`;
+  updateOverview(list);
+}
+
+async function load() {
+  try {
+    document.getElementById('btn-refresh').textContent = '↻ …';
+    const d = await apiGet('/boutiques', {per:300});
+    // Only boutiques with aliexpress_pct < 95 OR not yet checked
+    boutiques = (d.list || []).filter(b => {
+      const pct = b.aliexpress_pct;
+      return pct === undefined || pct === null || pct < 95;
+    });
+    render();
+    document.getElementById('btn-refresh').textContent = '↻ Actualiser';
+  } catch(e) {
+    toast(e.message, 'error');
+    document.getElementById('btn-refresh').textContent = '↻ Actualiser';
+  }
+}
+
+window.scrapeCard = function(id, domain, type) {
+  const supportsApi = ['shopify','woocommerce'].includes(type);
+  if (!supportsApi) {
+    toast(`${type || 'Ce CMS'} n'a pas d'API publique — scrapping non supporté`, 'error');
+    return;
+  }
+  toast(`🕷 Pour scrapper ${domain} — lancez: python3 /tmp/deep_scrape.py`, 'info');
+};
+
+window.deleteCard = async function(id, domain) {
+  if (!confirm(`Supprimer définitivement "${domain}" de toutes les pages ?\nCette action est irréversible.`)) return;
+  try {
+    await apiDelete('/boutiques/' + id);
+    boutiques = boutiques.filter(b => b.id !== id);
+    render();
+    toast(`${domain} supprimé`, 'success');
+  } catch(e) { toast(e.message, 'error'); }
+};
+
+window.showAgentCmd = function() {
+  document.getElementById('agent-cmd-box').textContent =
+`# Installer les dépendances
+pip3 install requests
+
+# Lancer l'agent AliExpress
+python3 /tmp/aliexpress_check.py
+
+# L'agent va:
+# 1. Charger toutes les boutiques via l'API
+# 2. Vérifier chaque produit sur fr.aliexpress.com
+# 3. Mettre à jour aliexpress_pct sur chaque boutique
+# 4. Afficher un rapport final`;
+  openModal('modal-agent');
+};
+
+load();
+</script>
+</body>
+</html>

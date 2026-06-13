@@ -299,7 +299,7 @@ async function load() {
       apiGet('/boutiques', {per:300}),
       apiGet('/scrape/status').catch(() => ({list:[]}))
     ]);
-    boutiques = d.list || [];
+    boutiques = (d.list || []).filter(b => !b.aliexpress_pct || b.aliexpress_pct >= 95);
     scrapeStatus = {};
     (ss.list||[]).forEach(s => { scrapeStatus[s.id] = s; });
     document.getElementById('r2-banner').style.display = 'block';

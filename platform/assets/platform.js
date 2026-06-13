@@ -80,6 +80,7 @@ const NAV_ITEMS = [
   { href: '/boutiques.html',             icon: '◉', label: 'Boutiques' },
   { href: '/cloner.html',               icon: '🚀', label: 'À cloner' },
   { href: '/scrapping.html',            icon: '🕷', label: 'Scrapping' },
+  { href: '/aliexpress.html',           icon: '🛒', label: 'Aliexpress' },
   { href: '/domaines-footprints.html',   icon: '◎', label: 'Footprints' },
   { href: '/dorks.html',                 icon: '🔍', label: 'Dorks' },
   { href: '/sites.html',                 icon: '✦', label: 'Sites' },
