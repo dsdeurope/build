@@ -1593,7 +1593,7 @@ window.startTranslation = async function() {
               titles.map(t => `- "${t}"`).join('\n');
           }
 
-          const fullPrompt = `${systemPrompt}\n\n${inputBlock}`;
+          const fullPrompt = `${systemPrompt}\n\n${inputBlock}\n\nRéponds UNIQUEMENT en JSON valide, sans markdown ni commentaire.`;
 
           log(`[${lang.toUpperCase()}] ${et} — batch ${Math.floor(offset/BATCH_SIZE)+1} (${chunk.length} items) → LLM…`, 'info');
 
