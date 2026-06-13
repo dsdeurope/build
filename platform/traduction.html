@@ -78,14 +78,41 @@
           </div>
         </div>
 
-        <!-- Qwen + Import -->
+        <!-- Providers gratuits + Import -->
         <div class="card">
-          <div class="card-header">Qwen (descriptions produits)</div>
-          <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
-            <div style="font-size:11px;color:var(--muted)">Via OpenRouter — routé auto pour <code>descriptions_produits</code></div>
-            <div style="display:flex;gap:6px">
-              <input id="qwen-key" class="form-input key-input" type="password" placeholder="sk-or-v1-…" style="flex:1">
-              <button class="btn btn-sm" onclick="testQwen()">Tester</button>
+          <div class="card-header">Providers gratuits</div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:10px">
+
+            <!-- Mistral -->
+            <div>
+              <div style="font-size:11px;font-weight:600;margin-bottom:4px">🇫🇷 Mistral Large <span style="color:#22c55e;font-size:10px">GRATUIT · natif FR · fallback Gemini</span></div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Clé sur <a href="https://console.mistral.ai/api-keys/" target="_blank" style="color:var(--accent)">console.mistral.ai</a></div>
+              <div style="display:flex;gap:6px">
+                <input id="mistral-key" class="form-input key-input" type="password" placeholder="…" style="flex:1">
+                <button class="btn btn-sm" onclick="saveMistral()">Sauvegarder</button>
+                <button class="btn btn-sm" onclick="testMistral()">Tester</button>
+              </div>
+            </div>
+
+            <!-- Groq -->
+            <div>
+              <div style="font-size:11px;font-weight:600;margin-bottom:4px">⚡ Groq — Llama-3.3-70B <span style="color:#22c55e;font-size:10px">GRATUIT · 14400 req/jour</span></div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Clé sur <a href="https://console.groq.com/keys" target="_blank" style="color:var(--accent)">console.groq.com</a></div>
+              <div style="display:flex;gap:6px">
+                <input id="groq-key" class="form-input key-input" type="password" placeholder="gsk_…" style="flex:1">
+                <button class="btn btn-sm" onclick="saveGroq()">Sauvegarder</button>
+                <button class="btn btn-sm" onclick="testGroq()">Tester</button>
+              </div>
+            </div>
+
+            <!-- Qwen -->
+            <div>
+              <div style="font-size:11px;font-weight:600;margin-bottom:4px">🔶 Qwen (descriptions produits)</div>
+              <div style="font-size:10px;color:var(--muted);margin-bottom:4px">Via OpenRouter — routé auto pour <code>descriptions_produits</code></div>
+              <div style="display:flex;gap:6px">
+                <input id="qwen-key" class="form-input key-input" type="password" placeholder="sk-or-v1-…" style="flex:1">
+                <button class="btn btn-sm" onclick="testQwen()">Tester</button>
+              </div>
             </div>
             <div style="border-top:1px solid var(--border);padding-top:8px">
               <div style="font-size:12px;margin-bottom:4px">Import config JSON (V35 protocol):</div>
@@ -252,11 +279,17 @@ function renderVault() {
 
   // Vault status badge
   const hasGemini = keys.filter(k=>k.status!=='disabled').length > 0;
-  const hasQwen   = !!vault.config.api_vault.qwen?.key;
+  const hasQwen    = !!vault.config.api_vault.qwen?.key;
+  const hasMistral = !!vault.config.api_vault.mistral?.key;
+  const hasGroq    = !!vault.config.api_vault.groq?.key;
   const badge = document.getElementById('vault-status');
-  if (hasGemini && hasQwen) { badge.textContent='Vault OK (Gemini + Qwen)'; badge.className='badge badge-success'; }
-  else if (hasGemini) { badge.textContent='Vault OK (Gemini)'; badge.className='badge badge-info'; }
+  const providers = [hasGemini&&'Gemini', hasMistral&&'Mistral', hasGroq&&'Groq', hasQwen&&'Qwen'].filter(Boolean);
+  if (providers.length >= 2) { badge.textContent=`Vault OK (${providers.join(' + ')})`; badge.className='badge badge-success'; }
+  else if (providers.length === 1) { badge.textContent=`Vault OK (${providers[0]})`; badge.className='badge badge-info'; }
   else { badge.textContent='Vault non configuré'; badge.className='badge badge-warn'; }
+  // Restore inputs
+  if (vault.config.api_vault.mistral?.key) document.getElementById('mistral-key').value = vault.config.api_vault.mistral.key;
+  if (vault.config.api_vault.groq?.key)    document.getElementById('groq-key').value    = vault.config.api_vault.groq.key;
 
   // Routing display
   const r = vault.config.routing_rules;
@@ -323,6 +356,56 @@ window.addGeminiKey = function() {
   } else {
     toast('Clé déjà présente ou invalide', 'error');
   }
+};
+
+window.saveMistral = function() {
+  const k = document.getElementById('mistral-key').value.trim();
+  if (!k) return toast('Clé vide', 'error');
+  vault.config.api_vault.mistral = { key: k, status: 'active', calls_count: 0 };
+  vault.save(); renderVault();
+  log('Clé Mistral sauvegardée ✓', 'ok');
+};
+
+window.testMistral = async function() {
+  const k = document.getElementById('mistral-key').value.trim() || vault.config.api_vault.mistral?.key;
+  if (!k) return toast('Clé Mistral absente', 'error');
+  log('Test Mistral…', 'info');
+  try {
+    const r = await fetch('https://api.mistral.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${k}` },
+      body: JSON.stringify({ model: 'mistral-small-latest', messages: [{ role: 'user', content: 'Reply: OK' }], max_tokens: 5 }),
+    });
+    if (!r.ok) throw new Error((await r.json().catch(()=>({}))).message || r.statusText);
+    vault.config.api_vault.mistral = { key: k, status: 'active', calls_count: 0 };
+    vault.save(); renderVault();
+    log('Mistral valide ✓', 'ok');
+  } catch(e) { log(`Mistral invalide: ${e.message}`, 'err'); }
+};
+
+window.saveGroq = function() {
+  const k = document.getElementById('groq-key').value.trim();
+  if (!k) return toast('Clé vide', 'error');
+  vault.config.api_vault.groq = { key: k, status: 'active', calls_count: 0 };
+  vault.save(); renderVault();
+  log('Clé Groq sauvegardée ✓', 'ok');
+};
+
+window.testGroq = async function() {
+  const k = document.getElementById('groq-key').value.trim() || vault.config.api_vault.groq?.key;
+  if (!k) return toast('Clé Groq absente', 'error');
+  log('Test Groq…', 'info');
+  try {
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${k}` },
+      body: JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: 'Reply: OK' }], max_tokens: 5 }),
+    });
+    if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error?.message || r.statusText);
+    vault.config.api_vault.groq = { key: k, status: 'active', calls_count: 0 };
+    vault.save(); renderVault();
+    log('Groq valide ✓', 'ok');
+  } catch(e) { log(`Groq invalide: ${e.message}`, 'err'); }
 };
 
 window.saveQwen = function() {

@@ -14,11 +14,15 @@ const DEFAULT_CONFIG = {
       keys: [],           // [{id, key, type, status, calls_count, last_error}]
       active_index: 0,
     },
-    qwen: { key: '', status: 'inactive', calls_count: 0 },
+    qwen:    { key: '', status: 'inactive', calls_count: 0 },
+    groq:    { key: '', status: 'inactive', calls_count: 0 },    // gratuit, 14400 req/jour
+    mistral: { key: '', status: 'inactive', calls_count: 0 },    // gratuit, natif FR
   },
   routing_rules: {
-    gemini_targets: ['homepage', 'titres_h1', 'collections', 'collection_intro', 'collection_longues', 'blog'],
-    qwen_targets:   ['descriptions_produits'],
+    gemini_targets:  ['homepage', 'titres_h1', 'collections', 'collection_intro', 'collection_longues', 'blog'],
+    qwen_targets:    ['descriptions_produits'],
+    // fallback_order: providers tentés en séquence si Gemini échoue
+    fallback_order:  ['gemini', 'mistral', 'groq'],
   },
   error_handling: {
     max_retries: 3,
@@ -26,7 +30,9 @@ const DEFAULT_CONFIG = {
     switch_on_429: true,
   },
   proxy_settings: {
-    target_model: 'gemini-2.5-flash',
+    target_model:     'gemini-2.5-flash',
+    mistral_model:    'mistral-large-latest',
+    groq_model:       'llama-3.3-70b-versatile',
     translation_mode: 'anthropic_to_google_api',
   },
 };
@@ -204,10 +210,9 @@ export class V35Router {
             const rotated = this.vault.rotateGemini(e.message);
             this.log(`429 → rotation clé Gemini (${rotated ? 'ok' : 'épuisé'})`, 'warn');
           }
-          // 403 suspended or no keys left → fallback OpenRouter Gemini
-          if (is403 || (!this.vault.getActiveGeminiKey())) {
-            this.log('Clé(s) Gemini suspendues → fallback OpenRouter Gemini…', 'warn');
-            return await this._callGeminiViaOpenRouter(prompt, opts);
+          // 403/suspendu ou plus de clés → fallback chain gratuit
+          if (is403 || !this.vault.getActiveGeminiKey()) {
+            return await this._callFallbackChain(prompt, opts);
           }
         }
 
@@ -245,6 +250,75 @@ export class V35Router {
     this.vault.trackCall('gemini');
     const d = await r.json();
     return d.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+  }
+
+  // Fallback chain : Mistral → Groq (tous gratuits, haute qualité FR)
+  async _callFallbackChain(prompt, opts = {}) {
+    const order = this.vault.config.routing_rules.fallback_order || ['mistral', 'groq'];
+    for (const p of order) {
+      if (p === 'gemini') continue;
+      if (p === 'mistral' && this.vault.config.api_vault.mistral?.key) {
+        try {
+          this.log('Fallback → Mistral Large (gratuit, natif FR)…', 'warn');
+          return await this._callMistral(prompt, opts);
+        } catch(e) { this.log(`Mistral: ${e.message}`, 'err'); }
+      }
+      if (p === 'groq' && this.vault.config.api_vault.groq?.key) {
+        try {
+          this.log('Fallback → Groq Llama-3.3-70B (gratuit)…', 'warn');
+          return await this._callGroq(prompt, opts);
+        } catch(e) { this.log(`Groq: ${e.message}`, 'err'); }
+      }
+    }
+    throw new Error('Tous les providers gratuits échoués — ajoutez une clé Mistral ou Groq dans le vault');
+  }
+
+  async _callMistral(prompt, opts = {}) {
+    const k = this.vault.config.api_vault.mistral?.key;
+    if (!k) throw new Error('Clé Mistral absente');
+    const model = this.vault.config.proxy_settings?.mistral_model || 'mistral-large-latest';
+    const r = await fetch('https://api.mistral.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${k}` },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: opts.maxTokens || 2048,
+        temperature: opts.temperature || 0.4,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ message: r.statusText }));
+      throw new Error(`[Mistral ${r.status}] ${err.message || r.statusText}`);
+    }
+    this.vault.trackCall('mistral');
+    const d = await r.json();
+    return d.choices?.[0]?.message?.content?.trim() || '';
+  }
+
+  async _callGroq(prompt, opts = {}) {
+    const k = this.vault.config.api_vault.groq?.key;
+    if (!k) throw new Error('Clé Groq absente');
+    const model = this.vault.config.proxy_settings?.groq_model || 'llama-3.3-70b-versatile';
+    const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${k}` },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: opts.maxTokens || 2048,
+        temperature: opts.temperature || 0.4,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({ error: { message: r.statusText } }));
+      throw new Error(`[Groq ${r.status}] ${err.error?.message || r.statusText}`);
+    }
+    this.vault.trackCall('groq');
+    const d = await r.json();
+    return d.choices?.[0]?.message?.content?.trim() || '';
   }
 
   async _callGeminiViaOpenRouter(prompt, opts = {}) {
