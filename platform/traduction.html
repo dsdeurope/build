@@ -1593,7 +1593,10 @@ window.startTranslation = async function() {
               titles.map(t => `- "${t}"`).join('\n');
           }
 
-          const fullPrompt = `${systemPrompt}\n\n${inputBlock}\n\nRéponds UNIQUEMENT en JSON valide, sans markdown ni commentaire.`;
+          const _schemaEx = batchCfg.mode === 'json_products'
+            ? `{"${batchCfg.arrayKey}":[{"original_fr":"texte_fr","${batchCfg.valueKey}":"traduction"}]}`
+            : `{"${batchCfg.arrayKey}":[{"original_fr":"texte_fr","${batchCfg.valueKey}":"traduction"}]}`;
+          const fullPrompt = `${systemPrompt}\n\n${inputBlock}\n\nRéponds UNIQUEMENT en JSON valide respectant exactement ce schéma (sans markdown):\n${_schemaEx}`;
 
           log(`[${lang.toUpperCase()}] ${et} — batch ${Math.floor(offset/BATCH_SIZE)+1} (${chunk.length} items) → LLM…`, 'info');
 
