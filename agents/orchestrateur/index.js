@@ -342,7 +342,33 @@ export default {
       };
     }, env);
 
-    // Step 2: Fetch images
+    // Step 2: Resolve AliExpress URLs for scraped products
+    // Maps each collection/product title → aliexpress_url for order fulfillment
+    const aliResolve = await runStep(jobId, 'ali_resolve', async () => {
+      const collections = blueprint?.collections || [];
+      if (!collections.length) return { count: 0, ali_map: {} };
+
+      // Batch in chunks of 50 (supplier-resolver limit)
+      const products = collections.slice(0, 50).map(c => ({ id: c.handle || c.id, title: c.title }));
+      const r = await fetch(`${WORKERS.SUPPLIER}/resolve/products/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ products }),
+        signal: AbortSignal.timeout(30000),
+      });
+      const d = await r.json();
+      const ali_map = {};
+      for (const item of (d.results || [])) {
+        if (item.id) ali_map[item.id] = { url: item.aliexpress_url, found: item.found };
+      }
+      return {
+        count: Object.keys(ali_map).length,
+        ali_map,
+        note: 'Pousser ali_map vers Shopify via POST /push/metafields (custom.aliexpress_url par produit)',
+      };
+    }, env);
+
+    // Step 3: Fetch images
     const images = await runStep(jobId, 'images', async () => {
       const query = `${niche} ${sourceDomain.split('.')[0]}`;
       const [pexels, unsplash] = await Promise.all([
@@ -454,6 +480,8 @@ export default {
       niche,
       languages,
       collections: blueprint?.totalCollections || 0,
+      ali_resolved: aliResolve?.count || 0,
+      ali_map: aliResolve?.ali_map || {},
       images: images?.count || 0,
       contentJobs: contentJobs?.count || 0,
       aged_domains_found: agedDomain?.count || 0,

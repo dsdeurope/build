@@ -202,6 +202,24 @@ async function updateBoutique(boutiqueId, result, apiToken) {
   } catch { /* non-blocking */ }
 }
 
+// ── Product-level AliExpress resolver ────────────────────────────────────────
+// Searches AliExpress by exact product title → returns direct product URL or
+// fallback search URL. Used for order fulfillment without DSers.
+async function resolveProduct(title) {
+  // 1. Try DDG to get a direct AliExpress product URL
+  const { url: directUrl } = await ddgSearch(title, 'aliexpress.com');
+
+  // 2. Fallback: AliExpress search URL (opens search results page)
+  const searchUrl = `https://fr.aliexpress.com/wholesale?SearchText=${encodeURIComponent(title)}`;
+
+  return {
+    title,
+    aliexpress_url: directUrl || searchUrl,
+    found: !!directUrl,
+    resolved_at: Date.now(),
+  };
+}
+
 // ── Cron: auto-resolve all boutiques with pct < 30 ───────────────────────────
 async function cronResolve(env) {
   const secret = env.CRON_SECRET || env.SEED_SECRET;
@@ -300,6 +318,38 @@ export default {
       await updateBoutique(b.id, result, env.API_TOKEN);
 
       return ok(result);
+    }
+
+    // ── POST /resolve/product ─────────────────────────────────────────────────
+    // Body: { title: "Sérum visage anti-âge 30ml" }
+    // Returns: { aliexpress_url, found, title }
+    if (path === '/resolve/product' && request.method === 'POST') {
+      let body;
+      try { body = await request.json(); } catch { return fail('Invalid JSON'); }
+      const { title } = body;
+      if (!title) return fail('title required');
+      const result = await resolveProduct(title.trim());
+      return ok(result);
+    }
+
+    // ── POST /resolve/products/bulk ───────────────────────────────────────────
+    // Body: { products: [{ id, title }] }  — max 50
+    // Returns: { results: [{ id, title, aliexpress_url, found }] }
+    // Usage: after scraping a catalog, enrich all products in 1 call
+    if (path === '/resolve/products/bulk' && request.method === 'POST') {
+      let body;
+      try { body = await request.json(); } catch { return fail('Invalid JSON'); }
+      const products = body.products || [];
+      if (!Array.isArray(products) || products.length === 0) return fail('products[] required');
+      if (products.length > 50) return fail('max 50 products per call');
+
+      const results = [];
+      for (const p of products) {
+        if (!p.title) { results.push({ id: p.id, error: 'missing title' }); continue; }
+        const r = await resolveProduct(p.title.trim());
+        results.push({ id: p.id, ...r });
+      }
+      return ok({ count: results.length, results });
     }
 
     // ── POST /cron/resolve ────────────────────────────────────────────────────
