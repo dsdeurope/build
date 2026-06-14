@@ -98,6 +98,16 @@ export default{
 
     if(!auth(request,env))return err('Unauthorized',401);
 
+    // GET /health-report — proxy sentinelle (CORS safe via service binding)
+    if(request.method==='GET'&&path==='/health-report'){
+      if(!env.SENTINELLE)return ok({workers:[],summary:{total:0,up:0,down:0,unknown:0},domains:[]});
+      const[rep,dom]=await Promise.allSettled([
+        env.SENTINELLE.fetch(new Request('https://sentinelle/report')).then(r=>r.json()).catch(()=>null),
+        env.SENTINELLE.fetch(new Request('https://sentinelle/domains')).then(r=>r.json()).catch(()=>null),
+      ]);
+      return ok({workers:rep.value?.workers||[],summary:rep.value?.summary||{},domains:dom.value?.domains||[],ts:new Date().toISOString()});
+    }
+
     // GET /pages — list pages for slug
     if(request.method==='GET'&&path==='/pages'){
       const sl=url.searchParams.get('slug');if(!sl)return err('slug required');

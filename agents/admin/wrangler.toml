@@ -14,3 +14,7 @@ bucket_name = "v35-sites"
 [[services]]
 binding = "ORCHESTRATOR"
 service = "v35-orchestrator"
+
+[[services]]
+binding = "SENTINELLE"
+service = "v35-sentinelle"

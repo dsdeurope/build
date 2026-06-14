@@ -144,8 +144,36 @@ function showTab(tab){
 }
 
 /* ── HOMEPAGE ─────────────────────────────────────────── */
+function loadHealthWidget(){
+  apiFetch('/health-report').then(function(r){return r.json();}).then(function(d){
+    var ws=d.workers||[];
+    var sm=d.summary||{};
+    var doms=d.domains||[];
+    var wHtml=ws.map(function(w){
+      var up=w.up===true,unk=w.up===null;
+      var dot=up?'🟢':unk?'⚪':'🔴';
+      var lat=w.latency?(' '+w.latency+'ms'):'';
+      return '<span style="font-size:.75rem;margin-right:.5rem;white-space:nowrap">'+dot+' '+w.name+lat+'</span>';
+    }).join('');
+    var domHtml=doms.filter(function(d){return d.daysLeft!==undefined&&d.daysLeft<60;}).map(function(d){
+      var col=d.daysLeft<7?'#dc2626':d.daysLeft<30?'#f59e0b':'#16a34a';
+      return '<span style="font-size:.75rem;margin-right:.7rem;color:'+col+'">⏱ '+d.domain+': '+d.daysLeft+'j</span>';
+    }).join('');
+    var allOk=(sm.down||0)===0;
+    var bar='<div style="background:'+(allOk?'#f0fdf4':'#fef2f2')+';border:1px solid '+(allOk?'#bbf7d0':'#fecaca')+';border-radius:6px;padding:.6rem 1rem;margin-bottom:1rem;display:flex;flex-wrap:wrap;align-items:center;gap:.4rem">'
+      +'<span style="font-weight:600;font-size:.78rem;margin-right:.5rem;color:'+(allOk?'#15803d':'#dc2626')+'">'
+      +(allOk?'✓ Tous UP':'⚠ Problème détecté')+'</span>'
+      +wHtml
+      +(domHtml?'<br><span style="font-size:.73rem;color:#6b7280;margin-top:.3rem">Domaines :</span>'+domHtml:'')
+      +'<button onclick="loadHealthWidget()" style="margin-left:auto;font-size:.7rem;background:none;border:1px solid #ccc;padding:.2rem .6rem;border-radius:4px;cursor:pointer">↻</button></div>';
+    var el=document.getElementById('health-widget');
+    if(el)el.innerHTML=bar;
+  }).catch(function(){});
+}
+
 function renderHome(){
-  set('<div class="hd"><h1>Homepage</h1><span class="slug-tag">'+SLUG+'</span></div><div id="hb"><span class="spin"></span> Chargement…</div>');
+  set('<div class="hd"><h1>Homepage</h1><span class="slug-tag">'+SLUG+'</span></div><div id="health-widget"><span style="font-size:.75rem;color:#999">⚪ Chargement statut workers…</span></div><div id="hb"><span class="spin"></span> Chargement…</div>');
+  loadHealthWidget();
   apiFetch('/page?slug='+SLUG+'&path=/').then(function(r){return r.json();}).then(function(d){
     var h=d.content||'';
     var h1=(h.match(/<h1>([^<]*)<\/h1>/)||['',''])[1];
