@@ -153,24 +153,30 @@ export default {
     // ── 5. Rate limiting ──────────────────────────────────────────────────
     if (await checkRate(env, ip)) return tooManyRequests();
 
-    // ── 6. Route parsing ──────────────────────────────────────────────────
-    const parts = url.pathname.replace(/^\//, '').split('/');
-    const sl = parts[0] || url.searchParams.get('site');
-    if (!sl) return new Response('', {status:400});
+    // ── 6. Route parsing — workers.dev (slug in path) vs custom domain (KV) ──
+    const isTestMode = url.hostname.endsWith('.workers.dev');
+    let sl, normalPath;
+    if (isTestMode) {
+      const parts = url.pathname.replace(/^\//, '').split('/');
+      sl = parts[0] || url.searchParams.get('site');
+      if (!sl) return new Response('', {status:400});
+      const p = '/' + parts.slice(1).join('/');
+      normalPath = p.endsWith('/') ? p : (p.includes('.') ? p : p + '/');
+    } else {
+      sl = await env.KV.get('site:hostname:' + url.hostname).catch(()=>null);
+      if (!sl) sl = await env.KV.get('site:hostname:' + url.hostname.replace(/^www\./,'')).catch(()=>null);
+      if (!sl) return notFound('');
+      const p = url.pathname;
+      normalPath = p.endsWith('/') ? p : (p.includes('.') ? p : p + '/');
+    }
+    const testMode = isTestMode;
 
-    // ── 7. Sandbox check — isolate flagged sites ──────────────────────────
+    // ── 7. Sandbox check ──────────────────────────────────────────────────
     const sandboxState = await getSandboxState(env, sl);
     if (sandboxState?.active) {
-      // Log access attempt
       await env.KV.put(`sandbox:${sl}:access:${Date.now()}`, JSON.stringify({ip, ua:ua.slice(0,120), ts:new Date().toISOString()}), {expirationTtl:86400*7}).catch(()=>{});
       return maintenancePage(sl, sandboxState.reason);
     }
-
-    // ── 8. Build normalized path ──────────────────────────────────────────
-    const normalPath = (() => {
-      const p = '/' + parts.slice(1).join('/');
-      return p.endsWith('/') ? p : (p.includes('.') ? p : p + '/');
-    })();
 
     // Block access to internal/sensitive paths
     if (/^\/(api|admin|_|\.env|config|\.git)/i.test(normalPath)) return forbidden();
@@ -181,11 +187,7 @@ export default {
     const baseHeaders = {
       'Content-Type': ct,
       'Cache-Control': isHtml ? 'public,max-age=3600' : 'public,max-age=86400',
-      // No X-Site, no X-Powered-By — no fingerprints
     };
-
-    // workers.dev = test mode → rewrite absolute links to include slug prefix
-    const testMode = url.hostname.endsWith('.workers.dev');
 
     // ── 9. Serve from R2 ──────────────────────────────────────────────────
     const geoCountry = request.cf?.country || 'FR';

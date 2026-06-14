@@ -6,32 +6,41 @@ const ok=(d,s=200)=>new Response(JSON.stringify(d),{status:s,headers:{'Content-T
 const err=(m,s=400)=>ok({error:m},s);
 
 // [primary, primaryDark, accentBg, emoji, label-fr, label-en, promoFr, promoEn]
+// NS: [primary, primaryDark, accentBg, emoji, label-fr, label-en, promoFr, promoEn, template(1=Luxury,2=Warm,3=Modern)]
 const NS={
-  'Lingerie':    ['#c0507a','#8b2e52','#fce7f3','👙','Mode & Intimité','Lingerie & Intimates','Livraison offerte dès 49€','Free delivery from 49€'],
-  'Mode Femme':  ['#7c3aed','#5b21b6','#f5f3ff','👗','Mode Féminine',"Women's Fashion",'Livraison offerte dès 49€','Free delivery from 49€'],
-  'Mode Homme':  ['#2563eb','#1d4ed8','#eff6ff','👔','Mode Masculine',"Men's Fashion",'Livraison offerte dès 49€','Free delivery from 49€'],
-  'Luminaires':  ['#d97706','#92400e','#fffbeb','💡','Éclairage','Lighting','Livraison offerte dès 65€','Free delivery from 65€'],
-  'Décoration':  ['#059669','#065f46','#ecfdf5','🏠','Décoration','Home Décor','Livraison offerte dès 49€','Free delivery from 49€'],
-  'Beauté':      ['#db2777','#9d174d','#fff1f2','💄','Beauté','Beauty','Livraison offerte dès 39€','Free delivery from 39€'],
-  'Bijoux':      ['#b45309','#78350f','#fef3c7','💍','Bijoux','Fine Jewellery','Livraison offerte — Retours 30j','Free shipping · 30-day returns'],
-  'Jewellery':   ['#b45309','#78350f','#fef3c7','💍','Fine Jewellery','Fine Jewellery','Free shipping · 30-day returns · Use NOVA10 for 10% off','Free shipping · 30-day returns · Use NOVA10 for 10% off'],
-  'Jewelry':     ['#9a7d3a','#6b5228','#fdf8ed','💍','Fine Jewelry','Fine Jewelry','Free shipping · Use NOVA10 for 10% off','Free shipping · Use NOVA10 for 10% off'],
-  'Sport':       ['#16a34a','#15803d','#f0fdf4','🏃','Sport','Sport','Livraison offerte dès 49€','Free delivery from 49€'],
-  'Bien-être':   ['#0891b2','#0e7490','#ecfeff','🧘','Bien-être','Wellness','Livraison offerte dès 39€','Free delivery from 39€'],
-  'Maroquinerie':['#92400e','#78350f','#fef3c7','👜','Maroquinerie','Leather Goods','Livraison offerte — Authentique','Free delivery · Authentic leather'],
-  'Accessoires': ['#be185d','#9d174d','#fdf2f8','🎩','Accessoires','Accessories','Livraison offerte dès 39€','Free delivery from 39€'],
-  'High-Tech':   ['#4f46e5','#4338ca','#eef2ff','💻','High-Tech','Electronics','Garantie 2 ans · Livraison offerte','2-year warranty · Free delivery'],
-  'Enfants':     ['#65a30d','#4d7c0f','#f7fee7','🧒','Enfants','Kids','Livraison offerte dès 39€','Free delivery from 39€'],
-  'Animaux':     ['#d97706','#b45309','#fff7ed','🐾','Animaux','Pet Shop','Livraison offerte dès 39€','Free delivery from 39€'],
-  'Voyage':      ['#0284c7','#075985','#f0f9ff','✈️','Voyage','Travel','Livraison offerte dès 59€','Free delivery from 59€'],
-  'Auto':        ['#475569','#334155','#f8fafc','🚗','Auto & Moto','Auto','Livraison offerte dès 49€','Free delivery from 49€'],
+  'Lingerie':    ['#c0507a','#8b2e52','#fce7f3','👙','Mode & Intimité','Lingerie & Intimates','Livraison offerte dès 49€','Free delivery from 49€',5],
+  'Mode Femme':  ['#7c3aed','#5b21b6','#f5f3ff','👗','Mode Féminine',"Women's Fashion",'Livraison offerte dès 49€','Free delivery from 49€',3],
+  'Mode Homme':  ['#2563eb','#1d4ed8','#eff6ff','👔','Mode Masculine',"Men's Fashion",'Livraison offerte dès 49€','Free delivery from 49€',3],
+  'Luminaires':  ['#d97706','#92400e','#fffbeb','💡','Éclairage','Lighting','Livraison offerte dès 65€','Free delivery from 65€',2],
+  'Décoration':  ['#059669','#065f46','#ecfdf5','🏠','Décoration','Home Décor','Livraison offerte dès 49€','Free delivery from 49€',2],
+  'Beauté':      ['#db2777','#9d174d','#fff1f2','💄','Beauté','Beauty','Livraison offerte dès 39€','Free delivery from 39€',4],
+  'Bijoux':      ['#b45309','#78350f','#fef3c7','💍','Bijoux','Fine Jewellery','Livraison offerte — Retours 30j','Free shipping · 30-day returns',1],
+  'Jewellery':   ['#b45309','#78350f','#fef3c7','💍','Fine Jewellery','Fine Jewellery','Free shipping · 30-day returns · Use NOVA10 for 10% off','Free shipping · 30-day returns · Use NOVA10 for 10% off',1],
+  'Jewelry':     ['#9a7d3a','#6b5228','#fdf8ed','💍','Fine Jewelry','Fine Jewelry','Free shipping · Use NOVA10 for 10% off','Free shipping · Use NOVA10 for 10% off',1],
+  'Sport':       ['#16a34a','#15803d','#f0fdf4','🏃','Sport','Sport','Livraison offerte dès 49€','Free delivery from 49€',3],
+  'Bien-être':   ['#0891b2','#0e7490','#ecfeff','🧘','Bien-être','Wellness','Livraison offerte dès 39€','Free delivery from 39€',4],
+  'Maroquinerie':['#92400e','#78350f','#fef3c7','👜','Maroquinerie','Leather Goods','Livraison offerte — Authentique','Free delivery · Authentic leather',1],
+  'Accessoires': ['#be185d','#9d174d','#fdf2f8','🎩','Accessoires','Accessories','Livraison offerte dès 39€','Free delivery from 39€',5],
+  'High-Tech':   ['#4f46e5','#4338ca','#eef2ff','💻','High-Tech','Electronics','Garantie 2 ans · Livraison offerte','2-year warranty · Free delivery',3],
+  'Enfants':     ['#65a30d','#4d7c0f','#f7fee7','🧒','Enfants','Kids','Livraison offerte dès 39€','Free delivery from 39€',3],
+  'Animaux':     ['#d97706','#b45309','#fff7ed','🐾','Animaux','Pet Shop','Livraison offerte dès 39€','Free delivery from 39€',2],
+  'Voyage':      ['#0284c7','#075985','#f0f9ff','✈️','Voyage','Travel','Livraison offerte dès 59€','Free delivery from 59€',2],
+  'Auto':        ['#475569','#334155','#f8fafc','🚗','Auto & Moto','Auto','Livraison offerte dès 49€','Free delivery from 49€',3],
 };
+const tplFor=niche=>(NS[niche]||[])[8]||1;
 const brand=d=>d.replace(/\.(fr|com|net|org|eu|io|co\.uk)$/,'').replace(/[-_]/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
 const slug=d=>d.replace(/\.(fr|com|net|org|eu|io|co\.uk)$/,'').replace(/[^a-z0-9]/gi,'-').toLowerCase();
 const yr=()=>new Date().getFullYear();
 const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-function css(p,pd,ac){return `:root{--p:${p};--pd:${pd};--a:${ac}}
+function cssTemplate(p,pd,tpl){
+  if(tpl===2) return `body{background:#fdf9f4}.pcard{border-radius:8px;border-color:#e4d5c5}.pcard:hover{box-shadow:0 8px 28px rgba(0,0,0,.1)}.trust{background:#fffbf7;border-color:#e8ddd0}.feat-bg{background:#fff8f2}.reviews-bg{background:#fffbf7}.nav{background:rgba(253,249,244,.97)}.about-s{background:#fdf9f4}.nl{background:${pd}}.ftr{background:#2d1f15}.btn-cart{border-radius:4px}.pc-btn{border-radius:4px}`;
+  if(tpl===3) return `body{background:#fff}.pcard{border:none;box-shadow:0 2px 8px rgba(0,0,0,.06);border-radius:4px;transition:all .28s ease}.pcard:hover{box-shadow:0 12px 36px rgba(0,0,0,.12);transform:translateY(-2px)}.pc-img{height:240px}.hero h1{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:800;letter-spacing:-.02em}.logo{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:800;letter-spacing:.06em}.trust{background:#f8f9fa}.feat-bg{background:#f5f5f5}.reviews-bg{background:#f8f9fa}.nl{background:#111}.ftr{background:#0d0d0d}.btn-cart{border-radius:2px}.pc-btn{border-radius:2px}.sec h2,.about-text h2{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:800;letter-spacing:-.015em}.btn-w{border-radius:2px}`;
+  if(tpl===4) return `body{background:#fffef9}.pcard{border-radius:12px;border:none;box-shadow:0 2px 12px rgba(0,0,0,.08)}.pcard:hover{box-shadow:0 8px 32px rgba(0,0,0,.14);transform:translateY(-3px)}.pc-img{border-radius:8px 8px 0 0}.hero h1{font-family:Georgia,serif;font-style:italic}.logo{font-family:Georgia,serif;font-style:italic;letter-spacing:.15em}.trust{background:#fffef9}.feat-bg{background:#fff8f5}.reviews-bg{background:#fffef9}.nl{background:${p}}.ftr{background:#1c1018}.btn-cart{border-radius:24px;font-weight:600}.pc-btn{border-radius:20px}`;
+  if(tpl===5) return `body{background:#fafaf7}.pcard{border:1px solid #ddd5c8;border-radius:0;box-shadow:none}.pcard:hover{box-shadow:0 4px 20px rgba(0,0,0,.09);transform:none}.nav{border-bottom:2px solid var(--p)}.logo{letter-spacing:.3em;font-size:1.1rem}.hero h1{font-family:Georgia,serif;font-weight:400}.btn-cart{border-radius:0;border:1.5px solid var(--p);background:transparent;color:var(--p)}.btn-cart:hover{background:var(--p);color:#fff}.pc-btn{border-radius:0;border:1px solid var(--p);background:transparent;color:var(--p)}.pc-btn:hover{background:var(--p);color:#fff}.nl{background:#1a1410}.ftr{background:#1a1410}`;
+  return '';
+}
+function css(p,pd,ac,tpl=1){return `:root{--p:${p};--pd:${pd};--a:${ac}}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;color:#1a1a1a;background:#fff;line-height:1.6}
 a{text-decoration:none;color:inherit}img{max-width:100%;display:block}
@@ -315,7 +324,7 @@ a{text-decoration:none;color:inherit}img{max-width:100%;display:block}
 .faq-item{border-bottom:1px solid #f0eeeb;padding:1rem 0}
 .faq-q{font-size:.88rem;font-weight:700;color:#111;margin-bottom:.4rem}
 .faq-a{font-size:.86rem;color:#666;line-height:1.8}
-@media(max-width:768px){.blog-g{grid-template-columns:1fr}.cf{top:0}}
+@media(max-width:768px){.blog-g{grid-template-columns:1fr}.cf{top:0}}${cssTemplate(p,pd,tpl)}
 .pc-stars{color:#f59e0b;font-size:.73rem;display:flex;align-items:center;gap:.3rem;margin-bottom:.3rem;line-height:1}
 .pc-wish-btn{position:absolute;top:.5rem;right:.5rem;background:rgba(255,255,255,.92);border:none;width:28px;height:28px;border-radius:50%;cursor:pointer;font-size:.95rem;display:flex;align-items:center;justify-content:center;color:#ccc;transition:color .2s;z-index:3;line-height:1;box-shadow:0 1px 4px rgba(0,0,0,.1)}
 .pc-wish-btn:hover,.pc-wish-btn.on{color:var(--p)}
@@ -372,8 +381,8 @@ function exitIntent(lang,p){
   return `<div id="ei-modal" style="position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.58);display:none;align-items:center;justify-content:center" role="dialog" aria-label="Special offer"><div style="background:#fff;max-width:440px;width:92%;text-align:center;padding:3rem 2.2rem 2.5rem;position:relative"><button onclick="_closeEI()" style="position:absolute;top:.9rem;right:1.1rem;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#bbb;line-height:1" aria-label="Close">✕</button><p style="font-size:.6rem;letter-spacing:.35em;text-transform:uppercase;color:${p};margin-bottom:.7rem">${e?'EXCLUSIVE OFFER':'OFFRE EXCLUSIVE'}</p><h2 style="font:normal 1.6rem/1.2 Georgia,serif;color:#111;margin-bottom:.75rem">${e?'Before you go…':'Avant de partir…'}</h2><p style="color:#888;font-size:.87rem;margin-bottom:1.3rem">${e?'Get <strong style="color:#111">10% off</strong> your first order:':'Obtenez <strong style="color:#111">-10%</strong> sur votre première commande :'}</p><div style="background:#f5f0ea;border:2px dashed ${p};padding:.8rem 1.4rem;font-family:monospace;font-size:1.15rem;font-weight:700;color:#111;letter-spacing:.25em;margin-bottom:1.3rem">WELCOME10</div><button onclick="location.href='/checkout/'" style="display:block;width:100%;padding:.92rem;background:${p};color:#fff;border:none;font-size:.71rem;letter-spacing:.18em;text-transform:uppercase;font-weight:700;cursor:pointer;margin-bottom:.65rem;font-family:inherit">${e?'Claim 10% off — Shop now':'Obtenir -10% — Commander'}</button><button onclick="_closeEI()" style="font-size:.72rem;color:#ccc;background:none;border:none;cursor:pointer;font-family:inherit">${e?'No thanks, I\'ll pay full price':'Non merci, je préfère payer plein tarif'}</button></div></div>`;
 }
 
-const layout=(title,desc,url,ld,body,p,pd,ac,lang='fr')=>
-  `<!DOCTYPE html><html lang="${lang}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><meta name="theme-color" content="${p}"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}"><meta property="og:type" content="website"><link rel="canonical" href="${url}"><link rel="manifest" href="/manifest.json"><link rel="preconnect" href="https://v35-admin.ernestpedanou.workers.dev"><script type="application/ld+json">${ld}</script><style>${css(p,pd,ac)}</style></head><body>${body}<button class="btt" id="btt" onclick="scrollTop()">↑</button>${cookieConsent(lang,p)}${exitIntent(lang,p)}${pageJS()}</body></html>`;
+const layout=(title,desc,url,ld,body,p,pd,ac,lang='fr',tpl=1)=>
+  `<!DOCTYPE html><html lang="${lang}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><meta name="theme-color" content="${p}"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}"><meta property="og:type" content="website"><link rel="canonical" href="${url}"><link rel="manifest" href="/manifest.json"><link rel="preconnect" href="https://v35-admin.ernestpedanou.workers.dev"><script type="application/ld+json">${ld}</script><style>${css(p,pd,ac,tpl)}</style></head><body>${body}<button class="btt" id="btt" onclick="scrollTop()">↑</button>${cookieConsent(lang,p)}${exitIntent(lang,p)}${pageJS()}</body></html>`;
 
 const SVG_HEART=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
 const SVG_BAG=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`;
@@ -548,7 +557,7 @@ function genBlog(bp,niche,domain,lang){
   const desc=e?`Jewellery guides, style tips and care advice from ${b}.`:`Guides bijoux, conseils style et entretien par ${b}.`;
   const ld=`{"@context":"https://schema.org","@type":"Blog","name":${JSON.stringify(title)},"url":"https://${domain}/blog/"}`;
   const body=`${promoBar(niche,lang)}${navBar(b,lang)}<div class="blog-h"><h1>${e?'Journal':'Blog &amp; Guides'}</h1><p>${e?'Style guides, care tips and inspiration':'Guides style, conseils entretien et inspirations'}</p></div><div class="blog-g">${cards}</div>${trustSection(lang)}${footerSection(b,domain,lang)}`;
-  return layout(title,desc,`https://${domain}/blog/`,ld,body,p,pd,ac,lang);
+  return layout(title,desc,`https://${domain}/blog/`,ld,body,p,pd,ac,lang,tplFor(niche));
 }
 
 function genBlogPost(topic,niche,domain,lang){
@@ -561,7 +570,7 @@ function genBlogPost(topic,niche,domain,lang){
   const date=new Date().toLocaleDateString(e?'en-GB':'fr-FR',{day:'numeric',month:'long',year:'numeric'});
   const ld=`{"@context":"https://schema.org","@type":"Article","headline":${JSON.stringify(title)},"author":{"@type":"Organization","name":${JSON.stringify(b)}},"datePublished":"${new Date().toISOString().slice(0,10)}","publisher":{"@type":"Organization","name":${JSON.stringify(b)}},"url":"https://${domain}/blog/${topic.slug}/"}`;
   const art=`${promoBar(niche,lang)}${navBar(b,lang)}<div class="bc"><div class="bc-i"><a href="/">${e?'Home':'Accueil'}</a> › <a href="/blog/">${e?'Journal':'Blog'}</a> › ${esc(title)}</div></div><div class="art-w"><div class="art-hd"><span class="art-tag">${niche}</span><h1>${esc(title)}</h1><div class="art-mt"><span>${date}</span><span>·</span><span>${topic.read} ${e?'min read':'min de lecture'}</span><span>·</span><a href="/blog/" style="color:var(--p)">${e?'← All articles':'← Tous les articles'}</a></div></div><div class="art">${body_html}${faqHtml}</div></div>${trustSection(lang)}${footerSection(b,domain,lang)}`;
-  return layout(`${title} | ${b}`,e?topic.enExc:topic.frExc,`https://${domain}/blog/${topic.slug}/`,ld,art,p,pd,ac,lang);
+  return layout(`${title} | ${b}`,e?topic.enExc:topic.frExc,`https://${domain}/blog/${topic.slug}/`,ld,art,p,pd,ac,lang,tplFor(niche));
 }
 
 const SVG_IG=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>`;
@@ -598,7 +607,7 @@ function genHome(bp,niche,domain,lang){
   const ld=`{"@context":"https://schema.org","@graph":[{"@type":"Organization","name":${JSON.stringify(b)},"url":"https://${domain}"},{"@type":"WebSite","url":"https://${domain}","potentialAction":{"@type":"SearchAction","target":"https://${domain}/search?q={s}","query-input":"required name=s"}},{"@type":"ItemList","itemListElement":[${ldItems}]}]}`;
   const trustBadge=e?`★★★★★ 4.8 · 2,400+ happy customers`:`★★★★★ 4.8 · 2 400+ clients satisfaits`;
   const body=`${promoBar(niche,lang)}${navBar(b,lang)}<section class="hero"><div class="hero-inner"><p class="hero-tag">${e?'New Collection 2024':'Nouvelle Collection 2024'}</p><h1>${esc(b)}</h1><p>${lb} — ${n} collections${e?'. Handcrafted for you.':'. Fait pour vous.'}</p><div class="hero-ctas"><a href="/collections/" class="btn-w">${e?'Explore Collections':'Voir les collections'}</a><a href="/collections/new-arrivals/" class="btn-o">${e?'New Arrivals':'Nouveautés'}</a></div><div class="hero-trust">${trustBadge}</div></div></section>${trustSection(lang)}${sloganSection(b,niche,lang)}${genNewArrivals(cols,em,lang)}${genFeatCols(cols,em,lang)}${genTestimonials(lang)}${genBestsellers(cols,em,lang)}${genAbout(b,p,em,lang)}${newsletterSection(pd,lang)}${footerSection(b,domain,lang)}`;
-  return layout(`${b} — ${lb}`,desc,`https://${domain}/`,ld,body,p,pd,ac,lang);
+  return layout(`${b} — ${lb}`,desc,`https://${domain}/`,ld,body,p,pd,ac,lang,tplFor(niche));
 }
 
 function genCollIndex(bp,niche,domain,lang){
@@ -611,7 +620,7 @@ function genCollIndex(bp,niche,domain,lang){
   const desc=e?`All ${b} collections — ${lb}. ${cols.length} categories.`:`Toutes nos collections — ${b}. ${cols.length} catégories.`;
   const ld=`{"@context":"https://schema.org","@type":"CollectionPage","name":${JSON.stringify(title)},"url":"https://${domain}/collections/"}`;
   const body=`${promoBar(niche,lang)}${navBar(b,lang)}<div class="bc"><div class="bc-i"><a href="/">${e?'Home':'Accueil'}</a> › ${e?'Collections':'Collections'}</div></div><div class="feat-bg"><div class="feat-h" style="margin-bottom:2rem"><h2 style="font:normal clamp(1.6rem,3vw,2.2rem)/1.15 Georgia,serif">${e?'All Collections':'Toutes nos collections'}</h2><p style="color:#888;font-size:.88rem;margin-top:.5rem">${cols.length} ${lb.toLowerCase()} ${e?'categories':'catégories'}</p></div><div class="feat-grid" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">${cards}</div></div>${trustSection(lang)}${newsletterSection(pd,lang)}${footerSection(b,domain,lang)}`;
-  return layout(title,desc,`https://${domain}/collections/`,ld,body,p,pd,ac,lang);
+  return layout(title,desc,`https://${domain}/collections/`,ld,body,p,pd,ac,lang,tplFor(niche));
 }
 
 function genColl(col,bp,niche,domain,lang){
@@ -629,7 +638,7 @@ function genColl(col,bp,niche,domain,lang){
   const ld=`{"@context":"https://schema.org","@type":"CollectionPage","name":${JSON.stringify(col.title)},"url":"https://${domain}${col.path}/"}`;
   const desc=e?`${col.title} — ${n} products. ${b}. Free delivery on orders over €39.`:`${col.title} — ${n} produits. ${b}. Livraison offerte dès 39€.`;
   const body=`${promoBar(niche,lang)}${navBar(b,lang)}<div class="bc"><div class="bc-i"><a href="/">${e?'Home':'Accueil'}</a> › <a href="/collections/">Collections</a> › ${esc(col.title)}</div></div><section class="hero" style="min-height:36vh;padding:2.5rem 2rem"><div class="hero-inner"><p class="hero-tag">${e?'Collection':'Collection'}</p><h1>${esc(col.title)}</h1><p>${n} ${e?'products · Free delivery from 39€':'produits · Livraison offerte dès 39€'}</p></div></section>${filterBar(col,niche,lang,n)}<div class="sec"><div class="pg4">${prods}</div></div>${newsletterSection(pd,lang)}${footerSection(b,domain,lang)}`;
-  return layout(`${esc(col.title)} | ${b}`,desc,`https://${domain}${col.path}/`,ld,body,p,pd,ac,lang);
+  return layout(`${esc(col.title)} | ${b}`,desc,`https://${domain}${col.path}/`,ld,body,p,pd,ac,lang,tplFor(niche));
 }
 
 function genLegal(domain,type,lang){
@@ -648,7 +657,7 @@ function genLegal(domain,type,lang){
   }[type];
   const ld=`{"@context":"https://schema.org","@type":"WebPage","name":${JSON.stringify(s.title+' | '+b)},"url":"https://${domain}${s.path}"}`;
   const body=`${navBar(b,lang)}<div class="legal"><h1>${s.title}</h1>${s.body}<p style="margin-top:2.5rem"><a href="/" style="color:var(--p)">← ${e?'Back to home':"Retour à l'accueil"}</a></p></div>${footerSection(b,domain,lang)}`;
-  return layout(`${s.title} | ${b}`,`${s.title} — ${b}`,`https://${domain}${s.path}`,ld,body,p,pd,ac,lang);
+  return layout(`${s.title} | ${b}`,`${s.title} — ${b}`,`https://${domain}${s.path}`,ld,body,p,pd,ac,lang,1);
 }
 
 function genSitemap(bp,domain){
@@ -816,7 +825,7 @@ function removePromo(){
   const url=`https://${domain}/checkout/`;
   const ld=`{"@context":"https://schema.org","@type":"CheckoutPage","name":"Checkout","url":"${url}"}`;
   const body=`${ckCss}${hd}<div style="background:#fafaf8;min-height:calc(100vh - 62px)"><div class="ck-wrap"><div>${stepsH}${form}</div>${summary}</div>${ft}</div>${modal}${js}`;
-  return layout(`${e?'Checkout':'Paiement'} | ${b}`,`${e?'Secure checkout':'Paiement sécurisé'} — ${b}`,url,ld,body,p,pd,ac,lang);
+  return layout(`${e?'Checkout':'Paiement'} | ${b}`,`${e?'Secure checkout':'Paiement sécurisé'} — ${b}`,url,ld,body,p,pd,ac,lang,tplFor(niche));
 }
 
 function genProduct(prod,col,niche,domain,lang){
@@ -892,7 +901,7 @@ function genProduct(prod,col,niche,domain,lang){
   const social=`<p class="pdp-social-proof">${e?`🔥 ${viewerCount+5} people bought this in the last 24h`:`🔥 ${viewerCount+5} personnes ont acheté ça ces dernières 24h`}</p>`;
   const mobCart=`<div id="mob-cart-bar" class="mob-cart-bar"><div class="mob-cart-info"><span class="mob-cart-name">${esc(title)}</span><span class="mob-cart-price">${price}€</span></div><button class="mob-cart-btn" onclick="location.href='/checkout/'">${e?'Buy Now':'Acheter'}</button></div>`;
   const body=`${promoBar(niche,lang)}${navBar(b,lang)}<div class="bc"><div class="bc-i"><a href="/">${e?'Home':'Accueil'}</a> › <a href="/collections/">${e?'Collections':'Collections'}</a> › <a href="${col.path}/">${esc(col.title)}</a> › ${esc(title)}</div></div><div class="pdp-wrap"><div class="pdp-grid"><div class="pdp-gallery">${mainImg}<div class="pdp-thumbs">${thumbs}</div></div><div class="pdp-info">${inStock}<p class="pdp-eye">${esc(col.title)}</p><h1>${esc(title)}</h1><div class="pdp-rating"><span class="pdp-stars">★★★★★</span><span class="pdp-rating-cnt">4.8</span><a href="#t3" class="pdp-rating-link">(47 ${e?'reviews':'avis'})</a></div><div class="pdp-price-row"><span class="pdp-price-now">${price}€</span>${orig?`<span class="pdp-price-orig">${orig}€</span><span class="pdp-price-save">${e?'−':'−'}${saveAmt}€</span>`:''}</div>${social}${bulletsHTML}${varHTML}<div class="pdp-qty"><button id="qm">−</button><span id="qv">1</span><button id="qp">+</button></div><button class="btn-cart" id="addCart" onclick="location.href='/checkout/'">${e?`Add to Cart — ${price}€`:`Ajouter au panier — ${price}€`}</button><button class="btn-wish">${SVG_HEART} ${e?'Add to Wishlist':'Ajouter à ma liste'}</button>${trustRow}<div class="pdp-dlv">${SVG_TRUCK} ${dlv}</div></div></div></div>${tabs}${related}${footerSection(b,domain,lang)}${mobCart}${js}`;
-  return layout(`${esc(title)} | ${b}`,desc,url,ld,body,p,pd,ac,lang);
+  return layout(`${esc(title)} | ${b}`,desc,url,ld,body,p,pd,ac,lang,tplFor(niche));
 }
 
 function genSuivi(domain,lang){
@@ -907,7 +916,7 @@ function genSuivi(domain,lang){
   const js=`<script>function trackOrder(){var n=(document.getElementById('ord-n').value||'').trim();if(!n)return;var steps=[['✓','${s1}','done'],['✓','${s2}','done'],['→','${s3}','act'],['📦','${s4}','']];document.getElementById('track-res').innerHTML='<div class="track-card"><h3>${lbl} '+n+'</h3><p class="track-ref">${dlvTxt}</p><div class="track-steps">'+steps.map(function(s){return '<div class="ts '+s[2]+'"><span>'+s[0]+'</span><span>'+s[1]+'</span></div>'}).join('')+'</div></div>';}<\/script>`;
   const body=`${navBar(b,lang)}<div class="track-wrap"><h1>${e?'Track your order':'Suivre ma commande'}</h1><p>${e?'Enter your order number to track your delivery status.':'Entrez votre numéro de commande pour suivre votre livraison.'}</p><div class="track-form"><input class="track-inp" id="ord-n" placeholder="#123456" aria-label="${e?'Order number':'Numéro de commande'}"><button class="track-btn" onclick="trackOrder()">${e?'Track':'Suivre'}</button></div><div id="track-res"></div>${js}${footerSection(b,domain,lang)}`;
   const ld=`{"@context":"https://schema.org","@type":"WebPage","name":"${e?'Order Tracking':'Suivi de commande'}","url":"https://${domain}/suivi-commande/"}`;
-  return layout(`${e?'Track my order':'Suivre ma commande'} | ${b}`,`${e?'Track your order delivery status.':'Suivez le statut de livraison de votre commande.'}`,`https://${domain}/suivi-commande/`,ld,body,p,pd,ac,lang);
+  return layout(`${e?'Track my order':'Suivre ma commande'} | ${b}`,`${e?'Track your order delivery status.':'Suivez le statut de livraison de votre commande.'}`,`https://${domain}/suivi-commande/`,ld,body,p,pd,ac,lang,1);
 }
 
 function genWishlist(domain,lang){
@@ -915,7 +924,7 @@ function genWishlist(domain,lang){
   const[p,pd,ac,em]=NS['Mode Femme'];
   const body=`${navBar(b,lang)}<div class="wl-wrap"><h1>${e?'My Wishlist':'Ma liste de souhaits'}</h1><p style="color:#888;font-size:.88rem;margin-bottom:2rem">${e?'Your saved items:':'Vos articles sauvegardés :'}</p><div id="wl-items"><div class="wl-empty"><h2>${e?'Your wishlist is empty':'Votre liste est vide'}</h2><p>${e?'Browse our collections and save your favourites.':'Parcourez nos collections et sauvegardez vos favoris.'}</p><a href="/collections/" style="display:inline-block;margin-top:1.4rem;padding:.8rem 2rem;background:var(--p);color:#fff;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;font-weight:700">${e?'Shop now':'Voir les collections'}</a></div></div><script>(function(){var w=JSON.parse(localStorage.getItem('wl')||'[]');if(!w.length)return;var h='<div class="pg4">';w.forEach(function(x){h+='<div class="pcard" style="cursor:pointer" onclick="location.href=\'/${domain}/collections/\'"><div class="pc-img"><div class="pci">${em}</div><button class="pc-wish-btn on" data-wish="'+x.s+'" onclick="event.stopPropagation();toggleWish(\''+x.s+'\',\''+x.n+'\')">♥</button></div><div class="pc-bd"><div class="pc-stars">★★★★★</div><p class="pc-nm">'+x.n+'</p><button class="pc-btn" onclick="event.stopPropagation();location.href=\'/checkout/\'">${e?'Add to Cart':'Ajouter'}</button></div></div>';});h+='</div>';document.getElementById('wl-items').innerHTML=h;})();<\/script>${footerSection(b,domain,lang)}`;
   const ld=`{"@context":"https://schema.org","@type":"WebPage","name":"${e?'Wishlist':'Liste de souhaits'}","url":"https://${domain}/wishlist/"}`;
-  return layout(`${e?'My Wishlist':'Ma liste de souhaits'} | ${b}`,`${e?'Your saved items.':'Vos articles sauvegardés.'}`,`https://${domain}/wishlist/`,ld,body,p,pd,ac,lang);
+  return layout(`${e?'My Wishlist':'Ma liste de souhaits'} | ${b}`,`${e?'Your saved items.':'Vos articles sauvegardés.'}`,`https://${domain}/wishlist/`,ld,body,p,pd,ac,lang,1);
 }
 
 async function buildAndStore(bp,niche,domain,lang,env){
@@ -956,8 +965,9 @@ async function buildAndStore(bp,niche,domain,lang,env){
     ...Object.entries(files).map(([path,html])=>env.R2.put(`${sl}${path}`,html,{httpMetadata:{contentType:ct(path)}})),
     env.R2.put(`${sl}/__meta.json`,meta,{httpMetadata:{contentType:'application/json'}}),
   ]);
-  // KV meta: best-effort (may fail if daily limit hit)
+  // KV meta + blueprint (best-effort)
   await env.KV.put(pre+'__meta',meta,{expirationTtl:86400*365}).catch(()=>{});
+  await env.R2.put('op/blueprint-'+sl+'.json',JSON.stringify(bp),{httpMetadata:{contentType:'application/json'}}).catch(()=>{});
   return{slug:sl,pages:Object.keys(files).length,url:`https://v35-site-server.ernestpedanou.workers.dev/${sl}/`,niche,lang,domain};
 }
 

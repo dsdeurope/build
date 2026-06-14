@@ -103,6 +103,23 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;backgrou
 .empty{color:#bbb;font-size:.82rem;padding:1rem 0}
 a.back{cursor:pointer;color:#bbb;font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;margin-bottom:.6rem;display:inline-block}
 a.back:hover{color:#111}
+.op-tb{padding:.45rem .9rem;background:none;border:1px solid #2a2a2a;border-radius:16px;font-size:.7rem;cursor:pointer;font-family:inherit;color:#555;white-space:nowrap;transition:all .18s}
+.op-tb.act{background:#b45309;color:#fff;border-color:#b45309}
+.op-h2{font-size:.68rem;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#b45309;margin-bottom:1rem}
+.op-field{margin-bottom:.75rem}
+.op-field label{display:block;font-size:.68rem;font-weight:700;color:#888;margin-bottom:.28rem;letter-spacing:.06em;text-transform:uppercase}
+.op-field input,.op-field textarea{width:100%;padding:.58rem .85rem;border:1px solid #e0e0db;border-radius:3px;font-size:.84rem;font-family:inherit;outline:none}
+.op-field input:focus,.op-field textarea:focus{border-color:#b45309}
+.op-field textarea{resize:vertical;min-height:60px}
+.op-tcard{border:2px solid #e0e0db;border-radius:6px;padding:.72rem;cursor:pointer;text-align:center;transition:border-color .18s;background:#fff}
+.op-tcard.sel{border-color:#b45309;background:#fff8f0}
+.reg-card{border:1px solid #e5e5e0;border-radius:4px;padding:.8rem;background:#fff}
+.reg-best{border-color:#b45309;background:#fff8f0}
+.badge-ok{background:#dcfce7;color:#166534;padding:.12rem .4rem;border-radius:8px;font-size:.63rem;font-weight:700}
+.badge-live{background:#dbeafe;color:#1e40af;padding:.12rem .4rem;border-radius:8px;font-size:.63rem;font-weight:700}
+.badge-err{background:#fee2e2;color:#991b1b;padding:.12rem .4rem;border-radius:8px;font-size:.63rem;font-weight:700}
+.lang-item{display:flex;align-items:center;gap:.4rem;padding:.3rem .5rem;border:1px solid #e8e4df;border-radius:3px;font-size:.73rem;cursor:pointer}
+.lang-item input{accent-color:#b45309}
 </style></head><body>
 <aside class="sb">
   <div class="sb-logo">V35</div>
@@ -117,6 +134,9 @@ a.back:hover{color:#111}
     <li><a onclick="showTab('promos')" id="n-promos">🏷 Codes promo</a></li>
     <li><a onclick="showTab('stats')" id="n-stats">📊 Analytics</a></li>
     <li><a onclick="showTab('bk')" id="n-bk">💾 Sauvegardes</a></li>
+    <li style="margin-top:.6rem;border-top:1px solid #1a1a1a;padding-top:.6rem"><a onclick="showTab('op')" id="n-op" style="background:rgba(180,83,9,.15);color:#d97706;font-weight:700">⚡ Opération</a></li>
+    <li style="margin-top:.3rem"><a onclick="showTab('orch')" id="n-orch" style="color:#7c3aed">🎯 Orchestrateur</a></li>
+    <li style="margin-top:.3rem"><a onclick="showTab('bl')" id="n-bl" style="color:#0891b2">🔗 Backlinks</a></li>
   </ul>
   <div class="sb-sep" id="sb-sep" style="display:none"></div>
   <div class="sb-site" id="sb-site"></div>
@@ -131,6 +151,8 @@ a.back:hover{color:#111}
 <script>
 var TOKEN='`+token+`', SLUG='', CUR_PAGE='', _html='';
 var BASE=location.origin;
+var OP_CFG={},_selTpl=1,_opUrls=[];
+var LANGS=[['fr','Français'],['en','English'],['de','Deutsch'],['es','Español'],['it','Italiano'],['nl','Nederlands'],['pt','Português'],['pl','Polski'],['sv','Svenska'],['da','Dansk'],['fi','Suomi'],['no','Norsk'],['cs','Čeština'],['ro','Română'],['hu','Magyar'],['sk','Slovenčina'],['sl','Slovenščina'],['hr','Hrvatski'],['bg','Български'],['el','Ελληνικά']];
 
 function toast(msg,good){var t=document.getElementById('toast');t.textContent=msg;t.style.background=good===false?'#dc2626':'#111';t.classList.add('show');setTimeout(function(){t.classList.remove('show')},3000);}
 
@@ -149,7 +171,7 @@ function loadSite(){
 }
 
 function showTab(tab){
-  ['home','cols','pages','media','promos','stats','bk'].forEach(function(t){
+  ['home','cols','pages','media','promos','stats','bk','op','orch','bl'].forEach(function(t){
     var el=document.getElementById('n-'+t);
     if(el)el.classList.toggle('act',t===tab);
   });
@@ -160,6 +182,9 @@ function showTab(tab){
   else if(tab==='promos')renderPromos();
   else if(tab==='stats')renderStats();
   else if(tab==='bk')renderBk();
+  else if(tab==='op')renderOperation();
+  else if(tab==='orch')renderOrch();
+  else if(tab==='bl')renderBacklinks();
 }
 
 /* ── HOMEPAGE ─────────────────────────────────────────── */
@@ -490,6 +515,522 @@ function deletePromo(code){
   });
 }
 
+/* ── ORCHESTRATEUR ────────────────────────────────────────── */
+var _orchRunId=null,_orchPoll=null;
+function renderOrch(){
+  set('<div class="hd"><h1>🎯 Orchestrateur</h1><span class="slug-tag">'+SLUG+'</span></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.5rem">'+
+    '<div><label class="lbl">Niche</label><input id="orch-niche" class="inp" placeholder="Jewellery" value="Jewellery"></div>'+
+    '<div><label class="lbl">Domaine (.fr)</label><input id="orch-domain" class="inp" placeholder="auranova.fr" value="auranova.fr"></div>'+
+    '<div><label class="lbl">Zone ID Cloudflare (optionnel)</label><input id="orch-zone" class="inp" placeholder="laisser vide si pas encore de domaine"></div>'+
+    '<div style="display:flex;align-items:flex-end"><button class="btn" onclick="startOrch()" style="background:#7c3aed;width:100%">🚀 Lancer pipeline complet</button></div>'+
+    '</div>'+
+    '<div id="orch-steps" style="display:none;margin-bottom:1.5rem">'+
+    '<div style="font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7c3aed;margin-bottom:.8rem">PIPELINE EN COURS</div>'+
+    '<div id="orch-steps-list" style="display:flex;flex-direction:column;gap:.5rem"></div>'+
+    '</div>'+
+    '<div id="orch-result" style="margin-bottom:1.5rem"></div>'+
+    '<div style="font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:.8rem">HISTORIQUE (30 derniers)</div>'+
+    '<div id="orch-hist"></div>');
+  loadOrchHist();
+}
+function orchStepIcon(s){return s==='done'?'✅':s==='running'?'⏳':s==='failed'?'❌':'⬜';}
+function orchStepLabel(n){return{factory_fr:'🇫🇷 Site FR',seo_assets:'🗺 Sitemap + robots.txt',dns_setup:'🌐 DNS 20 sous-domaines',factory_langs:'🌍 19 sites multilingues',ping_index:'📡 Ping Google/Bing',complete:'✅ Terminé'}[n]||n;}
+function renderOrchSteps(steps){
+  var h='';
+  steps.forEach(function(s){
+    var ic=orchStepIcon(s.status);
+    var col=s.status==='done'?'#166534':s.status==='running'?'#92400e':s.status==='failed'?'#991b1b':'#64748b';
+    var extra=s.error?'<div style="color:#ef4444;font-size:.7rem;margin-top:.2rem">'+s.error+'</div>':'';
+    var res=s.result&&s.status==='done'?'<div style="color:#888;font-size:.7rem">'+JSON.stringify(s.result).slice(0,120)+'</div>':'';
+    h+='<div style="display:flex;align-items:flex-start;gap:.6rem;padding:.5rem .7rem;background:#f8f7f5;border-radius:4px;border-left:3px solid '+col+'">'+
+      '<span>'+ic+'</span><div><div style="font-size:.75rem;font-weight:600;color:'+col+'">'+orchStepLabel(s.name)+'</div>'+extra+res+'</div></div>';
+  });
+  document.getElementById('orch-steps-list').innerHTML=h;
+}
+function startOrch(){
+  if(!SLUG){toast('Chargez un site d\'abord',false);return;}
+  var niche=document.getElementById('orch-niche').value.trim()||'Jewellery';
+  var domain=document.getElementById('orch-domain').value.trim();
+  var zone=document.getElementById('orch-zone').value.trim()||null;
+  if(!domain){toast('Domaine requis',false);return;}
+  apiFetch('/orchestrator/run',{method:'POST',body:JSON.stringify({slug:SLUG,niche,domain,zone_id:zone})}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok===false){toast('Erreur: '+(d.error||'?'),false);return;}
+    _orchRunId=d.runId;
+    document.getElementById('orch-steps').style.display='block';
+    renderOrchSteps(d.state.steps);
+    if(d.status!=='complete'&&d.status!=='failed')pollOrch();
+    else orchDone(d.state);
+  });
+}
+function pollOrch(){
+  if(_orchPoll)clearInterval(_orchPoll);
+  _orchPoll=setInterval(function(){
+    if(!_orchRunId)return;
+    apiFetch('/orchestrator/next',{method:'POST',body:JSON.stringify({runId:_orchRunId})}).then(function(r){return r.json();}).then(function(d){
+      if(!d.runId)return;
+      renderOrchSteps(d.state.steps);
+      if(d.status==='complete'||d.status==='failed'){clearInterval(_orchPoll);orchDone(d.state);}
+    });
+  },4000);
+}
+function orchDone(state){
+  var ok=state.status==='complete';
+  document.getElementById('orch-result').innerHTML='<div style="padding:1rem;background:'+(ok?'#dcfce7':'#fee2e2')+';border-radius:6px;font-size:.8rem;color:'+(ok?'#166534':'#991b1b')+'">'+
+    (ok?'🎉 Pipeline terminé avec succès — site live : <a href="https://www.'+state.domain+'" target="_blank">www.'+state.domain+'</a>':'❌ Pipeline échoué — vérifiez les étapes en rouge')+
+    '</div>';
+  loadOrchHist();
+}
+function loadOrchHist(){
+  apiFetch('/orchestrator/runs').then(function(r){return r.json();}).then(function(d){
+    var runs=d.runs||[];
+    var h=runs.length?'<div style="display:flex;flex-direction:column;gap:.4rem">'+runs.map(function(r){
+      var col=r.status==='complete'?'#166534':r.status==='failed'?'#991b1b':'#92400e';
+      var pct=Math.round((r.currentStep||0)/6*100);
+      return '<div style="display:flex;align-items:center;gap:.7rem;padding:.45rem .7rem;background:#f8f7f5;border-radius:4px;cursor:pointer" onclick="loadOrchRun(\''+r.runId+'\')">'+
+        '<span style="font-size:.7rem;color:'+col+';font-weight:700">'+r.status.toUpperCase()+'</span>'+
+        '<span style="flex:1;font-size:.73rem;color:#333">'+r.domain+' <span style="color:#888">·</span> '+r.niche+'</span>'+
+        '<div style="width:80px;height:4px;background:#e2e8f0;border-radius:2px"><div style="width:'+pct+'%;height:100%;background:'+col+';border-radius:2px"></div></div>'+
+        '<span style="font-size:.68rem;color:#aaa">'+new Date(r.startedAt).toLocaleString('fr-FR',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})+'</span>'+
+        '</div>';
+    }).join('')+'</div>':'<div style="color:#aaa;font-size:.8rem">Aucun pipeline lancé</div>';
+    var el=document.getElementById('orch-hist');
+    if(el)el.innerHTML=h;
+  }).catch(function(){});
+}
+function loadOrchRun(runId){
+  apiFetch('/orchestrator/run/'+runId).then(function(r){return r.json();}).then(function(d){
+    if(!d.runId)return;
+    _orchRunId=runId;
+    document.getElementById('orch-steps').style.display='block';
+    renderOrchSteps(d.steps);
+  });
+}
+
+/* ── BACKLINKS ────────────────────────────────────────────── */
+var BL_CATS=['blog','annuaire','forum','social','pbn','presse','partenaire'];
+function renderBacklinks(){
+  set('<div class="hd"><h1>🔗 Backlinks</h1><span class="slug-tag">'+SLUG+'</span></div>'+
+    // ── Dashboard pace + diversité ──
+    '<div id="bl-dash" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-bottom:1.2rem"></div>'+
+    // ── Suivi backlinks ──
+    '<div style="font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#0891b2;margin-bottom:.8rem">SUIVI BACKLINKS</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-bottom:1rem">'+
+    '<div><label class="lbl">Domaine source</label><input id="bl-domain" class="inp" placeholder="exemple.com"></div>'+
+    '<div><label class="lbl">URL exacte</label><input id="bl-url" class="inp" placeholder="https://exemple.com/article/"></div>'+
+    '<div><label class="lbl">Ancre</label><input id="bl-anchor" class="inp" placeholder="bijoux or 18k"></div>'+
+    '<div><label class="lbl">URL cible (notre site)</label><input id="bl-target" class="inp" placeholder="/collections/bagues/"></div>'+
+    '<div><label class="lbl">Type</label><select id="bl-type" class="inp"><option value="blog">Blog (40%)</option><option value="forum">Forum (30%)</option><option value="profile">Profil/Annuaire (20%)</option><option value="guestbook">Guestbook (10%)</option></select></div>'+
+    '<div><label class="lbl">Follow</label><select id="bl-follow" class="inp"><option value="dofollow">Dofollow</option><option value="nofollow">Nofollow</option></select></div>'+
+    '<div><label class="lbl">DR (>25)</label><input id="bl-dr" class="inp" type="number" min="0" max="100" placeholder="35"></div>'+
+    '<div><label class="lbl">TF (>15) / OBL (<50)</label><div style="display:flex;gap:.3rem"><input id="bl-tf" class="inp" type="number" placeholder="TF" style="flex:1"><input id="bl-obl" class="inp" type="number" placeholder="OBL" style="flex:1"></div></div>'+
+    '</div>'+
+    '<div style="display:flex;gap:.6rem;margin-bottom:1.5rem">'+
+    '<button class="btn" onclick="addBacklink()" style="background:#0891b2">+ Ajouter backlink</button>'+
+    '<button class="btn bo" onclick="pingGoogleBL()">📡 Ping Google indexation</button>'+
+    '</div>'+
+    '<div id="bl-list" style="margin-bottom:2rem"></div>'+
+    // ── Générateur commentaires blog ──
+    '<div style="border-top:2px solid #e8e4df;padding-top:1.5rem;margin-top:.5rem">'+
+    '<div style="font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#7c3aed;margin-bottom:.8rem">📝 GÉNÉRATEUR COMMENTAIRES BLOG (format Wix/tiptap)</div>'+
+    '<div style="font-size:.72rem;color:#888;margin-bottom:.8rem;line-height:1.5">'+
+    'Coller le tableau <b>url_article | url_boutique</b> (une ligne par paire, séparés par <code>|</code>).<br>'+
+    'Probabilités longueur : 100w×25% · 150w×25% · 200w×25% · 250w×12.5% · 300w×6.25% · 350w×3.125% · 400w×3.125%<br>'+
+    'Ancres : 50% non-optimisée · 35% semi-optimisée · 15% optimisée'+
+    '</div>'+
+    '<textarea id="bl-comment-input" class="inp" rows="8" style="width:100%;font-size:.72rem;font-family:monospace" placeholder="https://blog.exemple.com/article-bijoux/ | https://www.ma-boutique.fr/&#10;https://blog.exemple.com/article-mode/ | https://www.autre-boutique.fr/"></textarea>'+
+    '<div style="display:flex;gap:.6rem;margin-top:.8rem;align-items:center">'+
+    '<button class="btn" onclick="genComments()" style="background:#7c3aed" id="bl-gen-btn">🤖 Générer les commentaires</button>'+
+    '<span id="bl-gen-progress" style="font-size:.72rem;color:#888"></span>'+
+    '</div>'+
+    '<div id="bl-gen-results" style="margin-top:1rem"></div>'+
+    '</div>');
+  loadBL();loadBLDash();
+}
+
+// ── Dashboard pace + diversité ────────────────────────────────────────────
+function loadBLDash(){
+  if(!SLUG)return;
+  apiFetch('/backlinks?slug='+SLUG).then(function(r){return r.json();}).then(function(d){
+    var links=(d.links||[]).filter(function(l){return l.status==='active';});
+    var el=document.getElementById('bl-dash');if(!el)return;
+    var today=new Date().toISOString().split('T')[0];
+    var wStart=new Date();wStart.setDate(wStart.getDate()-wStart.getDay());var wStr=wStart.toISOString().split('T')[0];
+    var mStr=today.slice(0,7);
+    var todayN=links.filter(function(l){return l.liveAt===today;}).length;
+    var weekN=links.filter(function(l){return l.liveAt&&l.liveAt>=wStr;}).length;
+    var monthN=links.filter(function(l){return l.liveAt&&l.liveAt.startsWith(mStr);}).length;
+    var types={blog:0,forum:0,profile:0,guestbook:0};
+    links.forEach(function(l){if(types[l.link_type]!==undefined)types[l.link_type]++;});
+    var dof=links.filter(function(l){return l.follow_type!=='nofollow';}).length;
+    var nof=links.length-dof;
+    var paceCol=todayN>=7?'#ef4444':todayN>=5?'#f59e0b':'#166534';
+    el.innerHTML=[
+      {v:todayN+'/7',l:'Aujourd\'hui',c:paceCol},
+      {v:weekN,l:'Cette semaine',c:'#0891b2'},
+      {v:monthN,l:'Ce mois',c:'#7c3aed'},
+      {v:dof+'df / '+nof+'nf',l:'Do/Nofollow',c:dof>nof?'#166534':'#0891b2'},
+    ].map(function(x){
+      return '<div style="background:#f8f7f5;border-radius:6px;padding:.6rem .8rem;text-align:center">'+
+        '<div style="font-size:1.1rem;font-weight:700;color:'+x.c+'">'+x.v+'</div>'+
+        '<div style="font-size:.62rem;color:#888;margin-top:.1rem">'+x.l+'</div></div>';
+    }).join('')+
+    '<div style="background:#f8f7f5;border-radius:6px;padding:.6rem .8rem;grid-column:span 4">'+
+    '<div style="font-size:.6rem;font-weight:700;color:#888;margin-bottom:.3rem;letter-spacing:.1em">MIX TYPES (cible: 40/30/20/10)</div>'+
+    '<div style="display:flex;gap:.4rem;align-items:center">'+
+    ['blog','forum','profile','guestbook'].map(function(t,i){
+      var target=[40,30,20,10][i];var n=types[t];var pct=links.length?Math.round(n/links.length*100):0;
+      var col=Math.abs(pct-target)<=5?'#166534':Math.abs(pct-target)<=15?'#f59e0b':'#ef4444';
+      return '<span style="font-size:.65rem;padding:.1rem .4rem;border-radius:8px;background:'+col+';color:#fff">'+t+' '+pct+'%</span>';
+    }).join('')+
+    '</div></div>';
+  }).catch(function(){});
+}
+
+// ── Générateur commentaires ──────────────────────────────────────────────
+var _blResults=[];
+var BL_WORD_RANGE={blog:{min:100,max:400},forum:{min:50,max:100},profile:{min:30,max:60},guestbook:{min:50,max:100}};
+function blWordCount(type){
+  if(type&&BL_WORD_RANGE[type]){var rng=BL_WORD_RANGE[type];return rng.min+Math.floor(Math.random()*(rng.max-rng.min+1));}
+  var r=Math.random()*120;
+  if(r<25)return 100;if(r<50)return 150;if(r<75)return 200;if(r<90)return 250;if(r<100)return 300;if(r<107.5)return 350;return 400;
+}
+function blAnchorType(){
+  var r=Math.random();
+  if(r<0.50)return'non-optimisée';if(r<0.85)return'semi-optimisée';return'optimisée';
+}
+function genComments(){
+  var raw=document.getElementById('bl-comment-input').value.trim();
+  if(!raw){toast('Coller le tableau d\'abord',false);return;}
+  var rows=raw.split('\n').map(function(l){var p=l.split('|');return{blog:(p[0]||'').trim(),boutique:(p[1]||'').trim(),type:(p[2]||'').trim()||null};}).filter(function(r){return r.blog&&r.boutique;});
+  if(!rows.length){toast('Format incorrect — séparer blog|boutique par |',false);return;}
+  _blResults=[];
+  document.getElementById('bl-gen-btn').disabled=true;
+  document.getElementById('bl-gen-results').innerHTML='';
+  processBlRow(rows,0);
+}
+function processBlRow(rows,idx){
+  if(idx>=rows.length){blGenDone(rows.length);return;}
+  var r=rows[idx];
+  var linkType=r.type||document.getElementById('bl-type').value||'blog';
+  var wc=blWordCount(linkType);
+  var at=blAnchorType();
+  var nofollow=Math.random()<0.4;
+  document.getElementById('bl-gen-progress').textContent=(idx+1)+'/'+rows.length+' — '+wc+' mots · ancre '+at+(nofollow?' · nofollow':'');
+  apiFetch('/backlinks/generate-comment',{method:'POST',body:JSON.stringify({blog_url:r.blog,boutique_url:r.boutique,word_count:wc,anchor_type:at,link_type:linkType,nofollow})})
+    .then(function(res){return res.json();})
+    .then(function(d){
+      if(d.ok&&d.comment_html){_blResults.push({blog_url:r.blog,boutique_url:r.boutique,word_count:wc,anchor_type:at,comment_html:d.comment_html});}
+      else{_blResults.push({blog_url:r.blog,boutique_url:r.boutique,error:d.error||'?'});}
+      setTimeout(function(){processBlRow(rows,idx+1);},200);
+    })
+    .catch(function(e){
+      _blResults.push({blog_url:r.blog,boutique_url:r.boutique,error:e.message});
+      setTimeout(function(){processBlRow(rows,idx+1);},200);
+    });
+}
+function blGenDone(total){
+  document.getElementById('bl-gen-btn').disabled=false;
+  document.getElementById('bl-gen-progress').textContent='✅ '+total+' commentaires générés';
+  var ok=_blResults.filter(function(r){return r.comment_html;}).length;
+  var json=JSON.stringify(_blResults,null,2);
+  document.getElementById('bl-gen-results').innerHTML=
+    '<div style="font-size:.72rem;color:#166534;margin-bottom:.6rem">'+ok+'/'+total+' réussis</div>'+
+    '<div style="display:flex;gap:.6rem;margin-bottom:.8rem">'+
+    '<button class="btn" onclick="blDownloadJSON()" style="background:#166534;font-size:.72rem">⬇ Télécharger JSON</button>'+
+    '<button class="btn bo" onclick="blCopyJSON()" style="font-size:.72rem">📋 Copier JSON</button>'+
+    '</div>'+
+    '<div style="display:flex;flex-direction:column;gap:.5rem">'+
+    _blResults.slice(0,5).map(function(r){
+      return '<div style="padding:.5rem .7rem;background:#f8f7f5;border-radius:4px;font-size:.68rem">'+
+        '<div style="color:#888;margin-bottom:.2rem">'+r.blog_url+'</div>'+
+        (r.comment_html?'<div style="color:#166534">✅ '+r.word_count+'m · '+r.anchor_type+'</div>':'<div style="color:#ef4444">❌ '+r.error+'</div>')+
+        '</div>';
+    }).join('')+
+    (total>5?'<div style="font-size:.68rem;color:#aaa;padding:.3rem">'+(total-5)+' autres...</div>':'')+
+    '</div>';
+}
+function blDownloadJSON(){
+  var b=new Blob([JSON.stringify(_blResults,null,2)],{type:'application/json'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='commentaires-backlinks.json';a.click();
+}
+function blCopyJSON(){
+  navigator.clipboard.writeText(JSON.stringify(_blResults,null,2)).then(function(){toast('JSON copié ✓',true);});
+}
+function loadBL(){
+  if(!SLUG)return;
+  apiFetch('/backlinks?slug='+SLUG).then(function(r){return r.json();}).then(function(d){
+    var links=d.links||[];
+    var el=document.getElementById('bl-list');if(!el)return;
+    if(!links.length){el.innerHTML='<div style="color:#aaa;font-size:.8rem">Aucun backlink enregistré</div>';return;}
+    var statCol={pending:'#92400e',active:'#166534',rejected:'#991b1b',requested:'#1d4ed8'};
+    var typeCol={blog:'#7c3aed',forum:'#0891b2',profile:'#d97706',guestbook:'#059669'};
+    el.innerHTML='<div style="font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:.6rem">'+links.length+' BACKLINKS</div>'+
+      '<div style="display:flex;flex-direction:column;gap:.4rem">'+links.map(function(l){
+        var tc=typeCol[l.link_type]||'#888';
+        var dr_ok=!l.dr||l.dr>=25;var tf_ok=!l.tf||l.tf>=15;var obl_ok=!l.obl||l.obl<50;
+        var qual=(dr_ok&&tf_ok&&obl_ok)?'✓':'⚠';
+        return '<div style="display:flex;align-items:center;gap:.5rem;padding:.5rem .7rem;background:#f8f7f5;border-radius:4px;flex-wrap:wrap">'+
+          '<span style="font-size:.6rem;font-weight:700;padding:.1rem .4rem;border-radius:8px;background:'+statCol[l.status]+';color:#fff">'+l.status.toUpperCase()+'</span>'+
+          (l.link_type?'<span style="font-size:.6rem;padding:.1rem .4rem;border-radius:8px;background:'+tc+';color:#fff">'+l.link_type+'</span>':'')+
+          (l.follow_type?'<span style="font-size:.6rem;padding:.1rem .4rem;border-radius:8px;background:#e8e4df;color:#555">'+l.follow_type+'</span>':'')+
+          (l.dr?'<span style="font-size:.6rem;color:'+(dr_ok?'#166534':'#ef4444')+'" title="DR/TF/OBL">'+qual+' DR'+l.dr+(l.tf?'/TF'+l.tf:'')+(l.obl?'/OBL'+l.obl:'')+'</span>':'')+
+          '<span style="flex:1;font-size:.73rem;color:#333;min-width:0"><b>'+l.domain+'</b> <span style="color:#888">→</span> '+l.target+'</span>'+
+          '<span style="font-size:.68rem;color:#666;font-style:italic;white-space:nowrap">'+l.anchor+'</span>'+
+          '<select onchange="updateBLStatus(\''+l.id+'\',this.value)" style="font-size:.68rem;padding:.1rem .3rem;border:1px solid #ddd;border-radius:3px">'+
+            ['pending','requested','active','rejected'].map(function(s){return '<option '+(s===l.status?'selected':'')+'>'+s+'</option>';}).join('')+
+          '</select>'+
+          '<button onclick="delBL(\''+l.id+'\')" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:.8rem">✕</button>'+
+          '</div>';
+      }).join('')+'</div>';
+  }).catch(function(){});
+}
+function addBacklink(){
+  var dom=document.getElementById('bl-domain').value.trim();
+  var url=document.getElementById('bl-url').value.trim();
+  var anc=document.getElementById('bl-anchor').value.trim();
+  var tgt=document.getElementById('bl-target').value.trim();
+  var ltype=document.getElementById('bl-type').value;
+  var ftype=document.getElementById('bl-follow').value;
+  var dr=parseInt(document.getElementById('bl-dr').value)||0;
+  var tf=parseInt(document.getElementById('bl-tf').value)||0;
+  var obl=parseInt(document.getElementById('bl-obl').value)||0;
+  if(!dom||!anc){toast('Domaine et ancre requis',false);return;}
+  apiFetch('/backlinks',{method:'POST',body:JSON.stringify({slug:SLUG,domain:dom,url,anchor:anc,target:tgt||'/',link_type:ltype,follow_type:ftype,dr,tf,obl})}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){loadBL();loadBLDash();}else toast('Erreur: '+(d.error||'?'),false);
+  });
+}
+function updateBLStatus(id,status){
+  apiFetch('/backlinks/update',{method:'POST',body:JSON.stringify({slug:SLUG,id,status})}).then(function(r){return r.json();}).then(function(d){if(d.ok)loadBL();});
+}
+function delBL(id){
+  apiFetch('/backlinks/update',{method:'POST',body:JSON.stringify({slug:SLUG,id,deleted:true})}).then(function(r){return r.json();}).then(function(d){if(d.ok)loadBL();});
+}
+function pingGoogleBL(){
+  apiFetch('/backlinks/ping',{method:'POST',body:JSON.stringify({slug:SLUG})}).then(function(r){return r.json();}).then(function(d){toast(d.ok?'Ping envoyé ✓ (google:'+d.google+', bing:'+d.bing+')':'Erreur: '+(d.error||'?'),d.ok);});
+}
+
+/* ── OPÉRATION ────────────────────────────────────────────── */
+function renderOperation(){
+  set('<div class="hd"><h1>⚡ Opération</h1><span class="slug-tag">'+SLUG+'</span></div>'+
+    '<div id="op-nav" style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1.6rem;padding-bottom:.9rem;border-bottom:2px solid #e8e4df">'+
+    ['1 · Préparation','2 · Contenu 14pts','3 · Domaine','4 · Sous-domaines','5 · ✦ LIVE'].map(function(l,i){
+      return '<button class="op-tb'+(i===0?' act':'')+'" onclick="goOp('+(i+1)+',this)">'+l+'</button>';
+    }).join('')+'</div><div id="op-body"><span class="spin"></span> Chargement…</div>');
+  apiFetch('/operation/config?slug='+SLUG).then(function(r){return r.json();}).then(function(d){
+    OP_CFG=d.config||{};_selTpl=OP_CFG.tpl||1;
+    goOp(1,document.querySelector('#op-nav .op-tb'));
+  }).catch(function(){goOp(1,document.querySelector('#op-nav .op-tb'));});
+}
+function goOp(n,btn){
+  document.querySelectorAll('#op-nav .op-tb').forEach(function(b){b.classList.remove('act');});
+  if(btn)btn.classList.add('act');
+  var b=document.getElementById('op-body');
+  if(n===1)opPrep(b);else if(n===2)opContent(b);else if(n===3)opDomain(b);else if(n===4)opSubs(b);else opLive(b);
+}
+function opPrep(b){
+  var fUrl=OP_CFG.domain?'https://'+OP_CFG.domain+'/':'https://v35-site-server.ernestpedanou.workers.dev/'+SLUG+'/';
+  var tpls=[['T1 — Luxury','linear-gradient(135deg,#b45309,#78350f)','Serif doré · éditorial'],
+    ['T2 — Warm','linear-gradient(135deg,#d97706,#92400e)','Beige cosy · artisanal'],
+    ['T3 — Modern','linear-gradient(135deg,#333,#555)','Sans-serif · épuré'],
+    ['T4 — Artisanal','linear-gradient(135deg,#db2777,#9d174d)','Organique · doux'],
+    ['T5 — Boutique','linear-gradient(135deg,#be185d,#831843)','Classique · luxe FR']];
+  b.innerHTML='<div class="card"><div class="card-hd">🎨 Template — 5 squelettes</div>'+
+    '<p style="font-size:.77rem;color:#888;margin-bottom:.9rem">Le worker sélectionne selon la niche. Forcez un template ci-dessous :</p>'+
+    '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:.6rem;margin-bottom:1.2rem">'+
+    tpls.map(function(t,i){return '<div class="op-tcard'+((i+1===_selTpl)?' sel':'')+'" onclick="selTpl('+(i+1)+',this)">'+
+      '<div style="height:44px;border-radius:4px;background:'+t[1]+';margin-bottom:.4rem"></div>'+
+      '<p style="font-size:.68rem;font-weight:700">'+t[0]+'</p>'+
+      '<p style="font-size:.6rem;color:#888;margin-top:.12rem">'+t[2]+'</p></div>';}).join('')+
+    '</div>'+
+    '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:4px;padding:.65rem .9rem;font-size:.77rem;color:#166534;margin-bottom:1.1rem">'+
+    '✓ Squelette de référence injecté : <strong>Auranova</strong> (joaillerie fine, T1)</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1rem">'+
+    '<div class="op-field"><label>Domaine custom</label><input id="op-dom" placeholder="auranova.fr" value="'+(OP_CFG.domain||'')+'"></div>'+
+    '<div class="op-field"><label>Niche</label><input id="op-niche" placeholder="Jewellery" value="'+(OP_CFG.niche||'')+'"></div>'+
+    '</div>'+
+    '<div style="display:flex;gap:.7rem;align-items:center;flex-wrap:wrap;margin-bottom:1.1rem">'+
+    '<button class="sb-btn" style="width:auto;padding:.52rem 1.2rem" onclick="saveOpCfg()">💾 Sauvegarder</button>'+
+    '<a href="'+fUrl+'" target="_blank" style="display:inline-flex;align-items:center;gap:.35rem;padding:.52rem 1.2rem;background:#111;color:#fff;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;font-weight:700;border-radius:2px;text-decoration:none">🔗 Voir le site préparé</a>'+
+    '</div>'+
+    '<div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:4px;padding:.75rem .95rem;font-size:.8rem">'+
+    '⚡ Lien direct : <a href="'+fUrl+'" target="_blank" style="color:#92400e;font-weight:700">'+fUrl+'</a></div></div>';
+}
+function selTpl(n,el){
+  _selTpl=n;
+  document.querySelectorAll('.op-tcard').forEach(function(c){c.classList.remove('sel');});
+  if(el)el.classList.add('sel');
+}
+function saveOpCfg(){
+  OP_CFG.tpl=_selTpl;
+  OP_CFG.domain=(document.getElementById('op-dom')||{}).value||OP_CFG.domain||'';
+  OP_CFG.niche=(document.getElementById('op-niche')||{}).value||OP_CFG.niche||'';
+  apiFetch('/operation/config',{method:'POST',body:JSON.stringify({slug:SLUG,config:OP_CFG})})
+  .then(function(r){return r.json();}).then(function(d){toast(d.ok?'Config sauvée ✓':'Erreur',d.ok);});
+}
+function opContent(b){
+  b.innerHTML='<span class="spin"></span>';
+  var flds=[['brand','Nom de marque'],['tagline','Slogan principal'],['heroTitle','Titre hero'],['heroSub','Sous-titre hero'],
+    ['colNames','Noms des collections (séparés par |)'],['colIntro','Intro collection (court)'],['colLong','Description longue collection'],
+    ['bullets','Points forts — 4 lignes'],['blogTitles','Titres de blog — 1 par ligne'],['faq','FAQ — Q|R par ligne'],
+    ['about','Texte À propos'],['newsletter','CTA newsletter'],['trust','Badges de confiance'],['footer','Description footer']];
+  apiFetch('/operation/content?slug='+SLUG).then(function(r){return r.json();}).then(function(d){
+    var c=d.content||{};
+    var big=['colLong','bullets','blogTitles','faq','about','newsletter','trust','footer'];
+    b.innerHTML='<div class="card"><div class="card-hd">📝 14 points de contenu — issu de votre fichier de traduction</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.7rem">'+
+      flds.map(function(f){return '<div class="op-field"><label>'+f[1]+'</label>'+
+        (big.indexOf(f[0])>=0?'<textarea id="opc-'+f[0]+'">'+(c[f[0]]||'')+'</textarea>':
+         '<input id="opc-'+f[0]+'" value="'+(c[f[0]]||'')+'">') +
+        '</div>';}).join('')+
+      '</div>'+
+      '<div style="display:flex;gap:.7rem;margin-top:1rem">'+
+      '<button class="sb-btn" style="width:auto;padding:.52rem 1.2rem" onclick="saveOpContent()">💾 Sauvegarder</button>'+
+      '<button class="btn bs" style="padding:.52rem 1.2rem" onclick="injectContent()">⚡ Régénérer avec ce contenu</button>'+
+      '</div></div>';
+  }).catch(function(){b.innerHTML='<p style="color:red">Erreur</p>';});
+}
+function saveOpContent(){
+  var keys=['brand','tagline','heroTitle','heroSub','colNames','colIntro','colLong','bullets','blogTitles','faq','about','newsletter','trust','footer'];
+  var cnt={};
+  keys.forEach(function(k){var el=document.getElementById('opc-'+k);if(el)cnt[k]=el.tagName==='TEXTAREA'?el.value:el.value;});
+  apiFetch('/operation/content',{method:'POST',body:JSON.stringify({slug:SLUG,content:cnt})})
+  .then(function(r){return r.json();}).then(function(d){toast(d.ok?'Contenu sauvé ✓':'Erreur',d.ok);});
+}
+function injectContent(){
+  toast('Régénération en cours…');
+  apiFetch('/operation/inject',{method:'POST',body:JSON.stringify({slug:SLUG})})
+  .then(function(r){return r.json();}).then(function(d){toast(d.ok?'✓ Site régénéré ('+d.pages+' pages)':'Erreur: '+d.error,d.ok);});
+}
+function opDomain(b){
+  b.innerHTML='<span class="spin"></span>';
+  apiFetch('/operation/domain-suggest?niche='+encodeURIComponent(OP_CFG.niche||'Jewellery')).then(function(r){return r.json();}).then(function(d){
+    var regs=[{n:'Cloudflare',u:'https://www.cloudflare.com/products/registrar/',p:'~8$/an',note:'Prix coûtant · no markup',best:true},
+      {n:'OVH',u:'https://www.ovhcloud.com/fr/domains/',p:'~7€/an',note:'Français · fiable'},
+      {n:'Ionos',u:'https://www.ionos.fr/domaines/',p:'1€ 1ère ann.',note:'Promo bienvenue'},
+      {n:'Namecheap',u:'https://www.namecheap.com/',p:'~9$/an',note:'Simple & rapide'},
+      {n:'Gandi',u:'https://www.gandi.net/fr/domain',p:'~15€/an',note:'Support FR premium'}];
+    b.innerHTML='<div class="card"><div class="card-hd">🌐 Domaine — niche : '+(OP_CFG.niche||'?')+'</div>'+
+      '<p style="font-size:.77rem;color:#888;margin-bottom:.8rem">Cliquez un nom pour le sélectionner :</p>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:.4rem;margin-bottom:1.3rem">'+
+      (d.suggestions||[]).map(function(s){return '<span style="padding:.3rem .75rem;background:#fef3c7;border:1px solid #f59e0b;border-radius:14px;font-size:.77rem;cursor:pointer;font-weight:600" onclick="document.getElementById(\'op-dom2\').value=\''+s+'\'">'+s+'</span>';}).join('')+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1rem">'+
+      '<div class="op-field"><label>Domaine acheté</label><input id="op-dom2" value="'+(OP_CFG.domain||'')+'" placeholder="ex: auranova.fr"></div>'+
+      '<div class="op-field"><label>Zone ID Cloudflare</label><input id="op-zone" value="'+(OP_CFG.zone_id||'')+'" placeholder="CF Dashboard → Aperçu"></div>'+
+      '</div>'+
+      '<button class="sb-btn" style="width:auto;padding:.52rem 1.2rem;margin-bottom:1.6rem" onclick="saveDomain()">💾 Sauvegarder le domaine</button>'+
+      '<div class="card-hd" style="margin-bottom:.8rem">🏪 Registrars recommandés</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(165px,1fr));gap:.55rem">'+
+      regs.map(function(r){return '<div class="'+(r.best?'reg-best':'reg-card')+'">'+
+        (r.best?'<span style="font-size:.62rem;font-weight:700;color:#b45309">★ Recommandé</span><br>':'')+
+        '<strong>'+r.n+'</strong><br><span style="font-size:.76rem;color:#16a34a;font-weight:700">'+r.p+'</span><br>'+
+        '<span style="font-size:.7rem;color:#888">'+r.note+'</span><br>'+
+        '<a href="'+r.u+'" target="_blank" style="font-size:.7rem;color:#2563eb">Acheter →</a></div>';}).join('')+
+      '</div></div>';
+  }).catch(function(){b.innerHTML='<p style="color:red">Erreur</p>';});
+}
+function saveDomain(){
+  OP_CFG.domain=(document.getElementById('op-dom2')||{}).value||'';
+  OP_CFG.zone_id=(document.getElementById('op-zone')||{}).value||'';
+  apiFetch('/operation/config',{method:'POST',body:JSON.stringify({slug:SLUG,config:OP_CFG})})
+  .then(function(r){return r.json();}).then(function(d){toast(d.ok?'Domaine sauvé ✓':'Erreur',d.ok);});
+}
+function opSubs(b){
+  var subs=OP_CFG.subdomains||{};
+  b.innerHTML='<div class="card"><div class="card-hd">🗺 20 sous-domaines · IPs distinctes via Cloudflare anycast</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1rem">'+
+    '<div class="op-field"><label>Domaine principal</label><input id="op-sub-dom" value="'+(OP_CFG.domain||'')+'" placeholder="auranova.fr"></div>'+
+    '<div class="op-field"><label>Zone ID Cloudflare</label><input id="op-sub-zone" value="'+(OP_CFG.zone_id||'')+'" placeholder="Zone ID"></div>'+
+    '</div>'+
+    '<p style="font-size:.76rem;color:#888;margin-bottom:.7rem">Sélectionnez les langues à déployer :</p>'+
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.3rem;margin-bottom:1rem">'+
+    LANGS.map(function(l){var s=subs[l[0]]||{};return '<label class="lang-item">'+
+      '<input type="checkbox" id="lc-'+l[0]+'" '+(s.dns||s.deployed||l[0]==='fr'||l[0]==='en'?'checked':'')+'>'+
+      '<span style="flex:1;font-size:.71rem">'+l[0].toUpperCase()+' · '+l[1]+'</span>'+
+      (s.dns?'<span class="badge-ok">DNS</span>':'')+
+      (s.deployed?'<span class="badge-live">Live</span>':'')+
+      '</label>';}).join('')+
+    '</div>'+
+    '<div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:4px;padding:.65rem .9rem;font-size:.75rem;color:#0369a1;margin-bottom:1rem">'+
+    'ℹ Chaque sous-domaine (de.auranova.fr, en.auranova.fr…) obtient une IP Cloudflare distincte. Le Worker v35-site-server route par hostname.</div>'+
+    '<div style="display:flex;gap:.65rem;flex-wrap:wrap">'+
+    '<button class="sb-btn" style="width:auto;padding:.52rem 1.3rem" onclick="opCreateDNS()">🌐 1. Créer DNS Cloudflare</button>'+
+    '<button class="btn bs" style="padding:.52rem 1.3rem" onclick="opDeployLangs()">⚡ 2. Déployer toutes les langues</button>'+
+    '</div><div id="sub-prog" style="margin-top:.9rem"></div></div>';
+}
+function getSelLangs(){return LANGS.filter(function(l){var cb=document.getElementById('lc-'+l[0]);return cb&&cb.checked;}).map(function(l){return l[0];});}
+function opCreateDNS(){
+  var domain=(document.getElementById('op-sub-dom')||{}).value||OP_CFG.domain;
+  var zone=(document.getElementById('op-sub-zone')||{}).value||OP_CFG.zone_id;
+  OP_CFG.domain=domain;OP_CFG.zone_id=zone;
+  if(!zone||!domain){toast('Zone ID et domaine requis',false);return;}
+  var langs=getSelLangs();
+  var prog=document.getElementById('sub-prog');
+  prog.innerHTML='<p style="font-size:.77rem;color:#888;margin-bottom:.4rem">Création CNAME pour '+langs.length+' langues…</p>';
+  var p=Promise.resolve();
+  langs.forEach(function(lang){p=p.then(function(){
+    return apiFetch('/operation/subdomain',{method:'POST',body:JSON.stringify({slug:SLUG,domain:domain,zone_id:zone,lang:lang})}).then(function(r){return r.json();}).then(function(d){
+      if(!OP_CFG.subdomains)OP_CFG.subdomains={};if(!OP_CFG.subdomains[lang])OP_CFG.subdomains[lang]={};
+      OP_CFG.subdomains[lang].dns=d.ok?'ok':'err';
+      prog.innerHTML+='<div style="font-size:.74rem;padding:.15rem 0;color:'+(d.ok?'#166534':'#991b1b')+'">'+(d.ok?'✓':'✗')+' '+(lang==='fr'?'www.'+domain:lang+'.'+domain)+' → '+(d.ok?'CNAME créé':d.error)+'</div>';
+    });
+  });});
+  p.then(function(){saveOpCfg();toast('DNS créés ✓');});
+}
+function opDeployLangs(){
+  var domain=(document.getElementById('op-sub-dom')||{}).value||OP_CFG.domain;
+  var langs=getSelLangs();
+  var prog=document.getElementById('sub-prog');
+  if(!OP_CFG.blueprint){
+    toast('Chargement blueprint…');
+    apiFetch('/operation/blueprint?slug='+SLUG).then(function(r){return r.json();}).then(function(d){
+      if(!d.blueprint){toast('Blueprint introuvable — régénérez le site d\'abord',false);return;}
+      OP_CFG.blueprint=d.blueprint;_doDeployLangs(langs,domain,prog);
+    });return;}
+  _doDeployLangs(langs,domain,prog);
+}
+function _doDeployLangs(langs,domain,prog){
+  prog.innerHTML='<p style="font-size:.77rem;color:#888;margin-bottom:.4rem">Déploiement '+langs.length+' langues…</p>';
+  var p=Promise.resolve();
+  langs.forEach(function(lang){p=p.then(function(){
+    var dd=lang==='fr'?domain:lang+'.'+domain;
+    var dl=lang==='en'?'en':'fr';
+    return apiFetch('/operation/lang-deploy',{method:'POST',body:JSON.stringify({slug:SLUG,lang:dl,langCode:lang,domain:dd,niche:OP_CFG.niche||'Mode Femme',blueprint:OP_CFG.blueprint})}).then(function(r){return r.json();}).then(function(d){
+      if(!OP_CFG.subdomains)OP_CFG.subdomains={};if(!OP_CFG.subdomains[lang])OP_CFG.subdomains[lang]={};
+      OP_CFG.subdomains[lang].deployed=d.ok?'ok':'err';
+      prog.innerHTML+='<div style="font-size:.74rem;padding:.15rem 0;color:'+(d.ok?'#166534':'#991b1b')+'">'+(d.ok?'✓':'✗')+' '+lang+' → '+(d.ok?d.pages+' pages · '+dd:'Err: '+d.error)+'</div>';
+    });
+  });});
+  p.then(function(){saveOpCfg();toast('Déploiement terminé ✓');});
+}
+function opLive(b){
+  var subs=OP_CFG.subdomains||{};var domain=OP_CFG.domain||'';
+  var testUrl='https://v35-site-server.ernestpedanou.workers.dev/'+SLUG+'/';
+  _opUrls=[testUrl];
+  function uRow(u,label,ok){return '<div style="display:flex;align-items:center;gap:.65rem;padding:.48rem .8rem;background:#fff;border:1px solid '+(ok?'#bbf7d0':ok===false?'#e8e4df':'#fde68a')+';border-radius:4px;font-size:.77rem">'+
+    '<span style="width:16px;height:16px;border-radius:50%;background:'+(ok?'#16a34a':ok===false?'#d1d5db':'#f59e0b')+';color:#fff;font-size:.6rem;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">'+(ok?'✓':ok===false?'○':'~')+'</span>'+
+    '<a href="'+u+'" target="_blank" style="color:#b45309;flex:1;word-break:break-all">'+u+'</a>'+
+    '<span style="font-size:.64rem;color:#888;white-space:nowrap">'+label+'</span></div>';}
+  var rows=uRow(testUrl,'Workers.dev test',true);
+  if(domain){var mu='https://'+domain+'/';_opUrls.push(mu);rows+=uRow(mu,'Principal · FR',!!(subs.fr&&subs.fr.deployed));
+    LANGS.forEach(function(l){var code=l[0];if(code==='fr')return;var s=subs[code]||{};if(s.dns||s.deployed){var u='https://'+code+'.'+domain+'/';_opUrls.push(u);rows+=uRow(u,code.toUpperCase()+' · '+l[1],s.deployed?true:s.dns?null:false);}});}
+  var chk=[[!!OP_CFG.tpl,'Template sélectionné'],[!!domain,'Domaine configuré'],[!!OP_CFG.zone_id,'Zone Cloudflare renseignée'],[Object.keys(subs).length>0,'DNS créés'],[Object.values(subs).some(function(s){return s.deployed;}),'Langues déployées']];
+  var allOk=chk.every(function(c){return c[0];});
+  b.innerHTML='<div class="card"><div class="card-hd">✦ Go LIVE — Checklist</div>'+
+    '<div style="display:grid;gap:.35rem;margin-bottom:1.3rem">'+
+    chk.map(function(c){return '<div style="display:flex;align-items:center;gap:.65rem;padding:.42rem .7rem;border:1px solid #e8e4df;border-radius:3px;font-size:.8rem">'+
+      '<span style="width:17px;height:17px;border-radius:50%;background:'+(c[0]?'#16a34a':'#e5e7eb')+';color:#fff;display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;flex-shrink:0">'+(c[0]?'✓':'○')+'</span>'+c[1]+'</div>';}).join('')+
+    '</div>'+
+    '<div class="card-hd" style="margin-bottom:.65rem">🔗 Tous les URLs</div>'+
+    '<div style="display:grid;gap:.3rem;margin-bottom:1.2rem">'+rows+'</div>'+
+    '<button class="sb-btn" style="width:auto;padding:.58rem 1.8rem" onclick="copyAllOpUrls()">📋 Copier tous les liens</button>'+
+    (allOk?'<div style="background:#dcfce7;border:1px solid #86efac;border-radius:4px;padding:.9rem 1rem;margin-top:1rem;font-size:.82rem;color:#166534;text-align:center;font-weight:600">✦ Tous les systèmes OK — site EN LIVE ✦</div>':
+     '<div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:4px;padding:.75rem .9rem;margin-top:1rem;font-size:.77rem;color:#92400e">⚠ Complétez les étapes précédentes.</div>')+
+    '</div>';
+}
+function copyAllOpUrls(){navigator.clipboard.writeText(_opUrls.join('\n')).then(function(){toast('Liens copiés ✓');});}
+
 function set(html){document.getElementById('main').innerHTML=html;}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 </script></body></html>`;
@@ -587,6 +1128,17 @@ export default{
         headers:{'Content-Type':'application/json','Content-Disposition':'attachment; filename="'+sl+'-export.json"',...CORS}
       });
     }
+
+    // GET operation endpoints (before POST guard)
+    if(request.method==='GET'&&path==='/operation/config'){const sl=url.searchParams.get('slug');if(!sl)return err('slug required');const obj=await env.R2.get('op/cfg-'+sl+'.json').catch(()=>null);const cfg=obj?JSON.parse(await new Response(obj.body).text()):null;return ok({config:cfg||{}});}
+    if(request.method==='GET'&&path==='/operation/content'){const sl=url.searchParams.get('slug');if(!sl)return err('slug required');const obj=await env.R2.get('op/content-'+sl+'.json').catch(()=>null);const c=obj?JSON.parse(await new Response(obj.body).text()):null;return ok({content:c||{}});}
+    if(request.method==='GET'&&path==='/operation/domain-suggest'){const niche=url.searchParams.get('niche')||'';const sg={'Jewellery':['bijoupure.fr','orfevra.fr','eclat-bijoux.fr','dorure-fine.fr','cristale.fr'],'Bijoux':['bijoushine.fr','auroria.fr','lapure.fr','diamantine.fr','parure-fine.fr'],'Luminaires':['luminova.fr','lux-deco.fr','eclairia.fr','luminia.fr','lighterra.fr'],'Décoration':['maison-arte.fr','decostore.fr','homestyle.fr','belle-maison.fr','decoria.fr'],'Mode Femme':['modelia.fr','femmestyle.fr','tendance-mode.fr','ellefashion.fr','ellegance.fr'],'Mode Homme':['monsieur-mode.fr','manstore.fr','styleman.fr','hommechic.fr','gentstore.fr'],'Beauté':['beautystore.fr','glowshop.fr','cosmetica.fr','mabeaute.fr','beautylab.fr'],'Bien-être':['zenstore.fr','natureza.fr','serenia.fr','zenlab.fr','bienetre.fr'],'Sport':['sportzone.fr','fitshop.fr','activa.fr','fitgear.fr','sportlab.fr'],'Maroquinerie':['sacmode.fr','cuiromania.fr','leatherco.fr','maroquin.fr','sacpremium.fr'],'High-Tech':['techstore.fr','gadgetzone.fr','hitech.fr','techshop.fr','gadgetlab.fr'],'Animaux':['animalstore.fr','petshopfr.fr','monpet.fr','animalia.fr','petzone.fr']};return ok({niche,suggestions:sg[niche]||['topshop.fr','boutique-premium.fr','monstore.fr','eshop-france.fr']});}
+    // GET /orchestrator/* — proxy vers v35-orchestrator
+    if(request.method==='GET'&&path==='/orchestrator/runs'){const orRes=await env.ORCHESTRATOR.fetch(new Request('https://orchestrator/runs',{headers:{'Authorization':'Bearer '+(env.API_TOKEN||'dde0d1b0dfdc9546c0e3464e9939fa4c0fc138e8d5f43df3')}}));const orD=await orRes.json().catch(()=>({runs:[]}));return ok(orD);}
+    if(request.method==='GET'&&path.startsWith('/orchestrator/run/')){const runId=path.slice('/orchestrator/run/'.length);const orRes=await env.ORCHESTRATOR.fetch(new Request('https://orchestrator/run/'+runId,{headers:{'Authorization':'Bearer '+(env.API_TOKEN||'dde0d1b0dfdc9546c0e3464e9939fa4c0fc138e8d5f43df3')}}));const orD=await orRes.json().catch(()=>({}));return ok(orD);}
+    // GET /backlinks
+    if(request.method==='GET'&&path==='/backlinks'){const sl=url.searchParams.get('slug');if(!sl)return err('slug requis');const o=await env.R2.get('backlinks/'+sl+'/links.json').catch(()=>null);const links=o?JSON.parse(await new Response(o.body).text()):[];return ok({links});}
+    if(request.method==='GET'&&path==='/operation/blueprint'){const sl=url.searchParams.get('slug');if(!sl)return err('slug required');const obj=await env.R2.get('op/blueprint-'+sl+'.json').catch(()=>null);const bp=obj?JSON.parse(await new Response(obj.body).text()):null;return ok({blueprint:bp});}
 
     if(request.method!=='POST')return err('Method not allowed',405);
     let body={};try{body=await request.json();}catch{return err('Invalid JSON');}
@@ -720,6 +1272,186 @@ export default{
       const idx=idxRaw?JSON.parse(idxRaw):[];
       await env.KV.put('promo:index:'+slug,JSON.stringify(idx.filter(x=>x!==c)),{expirationTtl:86400*365}).catch(()=>{});
       return ok({slug,code:c,deleted:true});
+    }
+
+    // ── OPERATION POST endpoints ──────────────────────────────────────────────
+    if(path==='/operation/config'){
+      const{slug,config}=body;if(!slug)return err('slug required');
+      await env.R2.put('op/cfg-'+slug+'.json',JSON.stringify(config),{httpMetadata:{contentType:'application/json'}}).catch(()=>{});
+      return ok({slug,saved:true});
+    }
+    if(path==='/operation/content'){
+      const{slug,content}=body;if(!slug)return err('slug required');
+      await env.R2.put('op/content-'+slug+'.json',JSON.stringify(content),{httpMetadata:{contentType:'application/json'}}).catch(()=>{});
+      return ok({slug,saved:true});
+    }
+    if(path==='/operation/subdomain'){
+      const{slug,domain,zone_id,lang}=body;
+      if(!zone_id||!domain||!lang)return err('zone_id, domain, lang required');
+      const cfToken=env.CF_TOKEN;
+      const name=lang==='fr'?'www':lang;
+      const subdomain=(lang==='fr'?'www.':lang+'.')+domain;
+      const cfRes=await fetch('https://api.cloudflare.com/client/v4/zones/'+zone_id+'/dns_records',{
+        method:'POST',headers:{'Authorization':'Bearer '+cfToken,'Content-Type':'application/json'},
+        body:JSON.stringify({type:'CNAME',name,content:'v35-site-server.ernestpedanou.workers.dev',proxied:true,ttl:1})
+      });
+      const cfData=await cfRes.json().catch(()=>({success:false,errors:[{message:'Parse error'}]}));
+      if(!cfData.success&&!(cfData.errors||[]).some(e=>e.code===81053))return err((cfData.errors||[{message:'CF API error'}])[0].message);
+      // Also try to create Worker Route
+      await fetch('https://api.cloudflare.com/client/v4/zones/'+zone_id+'/workers/routes',{
+        method:'POST',headers:{'Authorization':'Bearer '+cfToken,'Content-Type':'application/json'},
+        body:JSON.stringify({pattern:subdomain+'/*',script:'v35-site-server'})
+      }).catch(()=>{});
+      const targetSlug=lang==='fr'?slug:slug+'-'+lang;
+      await env.KV.put('site:hostname:'+subdomain,targetSlug,{expirationTtl:86400*365*5}).catch(()=>{});
+      return ok({subdomain,slug:targetSlug,dns:'created'});
+    }
+    if(path==='/operation/lang-deploy'){
+      const{slug,lang,langCode,domain,niche,blueprint}=body;
+      if(!blueprint||!domain||!niche)return err('blueprint, domain, niche required');
+      const factRes=await fetch('https://v35-site-factory.ernestpedanou.workers.dev/',{
+        method:'POST',headers:{'Content-Type':'application/json','X-API-Token':env.API_TOKEN||'dde0d1b0dfdc9546c0e3464e9939fa4c0fc138e8d5f43df3'},
+        body:JSON.stringify({domain,niche,lang:lang||'fr',blueprint})
+      });
+      const fData=await factRes.json().catch(()=>({success:false,error:'Parse error'}));
+      if(!fData.success)return err(fData.error||'Factory error');
+      await env.KV.put('site:hostname:'+domain,fData.slug,{expirationTtl:86400*365*5}).catch(()=>{});
+      return ok({slug:fData.slug,pages:fData.pages,lang,domain});
+    }
+    if(path==='/operation/inject'){
+      const{slug}=body;
+      const[cObj,cfgObj,bpObj]=await Promise.all([
+        env.R2.get('op/content-'+slug+'.json').catch(()=>null),
+        env.R2.get('op/cfg-'+slug+'.json').catch(()=>null),
+        env.R2.get('op/blueprint-'+slug+'.json').catch(()=>null),
+      ]);
+      const content=cObj?JSON.parse(await new Response(cObj.body).text()):{};
+      const cfg=cfgObj?JSON.parse(await new Response(cfgObj.body).text()):{};
+      const bp=bpObj?JSON.parse(await new Response(bpObj.body).text()):null;
+      if(!bp)return err('Blueprint introuvable — régénérez le site d\'abord');
+      if(content.brand)bp.brandOverride=content.brand;
+      if(content.tagline)bp.sloganOverride=content.tagline;
+      bp.contentOverride=content;
+      const factRes=await fetch('https://v35-site-factory.ernestpedanou.workers.dev/',{
+        method:'POST',headers:{'Content-Type':'application/json','X-API-Token':env.API_TOKEN||'dde0d1b0dfdc9546c0e3464e9939fa4c0fc138e8d5f43df3'},
+        body:JSON.stringify({domain:cfg.domain||slug+'.fr',niche:cfg.niche||'Mode Femme',lang:'fr',blueprint:bp})
+      });
+      const fData=await factRes.json().catch(()=>({success:false,error:'Parse error'}));
+      return fData.success?ok({slug,pages:fData.pages,injected:true}):err(fData.error||'Factory error');
+    }
+
+    // POST /orchestrator/run — proxy lancement pipeline
+    if(path==='/orchestrator/run'){
+      const{slug,niche,domain,zone_id}=body;if(!slug)return err('slug requis');
+      const bpObj=await env.R2.get('op/blueprint-'+slug+'.json').catch(()=>null);
+      const bp=bpObj?JSON.parse(await new Response(bpObj.body).text()):null;
+      if(!bp?.allCollections?.length)return err('Blueprint introuvable — régénérez le site d\'abord via Opération');
+      const orRes=await env.ORCHESTRATOR.fetch(new Request('https://orchestrator/run',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(env.API_TOKEN||'dde0d1b0dfdc9546c0e3464e9939fa4c0fc138e8d5f43df3')},body:JSON.stringify({slug,niche:niche||'Mode Femme',domain:domain||slug+'.fr',blueprint:bp,zone_id:zone_id||null})}));
+      const orD=await orRes.json().catch(()=>({error:'Orchestrateur indisponible'}));
+      return ok(orD);
+    }
+    // POST /orchestrator/next — avancer d'une étape
+    if(path==='/orchestrator/next'){
+      const{runId}=body;if(!runId)return err('runId requis');
+      const orRes=await env.ORCHESTRATOR.fetch(new Request('https://orchestrator/run/next',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(env.API_TOKEN||'dde0d1b0dfdc9546c0e3464e9939fa4c0fc138e8d5f43df3')},body:JSON.stringify({runId})}));
+      const orD=await orRes.json().catch(()=>({error:'parse'}));
+      return ok(orD);
+    }
+    // POST /backlinks — ajouter un backlink
+    if(path==='/backlinks'){
+      const{slug,domain,url:burl,anchor,target,link_type,follow_type,dr,tf,obl}=body;if(!slug||!domain||!anchor)return err('slug, domain, anchor requis');
+      const key='backlinks/'+slug+'/links.json';
+      const o=await env.R2.get(key).catch(()=>null);
+      const links=o?JSON.parse(await new Response(o.body).text()):[];
+      links.push({id:Date.now().toString(36),domain,url:burl||'',anchor,target:target||'/',link_type:link_type||'blog',follow_type:follow_type||'dofollow',dr:dr||0,tf:tf||0,obl:obl||0,status:'pending',addedAt:new Date().toISOString().split('T')[0],liveAt:null});
+      await env.R2.put(key,JSON.stringify(links),{httpMetadata:{contentType:'application/json'}});
+      return ok({slug,added:true,total:links.length});
+    }
+    // POST /backlinks/update — changer statut ou supprimer
+    if(path==='/backlinks/update'){
+      const{slug,id,status,deleted}=body;if(!slug||!id)return err('slug + id requis');
+      const key='backlinks/'+slug+'/links.json';
+      const o=await env.R2.get(key).catch(()=>null);
+      let links=o?JSON.parse(await new Response(o.body).text()):[];
+      if(deleted)links=links.filter(l=>l.id!==id);
+      else{const l=links.find(l=>l.id===id);if(l){l.status=status;if(status==='active')l.liveAt=new Date().toISOString().split('T')[0];}}
+      await env.R2.put(key,JSON.stringify(links),{httpMetadata:{contentType:'application/json'}});
+      return ok({slug,updated:true});
+    }
+    // POST /backlinks/generate-comment — génère un commentaire HTML Wix/tiptap via OpenAI
+    if(path==='/backlinks/generate-comment'){
+      const{blog_url,boutique_url,word_count=150,anchor_type='non-optimisée',link_type='blog',nofollow=false}=body;
+      if(!blog_url||!boutique_url)return err('blog_url + boutique_url requis');
+      const OPENAI_KEY=env.OPENAI_KEY||'';
+      if(!OPENAI_KEY)return err('OPENAI_KEY non configurée');
+      // Dériver la homepage de la boutique
+      let homepage=boutique_url;try{homepage=new URL(boutique_url).origin+'/';}catch{}
+      // Choisir ancre selon type
+      const ancreExamples={
+        'non-optimisée':['ici','ce site','en savoir plus','cliquez ici','voir le site','cette page','ce lien'],
+        'semi-optimisée':['boutique en ligne','produits de qualité','voir la collection','découvrir la boutique','shop en ligne'],
+        'optimisée':['ancre-mot-clé exact à inférer de l\'URL de la boutique'],
+      };
+      const toneMap={blog:'éditorial et expert (structure h2/h3, paragraphes développés)',forum:'conversationnel et bref (1-2 paragraphes max, ton naturel)',profile:'très court, présentatif (50 mots max, pas de lien dans le texte sauf si demandé)',guestbook:'court et enthousiaste (2-3 phrases)'};
+      const tone=toneMap[link_type]||toneMap.blog;
+      const prompt=`Tu es un expert SEO combinant les approches de Koray Tuğberk GÜBÜR (topical authority) et Laurent Bourrelly (cocon sémantique).
+
+Ta mission : rédiger un commentaire de type "${link_type}" (ton : ${tone}) de exactement ${word_count} mots (±10 mots tolérance) à poster sur l'article : ${blog_url}
+Le commentaire doit rediriger vers la boutique : ${boutique_url} (et aussi vers la homepage : ${homepage})
+
+RÈGLES STRICTES :
+1. Le lien PRINCIPAL (vers ${boutique_url}) doit apparaître dans les 80 premiers mots
+2. Type d'ancre pour le lien principal : ${anchor_type}
+   - Si "non-optimisée" : utiliser une ancre générique parmi ["ici","ce site","en savoir plus","cliquez ici","voir le site","ce lien"]
+   - Si "semi-optimisée" : ancre partiellement liée au thème de la boutique (2-4 mots)
+   - Si "optimisée" : ancre = mot-clé principal exact lié au thème/niche de la boutique
+3. Le lien SECONDAIRE (vers la homepage ${homepage}) doit avoir une ancre du MÊME type (même règle)
+4. Le contenu apporte des informations expertes méconnues, comme un "article cousin" — informe le lecteur sur le sujet large sans paraphraser l'article cible
+5. Topical authority : maillage thématique cohérent, vocabulaire expert, sous-thèmes connexes
+6. Cocon sémantique : le commentaire agit comme un nœud thématique qui renforce le maillage
+7. Utiliser h1, h2, h3, blockquote, br, li pour aérer — OBLIGATOIRE d'avoir au moins un titre (h2 ou h3)
+8. Ajouter des <br> avant ET après les balises de structure (h2, h3, blockquote, ul)
+
+FORMAT EXACT (ne pas dévier d'un caractère dans les classes/attributs) :
+- Wrapper global : <div contenteditable="true" translate="no" class="tiptap ProseMirror" tabindex="0">
+- Chaque paragraphe : <p class="R-Rzg RAz0K" style=" id="foo" indentation="0" textstyle="[object Object]" dir="auto" data-ricos-id="foo">
+- Texte normal : <span data-hook="foreground-color" style="color: #000000; text-decoration: inherit;"><span class="ricos-selection">TEXTE ICI</span></span>
+- Lien : <a href="URL" rel="${nofollow?'nofollow noreferrer noopener':'noreferrer noopener'}" target="_blank" class="M4jZ2 eSnwX" data-hook="web-link" style="text-decoration:none;"><span data-hook="foreground-color" style="color: #000000; text-decoration: inherit;"><span><span class="ricos-selection">ANCRE ICI</span></span></span></a>
+- Plusieurs paragraphes autorisés (crée autant de <p>...</p> que nécessaire)
+- PAS de retour à la ligne ni indentation dans le code HTML final
+
+OUTPUT : JSON UNIQUEMENT, une seule clé "html" contenant le bloc HTML complet (une ligne, sans \n):
+{"html":"<div contenteditable=...>...</div>"}`;
+
+      const aiRes=await fetch('https://api.openai.com/v1/chat/completions',{
+        method:'POST',
+        headers:{'Content-Type':'application/json','Authorization':'Bearer '+OPENAI_KEY},
+        body:JSON.stringify({model:'gpt-4o-mini',messages:[{role:'user',content:prompt}],max_tokens:2000,temperature:0.85}),
+      });
+      const aiData=await aiRes.json().catch(()=>({}));
+      const raw=(aiData.choices?.[0]?.message?.content||'').trim();
+      // Extraire le JSON
+      let commentHtml='';
+      try{
+        const jsonMatch=raw.match(/\{[\s\S]*"html"\s*:\s*"([\s\S]*?)"\s*\}/);
+        if(jsonMatch)commentHtml=jsonMatch[1].replace(/\\"/g,'"').replace(/\\n/g,'');
+        else{const parsed=JSON.parse(raw);commentHtml=parsed.html||'';}
+      }catch{
+        // Fallback: si OpenAI retourne directement le HTML
+        if(raw.startsWith('<div'))commentHtml=raw;
+      }
+      if(!commentHtml)return err('Génération échouée — réessayer');
+      return ok({comment_html:commentHtml,word_count,anchor_type,blog_url,boutique_url});
+    }
+    // POST /backlinks/ping — ping Google/Bing pour indexation
+    if(path==='/backlinks/ping'){
+      const{slug}=body;if(!slug)return err('slug requis');
+      const cfgObj=await env.R2.get('op/cfg-'+slug+'.json').catch(()=>null);
+      const cfg=cfgObj?JSON.parse(await new Response(cfgObj.body).text()):{};
+      const domain=cfg.domain||slug+'.fr';
+      const sm=encodeURIComponent('https://www.'+domain+'/sitemap.xml');
+      const[g,b]=await Promise.allSettled([fetch('https://www.google.com/ping?sitemap='+sm),fetch('https://www.bing.com/ping?sitemap='+sm)]);
+      return ok({google:g.status==='fulfilled'?g.value.status:'error',bing:b.status==='fulfilled'?b.value.status:'error',sitemap:'https://www.'+domain+'/sitemap.xml'});
     }
 
     return err('Unknown endpoint',404);

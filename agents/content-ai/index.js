@@ -195,16 +195,19 @@ function extractJSON(text) {
 
 // ── PROMPTS (from xlsx — original professional prompts) ────────────────────
 
+// 20 langues EU — fr=principal, 19 sous-domaines
 const LANG_NAMES = {
-  fr:'Français', de:'Allemand', es:'Espagnol', it:'Italien', en:'Anglais',
-  nl:'Néerlandais', pt:'Portugais', pl:'Polonais', ru:'Russe', cs:'Tchèque',
-  hu:'Hongrois', ro:'Roumain', et:'Estonien', lv:'Letton', lt:'Lituanien'
+  fr:'Français', en:'Anglais', de:'Allemand', es:'Espagnol', it:'Italien',
+  nl:'Néerlandais', pt:'Portugais', pl:'Polonais', sv:'Suédois', da:'Danois',
+  fi:'Finnois', no:'Norvégien', cs:'Tchèque', ro:'Roumain', hu:'Hongrois',
+  sk:'Slovaque', sl:'Slovène', hr:'Croate', bg:'Bulgare', el:'Grec',
 };
 
 const COUNTRIES = {
-  fr:'France', de:'Allemagne', es:'Espagne', it:'Italie', en:'Royaume-Uni',
-  nl:'Pays-Bas', pt:'Portugal', pl:'Pologne', ru:'Russie', cs:'République Tchèque',
-  hu:'Hongrie', ro:'Roumanie', et:'Estonie', lv:'Lettonie', lt:'Lituanie'
+  fr:'France', en:'Royaume-Uni', de:'Allemagne', es:'Espagne', it:'Italie',
+  nl:'Pays-Bas', pt:'Portugal', pl:'Pologne', sv:'Suède', da:'Danemark',
+  fi:'Finlande', no:'Norvège', cs:'République Tchèque', ro:'Roumanie', hu:'Hongrie',
+  sk:'Slovaquie', sl:'Slovénie', hr:'Croatie', bg:'Bulgarie', el:'Grèce',
 };
 
 // Prompt 1: SEO Collection Titles (multi-language)
@@ -892,6 +895,56 @@ export default {
         return extractJSON(text);
       }, 86400 * 7);
       return ok({ block: result, type, lang, niche });
+    }
+
+    // ── /api/translate-blueprint ─────────────────────────────────────────────
+    // Traduit un blueprint complet (titres collections + produits) selon schéma xlsx
+    // body: { blueprint:{allCollections:[]}, lang, niche }
+    if (resource === 'translate-blueprint') {
+      const { blueprint={}, lang='en', niche='mode' } = body;
+      if (!blueprint.allCollections?.length) return err('blueprint.allCollections required');
+      const country = COUNTRIES[lang] || lang;
+      const ln = LANG_NAMES[lang] || lang;
+
+      // 1. Titres collections (prompt style xlsx: "Traduis ce titre H1 pour [LANG]")
+      const colTitles = blueprint.allCollections.map(c=>c.title);
+      const colPrompt = `Tu es expert SEO e-commerce multilingue. Traduis ces titres de collections en ${ln} (${country}).
+Règles: naturels dans la langue cible, 2-5 mots, optimisés moteur de recherche local.
+Niche: ${niche}
+Input: ${JSON.stringify(colTitles)}
+Output JSON: {"translations":[{"fr":"titre original","${lang}":"traduction"}]}`;
+      const colText = await rotator.callWithRotation(colPrompt);
+      const colData = extractJSON(colText);
+      const colMap = {};
+      (colData?.translations||[]).forEach(t=>{if(t.fr&&t[lang])colMap[t.fr]=t[lang];});
+
+      // 2. Titres produits (prompt style xlsx: "Traduis cette description produit pour [LANG]")
+      const allProds = blueprint.allCollections.flatMap(c=>(c.products||[]).map(p=>({slug:p.slug,title:p.title,desc:p.desc})));
+      const prodPrompt = `Tu es expert SEO e-commerce multilingue. Traduis ces titres et descriptions produits en ${ln} (${country}).
+Règles: titre 4-7 mots longue-traîne, description 1 phrase percutante. Niche: ${niche}
+Input: ${JSON.stringify(allProds.slice(0,30))}
+Output JSON: {"translations":[{"slug":"slug","title":"titre traduit","desc":"description traduite"}]}`;
+      const prodText = await rotator.callWithRotation(prodPrompt);
+      const prodData = extractJSON(prodText);
+      const prodMap = {};
+      (prodData?.translations||[]).forEach(t=>{if(t.slug)prodMap[t.slug]={title:t.title,desc:t.desc};});
+
+      // 3. Reconstruire blueprint traduit
+      const translated = {
+        ...blueprint,
+        allCollections: blueprint.allCollections.map(col=>({
+          ...col,
+          title: colMap[col.title]||col.title,
+          intro: col.intro,
+          products: (col.products||[]).map(p=>({
+            ...p,
+            title: prodMap[p.slug]?.title||p.title,
+            desc: prodMap[p.slug]?.desc||p.desc,
+          })),
+        })),
+      };
+
+      return ok({blueprint:translated, lang, country, collections_translated:Object.keys(colMap).length, products_translated:Object.keys(prodMap).length});
     }
 
     return err('Not found', 404);
