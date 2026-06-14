@@ -2,34 +2,38 @@ const MIME = {
   '.html': 'text/html;charset=UTF-8',
   '.xml':  'application/xml',
   '.txt':  'text/plain',
+  '.json': 'application/json',
 };
 
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
-    // /{slug}/{...path} or ?site={slug}&path={path}
     const parts = url.pathname.replace(/^\//, '').split('/');
     const sl = parts[0] || url.searchParams.get('site');
     if (!sl) return new Response('Usage: /{slug}/{path}', {status:400});
 
-    const path = '/' + parts.slice(1).join('/');
-    const normalPath = path.endsWith('/') ? path : (path.includes('.') ? path : path+'/');
-    const key = `site:${sl}:${normalPath}`;
+    const normalPath = (() => {
+      const p = '/' + parts.slice(1).join('/');
+      return p.endsWith('/') ? p : (p.includes('.') ? p : p + '/');
+    })();
+
+    const ext = normalPath.includes('.') ? '.' + normalPath.split('.').pop() : '.html';
+    const ct = MIME[ext] || 'text/html;charset=UTF-8';
+    const headers = {'Content-Type': ct, 'Cache-Control': 'public,max-age=3600', 'X-Site': sl};
+
+    // R2 first (works even if KV meta missing due to daily limit)
+    if (env.R2) {
+      const obj = await env.R2.get(`${sl}${normalPath}`);
+      if (obj) return new Response(obj.body, {headers});
+    }
+
+    // KV fallback (legacy shops without R2)
     const meta = await env.KV.get(`site:${sl}:__meta`);
     if (!meta) return new Response(notFound(sl), {status:404, headers:{'Content-Type':'text/html;charset=UTF-8'}});
 
-    const content = await env.KV.get(key);
+    const content = await env.KV.get(`site:${sl}:${normalPath}`);
     if (!content) return new Response(notFound(sl), {status:404, headers:{'Content-Type':'text/html;charset=UTF-8'}});
-
-    const ext = normalPath.includes('.') ? '.'+normalPath.split('.').pop() : '.html';
-    const ct = MIME[ext] || 'text/html;charset=UTF-8';
-    return new Response(content, {
-      headers: {
-        'Content-Type': ct,
-        'Cache-Control': 'public,max-age=3600',
-        'X-Site': sl,
-      }
-    });
+    return new Response(content, {headers});
   }
 };
 

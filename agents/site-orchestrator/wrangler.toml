@@ -1,0 +1,18 @@
+name = "v35-site-orchestrator"
+compatibility_date = "2024-10-01"
+main = "index.js"
+account_id = "fe4415f3f3f3b64f651166d1a7ffe1a0"
+
+[[kv_namespaces]]
+binding = "KV"
+id = "e2eca9fb88584dbca9c59626f28714b6"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "v35-sites"
+
+[vars]
+FACTORY_URL    = "https://v35-site-factory.ernestpedanou.workers.dev"
+CONTENT_AI_URL = "https://v35-content-ai.ernestpedanou.workers.dev"
+ENHANCER_URL   = "https://v35-site-enhancer.ernestpedanou.workers.dev"
+SERVER_URL     = "https://v35-site-server.ernestpedanou.workers.dev"

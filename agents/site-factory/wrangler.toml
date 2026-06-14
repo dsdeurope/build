@@ -6,3 +6,7 @@ account_id = "fe4415f3f3f3b64f651166d1a7ffe1a0"
 [[kv_namespaces]]
 binding = "KV"
 id = "e2eca9fb88584dbca9c59626f28714b6"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "v35-sites"
