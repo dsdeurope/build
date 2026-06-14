@@ -814,6 +814,9 @@ function pingGoogleBL(){
 
 /* ── SPOTS ────────────────────────────────────────────────── */
 var SPOT_TYPE_COL={blog:'#7c3aed',forum:'#0891b2',profile:'#d97706',guestbook:'#059669'};
+// Catégories TSV → type spot + needs_account
+var SPOT_CAT_MAP={'Blog':{type:'blog',na:false},'Forum':{type:'forum',na:true},'Annuaire':{type:'profile',na:false},'Profil':{type:'profile',na:true},'Gov':{type:'blog',na:false},'Média':{type:'blog',na:false},'Wiki':{type:'guestbook',na:true},'Agrégateur':{type:'profile',na:false}};
+function spotCatMap(raw){for(var k in SPOT_CAT_MAP){if(raw.indexOf(k)>=0)return SPOT_CAT_MAP[k];}return{type:'blog',na:false};}
 function spotAvailable(s){
   if(s.status==='blacklist')return false;
   if(!s.last_used)return true;
@@ -825,82 +828,225 @@ function spotCooldownLeft(s){
   var diff=Math.floor((Date.now()-new Date(s.last_used).getTime())/86400000);
   return Math.max(0,(s.cooldown||30)-diff);
 }
+// Dorks embarqués — focus dofollow direct (pas de compte requis)
+var SPOT_DORKS=[
+  // ── AUTO-APPROVE DOFOLLOW ──
+  ['*','auto_approve','"Enable CommentLuv" site:.fr','CommentLuv = dofollow garanti'],
+  ['*','auto_approve','"KeywordLuv" site:.fr','KeywordLuv = dofollow + ancre riche'],
+  ['*','auto_approve','"Powered by BlogEngine.NET" "[votre niche]"','Auto-approve, remplacer [votre niche]'],
+  ['*','auto_approve','"livre d\'or" site:.fr -"fermé" -"login"','Livres d\'or ouverts = dofollow'],
+  ['*','auto_approve','inurl:guestbook "[votre niche]" site:.fr -"login required"','Guestbooks ouverts'],
+  // ── BLOG COMMENTAIRES (dofollow possible) ──
+  ['*','blog','"laisser un commentaire" "[votre niche]" -"commentaires fermés" site:.fr','Blogs FR ouverts'],
+  ['*','blog','"Enable CommentLuv" "[votre niche]" site:.fr','CommentLuv par niche'],
+  ['*','blog','"votre commentaire" "[votre niche]" site:.fr -nofollow','Exclure nofollow explicitement'],
+  ['*','blog','inurl:wp-comments-post "[votre niche]" site:.fr','WordPress commentaires ouverts'],
+  ['*','blog','inurl:/2024/ "[votre niche]" "laisser un commentaire" site:.fr','Articles récents 2024'],
+  // ── ANNUAIRES DOFOLLOW ──
+  ['*','annuaire','inurl:annuaire "ajouter site" site:.fr -"connexion"','Annuaires gratuits sans compte'],
+  ['*','annuaire','"annuaire gratuit" "soumettre" site:.fr','Soumission directe'],
+  ['*','annuaire','"référencer gratuitement" site:.fr','Référencement gratuit'],
+  ['*','annuaire','"ajouter votre site" inurl:annuaire site:.fr','Formulaire d\'ajout direct'],
+  // ── NINJA (partenaires/ressources) ──
+  ['*','ninja','"[votre niche]" inurl:partenaires -"connexion requise" site:.fr','Pages partenaires ouvertes'],
+  ['*','ninja','"[votre niche]" inurl:liens-utiles site:.fr','Pages ressources'],
+  ['*','ninja','"[votre niche]" inurl:ressources "lien" site:.fr','Annuaires ressources'],
+  // ── FORUMS (compte requis mais dofollow phpBB) ──
+  ['*','forum','"Powered by phpBB" "[votre niche]" site:.fr inurl:viewtopic','phpBB — profil dofollow'],
+  ['*','forum','"Powered by SMF" "[votre niche]" site:.fr','SMF — signature dofollow'],
+  // ── NICHE MAISON ──
+  ['maison','blog','"laisser un commentaire" "décoration" -"commentaires fermés" site:.fr','Blog déco FR'],
+  ['maison','blog','"Enable CommentLuv" "déco" site:.fr','CommentLuv déco'],
+  ['maison','ninja','"maison" "livre d\'or" site:.fr -"fermé"','Livres d\'or maison'],
+  ['maison','annuaire','inurl:annuaire "ajouter site" "maison" OR "déco" site:.fr','Annuaire maison'],
+  // ── NICHE MODE/BIJOUX ──
+  ['mode','blog','"laisser un commentaire" "bijoux" -"fermés" site:.fr','Blog bijoux'],
+  ['mode','blog','"Enable CommentLuv" "bijoux" site:.fr','CommentLuv bijoux'],
+  ['mode','ninja','"bijoux" "livre d\'or" -"fermé" site:.fr','Livres d\'or bijoux'],
+  ['mode','annuaire','inurl:annuaire "mode" "ajouter" site:.fr','Annuaire mode'],
+  // ── NICHE BIEN-ÊTRE ──
+  ['bienetre','blog','"laisser un commentaire" "bien-être" -"fermé" site:.fr','Blog bien-être'],
+  ['bienetre','blog','"Enable CommentLuv" "zen" site:.fr','CommentLuv zen'],
+  ['bienetre','ninja','"bien-être" inurl:partenaires site:.fr','Partenaires bien-être'],
+  // ── NICHE ANIMAUX ──
+  ['animaux','blog','"laisser un commentaire" "chat" -"connecté" -"fermé" site:.fr','Blog animaux'],
+  ['animaux','ninja','"animaux" "livre d\'or" -"fermé" site:.fr','Livres d\'or animaux'],
+  // ── NICHE SPORT ──
+  ['sport','blog','"laisser un commentaire" "sport" -"fermé" site:.fr','Blog sport'],
+  ['sport','blog','"Enable CommentLuv" "musculation" site:.fr','CommentLuv sport'],
+  // ── NICHE CULTURE/MANGA ──
+  ['culture','blog','"laisser un commentaire" "manga" -"fermé" site:.fr','Blog manga'],
+  ['culture','ninja','"manga" inurl:partenaires site:.fr','Partenaires manga'],
+  // ── PROFILS WEB 2.0 (compte requis) ──
+  ['*','profil','"[votre niche]" site:wixsite.com -"connexion"','Wix profiles — lien bio'],
+  ['*','profil','"[votre niche]" site:e-monsite.com inurl:annuaire','e-monsite annuaire'],
+  ['*','profil','"[votre niche]" site:odoo.com','Odoo pages'],
+  ['*','profil','"[votre niche]" site:canva.site','Canva sites'],
+];
+var _spTab='list';
 function renderSpot(){
   set('<div class="hd"><h1>📍 Spots</h1><span class="slug-tag">'+SLUG+'</span></div>'+
-    '<div id="spot-dash" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-bottom:1.2rem"></div>'+
-    '<div style="font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#059669;margin-bottom:.8rem">AJOUTER UN SPOT</div>'+
-    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-bottom:.8rem">'+
-    '<div><label class="lbl">Domaine</label><input id="sp-domain" class="inp" placeholder="exemple.com"></div>'+
-    '<div><label class="lbl">URL page cible</label><input id="sp-url" class="inp" placeholder="https://exemple.com/blog/article/"></div>'+
-    '<div><label class="lbl">Type</label><select id="sp-type" class="inp"><option value="blog">Blog</option><option value="forum">Forum</option><option value="profile">Profil/Annuaire</option><option value="guestbook">Guestbook</option></select></div>'+
-    '<div><label class="lbl">Cooldown (jours)</label><input id="sp-cooldown" class="inp" type="number" value="30" min="1" max="365"></div>'+
-    '<div><label class="lbl">DR (>25)</label><input id="sp-dr" class="inp" type="number" placeholder="35"></div>'+
-    '<div><label class="lbl">TF (>15)</label><input id="sp-tf" class="inp" type="number" placeholder="20"></div>'+
-    '<div><label class="lbl">OBL (<50)</label><input id="sp-obl" class="inp" type="number" placeholder="15"></div>'+
-    '<div><label class="lbl">Notes</label><input id="sp-notes" class="inp" placeholder="Accès libre, section commentaires..."></div>'+
-    '</div>'+
-    '<div style="display:flex;gap:.6rem;margin-bottom:1.5rem">'+
-    '<button class="btn" onclick="addSpot()" style="background:#059669">+ Ajouter spot</button>'+
+    '<div style="display:flex;gap:.4rem;margin-bottom:1.2rem;border-bottom:2px solid #e8e4df;padding-bottom:.8rem">'+
+    '<button class="op-tb act" id="spt-list" onclick="spTab(\'list\',this)">📍 Liste</button>'+
+    '<button class="op-tb" id="spt-add" onclick="spTab(\'add\',this)">➕ Ajouter</button>'+
+    '<button class="op-tb" id="spt-import" onclick="spTab(\'import\',this)">📥 Import TSV</button>'+
+    '<button class="op-tb" id="spt-dorks" onclick="spTab(\'dorks\',this)">🔍 Dorks</button>'+
+    '</div><div id="sp-body"><span class="spin"></span></div>');
+  spTab('list',document.getElementById('spt-list'));
+}
+function spTab(t,btn){
+  _spTab=t;
+  document.querySelectorAll('.op-tb[id^="spt-"]').forEach(function(b){b.classList.remove('act');});
+  if(btn)btn.classList.add('act');
+  var b=document.getElementById('sp-body');
+  if(t==='list')spRenderList(b);
+  else if(t==='add')spRenderAdd(b);
+  else if(t==='import')spRenderImport(b);
+  else spRenderDorks(b);
+}
+function spRenderList(b){
+  b.innerHTML='<div id="spot-dash" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-bottom:1rem"></div>'+
+    '<div style="display:flex;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap">'+
     '<select id="sp-filter" class="inp" style="width:auto;font-size:.72rem" onchange="loadSpots()">'+
-    '<option value="all">Tous</option><option value="available">Disponibles</option><option value="cooldown">Cooldown</option><option value="blacklist">Blacklist</option>'+
+    '<option value="all">Tous les spots</option>'+
+    '<option value="available">Disponibles</option>'+
+    '<option value="dofollow_direct">🟢 Dofollow sans compte</option>'+
+    '<option value="account">🔑 Nécessite compte</option>'+
+    '<option value="cooldown">En cooldown</option>'+
+    '<option value="blacklist">Blacklist</option>'+
     '</select>'+
-    '</div>'+
-    '<div id="spot-list"></div>');
+    '<select id="sp-type-filter" class="inp" style="width:auto;font-size:.72rem" onchange="loadSpots()">'+
+    '<option value="all">Tous types</option>'+
+    '<option value="blog">Blog</option><option value="forum">Forum</option>'+
+    '<option value="profile">Profil/Annuaire</option><option value="guestbook">Guestbook</option>'+
+    '</select></div>'+
+    '<div id="spot-list"></div>';
   loadSpots();
+}
+function spRenderAdd(b){
+  b.innerHTML='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-bottom:.8rem">'+
+    '<div><label class="lbl">Domaine</label><input id="sp-domain" class="inp" placeholder="exemple.com"></div>'+
+    '<div><label class="lbl">URL page cible</label><input id="sp-url" class="inp" placeholder="https://exemple.com/article/"></div>'+
+    '<div><label class="lbl">Type</label><select id="sp-type" class="inp"><option value="blog">Blog</option><option value="forum">Forum</option><option value="profile">Profil/Annuaire</option><option value="guestbook">Guestbook</option></select></div>'+
+    '<div><label class="lbl">Niche</label><input id="sp-niche" class="inp" placeholder="mode, maison…"></div>'+
+    '<div><label class="lbl">Cooldown (jours)</label><input id="sp-cooldown" class="inp" type="number" value="30"></div>'+
+    '<div><label class="lbl">DR</label><input id="sp-dr" class="inp" type="number" placeholder="35"></div>'+
+    '<div><label class="lbl">TF / OBL</label><div style="display:flex;gap:.3rem"><input id="sp-tf" class="inp" type="number" placeholder="TF" style="flex:1"><input id="sp-obl" class="inp" type="number" placeholder="OBL" style="flex:1"></div></div>'+
+    '<div><label class="lbl">Notes / Action</label><input id="sp-notes" class="inp" placeholder="Commentaire libre, soumettre URL…"></div>'+
+    '</div>'+
+    '<div style="display:flex;gap:1rem;align-items:center;margin-bottom:1rem">'+
+    '<label style="display:flex;align-items:center;gap:.4rem;font-size:.75rem"><input type="checkbox" id="sp-dofollow"> 🟢 Dofollow</label>'+
+    '<label style="display:flex;align-items:center;gap:.4rem;font-size:.75rem"><input type="checkbox" id="sp-needs-acc"> 🔑 Compte requis</label>'+
+    '</div>'+
+    '<button class="btn" onclick="addSpot()" style="background:#059669">+ Ajouter spot</button>';
+}
+function spRenderImport(b){
+  b.innerHTML='<div style="font-size:.72rem;color:#888;margin-bottom:.8rem;line-height:1.6">'+
+    'Coller le contenu TSV de <b>SPOTS_ACTIONNABLES_FINAL.tsv</b> ci-dessous.<br>'+
+    'Colonnes attendues : # | Domaine | Catégorie | Niche | Score | Dofollow | Effort | Action | URL Exemple | Statut'+
+    '</div>'+
+    '<textarea id="sp-tsv" class="inp" rows="12" style="width:100%;font-family:monospace;font-size:.68rem" placeholder="Coller le TSV ici…"></textarea>'+
+    '<div style="display:flex;gap:.6rem;margin-top:.8rem;align-items:center">'+
+    '<button class="btn" onclick="importSpotsTSV()" style="background:#059669">📥 Importer</button>'+
+    '<span id="sp-import-status" style="font-size:.72rem;color:#888"></span>'+
+    '</div>';
+}
+function spRenderDorks(b){
+  var niches=['*','maison','mode','animaux','bebe','sport','jardin','bienetre','culture','cadeaux','auto','voyage'];
+  var cats=['all','auto_approve','blog','annuaire','ninja','forum','profil'];
+  var n=b._dork_niche||'*';var c=b._dork_cat||'all';
+  b.innerHTML='<div style="display:flex;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap">'+
+    '<select id="dk-niche" class="inp" style="width:auto;font-size:.72rem" onchange="dorkFilter()">'+
+    niches.map(function(x){return '<option '+(x===n?'selected':'')+' value="'+x+'">'+x+'</option>';}).join('')+
+    '</select>'+
+    '<select id="dk-cat" class="inp" style="width:auto;font-size:.72rem" onchange="dorkFilter()">'+
+    cats.map(function(x){return '<option '+(x===c?'selected':'')+' value="'+x+'">'+x+'</option>';}).join('')+
+    '</select>'+
+    '<span style="font-size:.72rem;color:#888;align-self:center">Copier le dork → coller dans Google → trouver spots → Import TSV</span>'+
+    '</div><div id="dk-list"></div>';
+  dorkFilter();
+}
+function dorkFilter(){
+  var n=(document.getElementById('dk-niche')||{}).value||'*';
+  var c=(document.getElementById('dk-cat')||{}).value||'all';
+  var rows=SPOT_DORKS.filter(function(d){
+    var nok=d[0]==='*'||d[0]===n||n==='*';
+    var cok=c==='all'||d[1]===c;
+    return nok&&cok;
+  });
+  var el=document.getElementById('dk-list');if(!el)return;
+  var df_cats={auto_approve:true,blog:true,annuaire:true,ninja:true,forum:false,profil:false};
+  el.innerHTML='<div style="display:flex;flex-direction:column;gap:.4rem">'+rows.map(function(d){
+    var isdf=df_cats[d[1]]!==false;
+    return '<div style="padding:.5rem .7rem;background:#f8f7f5;border-radius:4px;display:flex;align-items:center;gap:.6rem">'+
+      '<span style="font-size:.6rem;padding:.1rem .4rem;border-radius:8px;background:'+(isdf?'#059669':'#0891b2')+';color:#fff;white-space:nowrap">'+d[1]+'</span>'+
+      (isdf?'<span style="font-size:.6rem;color:#059669">🟢</span>':'<span style="font-size:.6rem;color:#0891b2">🔑</span>')+
+      '<code style="flex:1;font-size:.65rem;background:none;color:#333;word-break:break-all">'+d[2]+'</code>'+
+      '<span style="font-size:.62rem;color:#aaa;white-space:nowrap">'+d[3]+'</span>'+
+      '<button onclick="navigator.clipboard.writeText(\''+d[2].replace(/'/g,"\\'")+'\')" class="btn bo" style="font-size:.6rem;padding:.1rem .4rem;white-space:nowrap">Copier</button>'+
+      '</div>';
+  }).join('')+'</div>';
 }
 function loadSpots(){
   if(!SLUG)return;
   apiFetch('/spots?slug='+SLUG).then(function(r){return r.json();}).then(function(d){
     var spots=d.spots||[];
     var filter=(document.getElementById('sp-filter')||{}).value||'all';
+    var typeF=(document.getElementById('sp-type-filter')||{}).value||'all';
     var filtered=spots.filter(function(s){
+      var typeOk=typeF==='all'||s.type===typeF;
+      if(!typeOk)return false;
       if(filter==='available')return spotAvailable(s);
+      if(filter==='dofollow_direct')return spotAvailable(s)&&s.dofollow&&!s.needs_account;
+      if(filter==='account')return s.needs_account;
       if(filter==='cooldown')return !spotAvailable(s)&&s.status!=='blacklist';
       if(filter==='blacklist')return s.status==='blacklist';
       return true;
     });
-    // Dashboard stats
+    // Dashboard
     var avail=spots.filter(spotAvailable);
+    var dfDirect=avail.filter(function(s){return s.dofollow&&!s.needs_account;});
+    var needAcc=spots.filter(function(s){return s.needs_account;});
     var dash=document.getElementById('spot-dash');
     if(dash){
       var byType={blog:0,forum:0,profile:0,guestbook:0};
-      avail.forEach(function(s){if(byType[s.type]!==undefined)byType[s.type]++;});
+      dfDirect.forEach(function(s){if(byType[s.type]!==undefined)byType[s.type]++;});
       dash.innerHTML=[
-        {v:spots.length,l:'Total spots',c:'#333'},
+        {v:spots.length,l:'Total',c:'#333'},
         {v:avail.length,l:'Disponibles',c:'#059669'},
-        {v:spots.filter(function(s){return !spotAvailable(s)&&s.status!=='blacklist';}).length,l:'Cooldown',c:'#f59e0b'},
-        {v:spots.filter(function(s){return s.status==='blacklist';}).length,l:'Blacklist',c:'#ef4444'},
+        {v:dfDirect.length,l:'🟢 Dofollow direct',c:'#059669'},
+        {v:needAcc.length,l:'🔑 Compte requis',c:'#0891b2'},
       ].map(function(x){
         return '<div style="background:#f8f7f5;border-radius:6px;padding:.6rem .8rem;text-align:center">'+
           '<div style="font-size:1.1rem;font-weight:700;color:'+x.c+'">'+x.v+'</div>'+
           '<div style="font-size:.62rem;color:#888;margin-top:.1rem">'+x.l+'</div></div>';
       }).join('')+
       '<div style="background:#f8f7f5;border-radius:6px;padding:.6rem .8rem;grid-column:span 4">'+
-      '<div style="font-size:.6rem;font-weight:700;color:#888;margin-bottom:.3rem;letter-spacing:.1em">DISPONIBLES PAR TYPE</div>'+
+      '<div style="font-size:.6rem;font-weight:700;color:#888;margin-bottom:.3rem;letter-spacing:.1em">DOFOLLOW DIRECTS PAR TYPE</div>'+
       '<div style="display:flex;gap:.4rem">'+
       ['blog','forum','profile','guestbook'].map(function(t){
-        var tc=SPOT_TYPE_COL[t];
-        return '<span style="font-size:.65rem;padding:.1rem .5rem;border-radius:8px;background:'+tc+';color:#fff">'+t+' '+byType[t]+'</span>';
+        var n=dfDirect.filter(function(s){return s.type===t;}).length;
+        return '<span style="font-size:.65rem;padding:.1rem .5rem;border-radius:8px;background:'+(SPOT_TYPE_COL[t]||'#888')+';color:#fff">'+t+' '+n+'</span>';
       }).join('')+'</div></div>';
     }
-    // Liste
     var el=document.getElementById('spot-list');if(!el)return;
-    if(!filtered.length){el.innerHTML='<div style="color:#aaa;font-size:.8rem">Aucun spot'+( filter!=='all'?' ('+filter+')':'')+' enregistré</div>';return;}
+    if(!filtered.length){el.innerHTML='<div style="color:#aaa;font-size:.8rem">Aucun spot ('+filter+')</div>';return;}
     el.innerHTML='<div style="font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:.6rem">'+filtered.length+' SPOTS</div>'+
       '<div style="display:flex;flex-direction:column;gap:.4rem">'+filtered.map(function(s){
-        var avail=spotAvailable(s);var left=spotCooldownLeft(s);
-        var statBg=s.status==='blacklist'?'#991b1b':avail?'#166534':'#92400e';
-        var statLbl=s.status==='blacklist'?'BLACKLIST':avail?'DISPO':'CD J+'+left;
+        var av=spotAvailable(s);var left=spotCooldownLeft(s);
+        var statBg=s.status==='blacklist'?'#991b1b':av?'#166534':'#92400e';
+        var statLbl=s.status==='blacklist'?'BLACKLIST':av?'DISPO':'CD J+'+left;
         var tc=SPOT_TYPE_COL[s.type]||'#888';
-        var qual_ok=(!s.dr||s.dr>=25)&&(!s.tf||s.tf>=15)&&(!s.obl||s.obl<50);
         return '<div style="display:flex;align-items:center;gap:.5rem;padding:.5rem .7rem;background:#f8f7f5;border-radius:4px;flex-wrap:wrap">'+
           '<span style="font-size:.6rem;font-weight:700;padding:.1rem .4rem;border-radius:8px;background:'+statBg+';color:#fff;white-space:nowrap">'+statLbl+'</span>'+
           '<span style="font-size:.6rem;padding:.1rem .4rem;border-radius:8px;background:'+tc+';color:#fff">'+s.type+'</span>'+
-          (s.dr?'<span style="font-size:.6rem;color:'+(qual_ok?'#166534':'#ef4444')+'">DR'+s.dr+(s.tf?'/TF'+s.tf:'')+(s.obl?'/OBL'+s.obl:'')+'</span>':'')+
+          (s.dofollow?'<span style="font-size:.6rem;color:#059669">🟢 do</span>':'')+
+          (s.needs_account?'<span style="font-size:.6rem;color:#0891b2">🔑</span>':'')+
+          (s.niche?'<span style="font-size:.6rem;color:#888;padding:.1rem .3rem;background:#e8e4df;border-radius:4px">'+s.niche+'</span>':'')+
           '<span style="flex:1;font-size:.73rem;color:#333;min-width:0"><b>'+s.domain+'</b>'+(s.url?' <a href="'+s.url+'" target="_blank" style="color:#0891b2;font-size:.65rem">↗</a>':'')+
-          (s.notes?' <span style="color:#aaa;font-size:.65rem">— '+s.notes+'</span>':'')+
-          ' <span style="color:#ccc;font-size:.62rem">× '+s.uses+'</span></span>'+
-          (avail&&s.status!=='blacklist'?'<button onclick="useSpot(\''+s.id+'\')" class="btn" style="font-size:.62rem;padding:.2rem .5rem;background:#7c3aed;white-space:nowrap">Utiliser →</button>':'')+
+          (s.notes?' <span style="color:#aaa;font-size:.65rem">— '+s.notes.slice(0,40)+'</span>':'')+
+          ' <span style="color:#ccc;font-size:.62rem">× '+(s.uses||0)+'</span></span>'+
+          (av&&s.status!=='blacklist'?'<button onclick="useSpot(\''+s.id+'\')" class="btn" style="font-size:.62rem;padding:.2rem .5rem;background:#7c3aed;white-space:nowrap">Utiliser →</button>':'')+
           '<select onchange="updateSpot(\''+s.id+'\',{status:this.value})" style="font-size:.68rem;padding:.1rem .3rem;border:1px solid #ddd;border-radius:3px">'+
             ['available','cooldown','blacklist'].map(function(x){return '<option '+(x===s.status?'selected':'')+'>'+x+'</option>';}).join('')+
           '</select>'+
@@ -918,9 +1064,40 @@ function addSpot(){
   var tf=parseInt(document.getElementById('sp-tf').value)||0;
   var obl=parseInt(document.getElementById('sp-obl').value)||0;
   var notes=document.getElementById('sp-notes').value.trim();
+  var niche=document.getElementById('sp-niche').value.trim();
+  var dofollow=document.getElementById('sp-dofollow').checked;
+  var needs_account=document.getElementById('sp-needs-acc').checked;
   if(!dom){toast('Domaine requis',false);return;}
-  apiFetch('/spots',{method:'POST',body:JSON.stringify({slug:SLUG,domain:dom,url,type,cooldown,dr,tf,obl,notes})}).then(function(r){return r.json();}).then(function(d){
-    if(d.ok){toast('Spot ajouté ✓',true);loadSpots();}else toast('Erreur: '+(d.error||'?'),false);
+  apiFetch('/spots',{method:'POST',body:JSON.stringify({slug:SLUG,domain:dom,url,type,cooldown,dr,tf,obl,notes,niche,dofollow,needs_account})}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){toast('Spot ajouté ✓',true);spTab('list',document.getElementById('spt-list'));}else toast('Erreur: '+(d.error||'?'),false);
+  });
+}
+function importSpotsTSV(){
+  var raw=document.getElementById('sp-tsv').value.trim();
+  if(!raw){toast('Coller le TSV d\'abord',false);return;}
+  var lines=raw.split('\n');
+  // Détecter si la 1ère ligne est un header
+  var start=lines[0].startsWith('#')||lines[0].startsWith('Domaine')?1:0;
+  var spots=[];
+  for(var i=start;i<lines.length;i++){
+    var cols=lines[i].split('\t');
+    if(cols.length<3)continue;
+    var domain=(cols[1]||'').trim();if(!domain)continue;
+    var catRaw=(cols[2]||'').trim();
+    var m=spotCatMap(catRaw);
+    var dofollow=parseInt(cols[5]||'0')>0;
+    var effortRaw=(cols[6]||'').trim();
+    var cooldown=effortRaw.indexOf('Long')>=0?45:effortRaw.indexOf('Moyen')>=0?30:21;
+    var niche=(cols[3]||'').trim();
+    var action=(cols[7]||'').trim();
+    var url=(cols[8]||'').trim();
+    spots.push({domain,type:m.type,needs_account:m.na,dofollow,niche,cooldown,url,notes:action});
+  }
+  if(!spots.length){toast('Aucun spot parsé — vérifier format',false);return;}
+  var st=document.getElementById('sp-import-status');if(st)st.textContent='Import de '+spots.length+' spots…';
+  apiFetch('/spots/import',{method:'POST',body:JSON.stringify({slug:SLUG,spots})}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){toast('✅ '+d.added+' spots importés ('+d.skipped+' doublons ignorés)',true);if(st)st.textContent=d.added+' ajoutés · '+d.skipped+' doublons';}
+    else toast('Erreur: '+(d.error||'?'),false);
   });
 }
 function useSpot(id){
@@ -1582,13 +1759,29 @@ OUTPUT : JSON UNIQUEMENT, une seule clé "html" contenant le bloc HTML complet (
     if(request.method==='GET'&&path==='/spots'){const sl=url.searchParams.get('slug');if(!sl)return err('slug requis');const o=await env.R2.get('backlinks/'+sl+'/spots.json').catch(()=>null);const spots=o?JSON.parse(await new Response(o.body).text()):[];return ok({spots});}
     // POST /spots — ajouter un spot
     if(path==='/spots'){
-      const{slug,domain,url:surl,type,cooldown,dr,tf,obl,notes}=body;if(!slug||!domain)return err('slug + domain requis');
+      const{slug,domain,url:surl,type,cooldown,dr,tf,obl,notes,niche,dofollow,needs_account}=body;if(!slug||!domain)return err('slug + domain requis');
       const key='backlinks/'+slug+'/spots.json';
       const o=await env.R2.get(key).catch(()=>null);
       const spots=o?JSON.parse(await new Response(o.body).text()):[];
-      spots.push({id:Date.now().toString(36),domain,url:surl||'',type:type||'blog',cooldown:cooldown||30,dr:dr||0,tf:tf||0,obl:obl||0,notes:notes||'',status:'available',uses:0,last_used:null,addedAt:new Date().toISOString().split('T')[0]});
+      spots.push({id:Date.now().toString(36),domain,url:surl||'',type:type||'blog',cooldown:cooldown||30,dr:dr||0,tf:tf||0,obl:obl||0,notes:notes||'',niche:niche||'',dofollow:!!dofollow,needs_account:!!needs_account,status:'available',uses:0,last_used:null,addedAt:new Date().toISOString().split('T')[0]});
       await env.R2.put(key,JSON.stringify(spots),{httpMetadata:{contentType:'application/json'}});
       return ok({slug,added:true,total:spots.length});
+    }
+    // POST /spots/import — import bulk TSV (dédup par domaine)
+    if(path==='/spots/import'){
+      const{slug,spots:incoming}=body;if(!slug||!incoming?.length)return err('slug + spots requis');
+      const key='backlinks/'+slug+'/spots.json';
+      const o=await env.R2.get(key).catch(()=>null);
+      const existing=o?JSON.parse(await new Response(o.body).text()):[];
+      const existingDomains=new Set(existing.map(s=>s.domain));
+      let added=0,skipped=0;
+      for(const s of incoming){
+        if(!s.domain||existingDomains.has(s.domain)){skipped++;continue;}
+        existing.push({id:Date.now().toString(36)+Math.random().toString(36).slice(2,4),domain:s.domain,url:s.url||'',type:s.type||'blog',cooldown:s.cooldown||21,dr:0,tf:0,obl:0,notes:s.notes||'',niche:s.niche||'',dofollow:!!s.dofollow,needs_account:!!s.needs_account,status:'available',uses:0,last_used:null,addedAt:new Date().toISOString().split('T')[0]});
+        existingDomains.add(s.domain);added++;
+      }
+      await env.R2.put(key,JSON.stringify(existing),{httpMetadata:{contentType:'application/json'}});
+      return ok({ok:true,added,skipped,total:existing.length});
     }
     // POST /spots/use — marquer un spot comme utilisé (déclenche cooldown)
     if(path==='/spots/use'){
