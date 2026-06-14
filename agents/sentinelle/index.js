@@ -19,6 +19,7 @@ const WORKERS = {
   'image-processor':    'https://v35-image-processor.ernestpedanou.workers.dev/health',
   'scrape-orchestrator':'https://v35-scrape-orchestrator.ernestpedanou.workers.dev/health',
   'site-discover':      'https://v35-site-discover.ernestpedanou.workers.dev/api/health',
+  'analytics':          'https://v35-analytics.ernestpedanou.workers.dev/health',
 };
 
 // Workers critiques → alerte si DOWN (les autres = warning seulement)
