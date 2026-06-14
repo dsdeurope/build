@@ -158,6 +158,7 @@ async function advance(state,env){
   if(step.name==='complete'){
     step.status='done';step.completedAt=new Date().toISOString();
     state.status='complete';state.completedAt=new Date().toISOString();
+    env.KV.delete('lock:deploy:'+state.domain).catch(()=>{});
     // Backup automatique après pipeline complet
     if(env.BACKUP){
       env.BACKUP.fetch(new Request('https://backup/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:state.slug})})).catch(()=>{});
@@ -176,7 +177,7 @@ async function advance(state,env){
     state.currentStep=idx+1;
     const next=state.steps[state.currentStep];
     if(!next||next.name==='complete'){state.status='complete';state.completedAt=new Date().toISOString();if(next){next.status='done';next.completedAt=new Date().toISOString();}}
-  }catch(e){step.status='failed';step.error=e.message;state.status='failed';}
+  }catch(e){step.status='failed';step.error=e.message;state.status='failed';env.KV.delete('lock:deploy:'+state.domain).catch(()=>{});}
 }
 
 export default{
@@ -207,7 +208,12 @@ export default{
     if(path==='/run'){
       const{slug,niche,domain,blueprint,zone_id}=body;
       if(!slug||!niche||!domain||!blueprint?.allCollections?.length)return err('slug, niche, domain, blueprint.allCollections requis');
+      // Dedup : empêche double-deploy du même domaine simultané
+      const lockKey='lock:deploy:'+domain;
+      const existing=await env.KV.get(lockKey).catch(()=>null);
+      if(existing)return ok({deduplicated:true,runId:existing,message:'Deploy déjà en cours pour ce domaine'},409);
       const runId=genId();
+      await env.KV.put(lockKey,runId,{expirationTtl:600}).catch(()=>{}); // lock 10min
       const state={runId,slug,niche,domain,blueprint,zone_id:zone_id||null,steps:STEPS.map(n=>({name:n,status:'pending',result:null,error:null,startedAt:null,completedAt:null})),currentStep:0,startedAt:new Date().toISOString(),completedAt:null,status:'running'};
       await advance(state,env);
       await rput(env,'orch/run-'+runId+'.json',state);

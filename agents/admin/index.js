@@ -61,12 +61,20 @@ export default{
     // Serve admin UI — protected by HTTP Basic Auth before token is embedded
     if(request.method==='GET'&&path==='/'){
       if(!token)return new Response('API_TOKEN not configured',{status:500});
+      const ip=request.headers.get('CF-Connecting-IP')||'unknown';
+      const rlKey='auth-fail:'+ip;
+      // Rate-limit: 5 échecs → 429 pendant 5min
+      const rlRaw=await env.KV.get(rlKey).catch(()=>null);
+      const rl=rlRaw?JSON.parse(rlRaw):{count:0};
+      if(rl.count>=5)return new Response('Too Many Requests',{status:429,headers:{'Retry-After':'300','Cache-Control':'no-store'}});
       // HTTP Basic Auth gate: credentials = admin / <API_TOKEN>
       const basicRaw=request.headers.get('Authorization')||'';
       const validBasic='Basic '+btoa('admin:'+token);
       if(basicRaw!==validBasic){
+        await env.KV.put(rlKey,JSON.stringify({count:rl.count+1}),{expirationTtl:300}).catch(()=>{});
         return new Response('Unauthorized',{status:401,headers:{'WWW-Authenticate':'Basic realm="V35 Admin"','Cache-Control':'no-store'}});
       }
+      await env.KV.delete(rlKey).catch(()=>{}); // reset compteur sur succès
       return new Response(adminHTML(token),{headers:{'Content-Type':'text/html;charset=UTF-8','Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow'}});
     }
 
