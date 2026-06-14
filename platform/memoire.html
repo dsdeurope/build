@@ -23,6 +23,9 @@
         <button class="tab-btn active" onclick="switchTab('prompts',this)">📝 Prompts</button>
         <button class="tab-btn" onclick="switchTab('jules',this)">🛒 Jules_dur (167)</button>
         <button class="tab-btn" onclick="switchTab('footprints',this)">🔍 Footprints</button>
+        <button class="tab-btn" onclick="switchTab('ref',this)">📊 Benchmarks</button>
+        <button class="tab-btn" onclick="switchTab('workers',this)">⚙️ Workers</button>
+        <button class="tab-btn" onclick="switchTab('pipeline',this)">🔄 Pipeline</button>
       </div>
 
       <!-- ═══════════════════════════════ PROMPTS ═══════════════════════════ -->
@@ -64,6 +67,115 @@
         <div id="footprints-grid"></div>
       </div>
 
+      <!-- ═══════════════════════════════ BENCHMARKS ═══════════════════════ -->
+      <div id="tab-ref" class="tab-panel" style="display:none">
+
+        <div class="section-group">
+          <div class="section-group-title">💰 CPC + Panier moyen par niche</div>
+          <table class="ref-table">
+            <thead><tr><th>Niche</th><th>CPC FR (€)</th><th>Panier moyen (€)</th><th>Taux conv. Shopify</th><th>CA/mois (1k visites)</th></tr></thead>
+            <tbody>
+              <tr><td>💍 Bijoux</td><td>0.65</td><td>85</td><td>1.8%</td><td class="green">1 530€</td></tr>
+              <tr><td>🏠 Maison / Déco</td><td>0.70</td><td>75</td><td>1.8%</td><td class="green">1 350€</td></tr>
+              <tr><td>💄 Beauté</td><td>0.55</td><td>45</td><td>1.8%</td><td>810€</td></tr>
+              <tr><td>👗 Mode femme</td><td>0.45</td><td>55</td><td>1.8%</td><td>990€</td></tr>
+              <tr><td>🏋️ Sport</td><td>0.60</td><td>65</td><td>1.8%</td><td>1 170€</td></tr>
+              <tr><td>🐾 Animaux</td><td>0.50</td><td>35</td><td>1.8%</td><td>630€</td></tr>
+              <tr><td>👶 Enfant</td><td>0.55</td><td>40</td><td>1.8%</td><td>720€</td></tr>
+              <tr><td>💻 Électronique</td><td>0.80</td><td>120</td><td>1.8%</td><td class="green">2 160€</td></tr>
+              <tr><td>🍳 Cuisine</td><td>0.45</td><td>45</td><td>1.8%</td><td>810€</td></tr>
+              <tr><td>💎 Luxe</td><td>1.20</td><td>200</td><td>1.2%</td><td class="green">2 400€</td></tr>
+              <tr><td>🚗 Auto</td><td>0.70</td><td>80</td><td>1.5%</td><td>1 200€</td></tr>
+            </tbody>
+          </table>
+          <p class="ref-note">CA/mois = 1 000 visites × taux conv. × panier moyen</p>
+        </div>
+
+        <div class="section-group">
+          <div class="section-group-title">🏆 Score V35 /10 — Formule de calcul</div>
+          <table class="ref-table">
+            <thead><tr><th>Critère</th><th>Points max</th><th>Règle</th></tr></thead>
+            <tbody>
+              <tr><td>AliExpress %</td><td>3.0 pts</td><td>100% → 3pts | 80-99% → 2pts | 60-79% → 1pt | &lt;60% → 0</td></tr>
+              <tr><td>CMS</td><td>2.0 pts</td><td>Shopify → 2 | WooCommerce → 1.5 | PrestaShop → 1 | Autre → 0.5</td></tr>
+              <tr><td>Âge domaine</td><td>2.0 pts</td><td>≥5 ans → 2 | ≥2 ans → 1.5 | ≥1 an → 1 | &lt;1 an → 0.5</td></tr>
+              <tr><td>Statut en ligne</td><td>1.5 pts</td><td>HTTP 200 → 1.5 | autre → 0</td></tr>
+              <tr><td>Collections</td><td>1.0 pt</td><td>≥50 → 1 | ≥20 → 0.5 | &lt;20 → 0</td></tr>
+              <tr><td>Produits</td><td>0.5 pt</td><td>≥200 → 0.5 | &lt;200 → 0</td></tr>
+            </tbody>
+          </table>
+          <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+            <span class="ref-badge green">≥8.0 — Cloner rapidement</span>
+            <span class="ref-badge yellow">6.5–7.9 — Qualifié</span>
+            <span class="ref-badge orange">5.0–6.4 — À surveiller</span>
+            <span class="ref-badge red">&lt;5.0 — Ignorer</span>
+          </div>
+        </div>
+
+        <div class="section-group">
+          <div class="section-group-title">📅 Calendrier saisonnier — Niches prioritaires</div>
+          <table class="ref-table">
+            <thead><tr><th>Mois</th><th>Niches chaudes 🔥</th><th>Préparation (M-6)</th></tr></thead>
+            <tbody>
+              <tr><td>Jan–Fév</td><td>Saint-Valentin (bijoux, lingerie, bougies), Nouvelle année (fitness, organisation)</td><td>Juillet–Août</td></tr>
+              <tr><td>Mar–Avr</td><td>Printemps (jardin, déco, mode légère), Pâques (enfant, cadeaux)</td><td>Sep–Oct</td></tr>
+              <tr><td>Mai–Juin</td><td>Fête des mères (bijoux, beauté, maison), Mariages (décoration, mode)</td><td>Nov–Déc</td></tr>
+              <tr><td>Juil–Août</td><td>Été (maillots, accessoires plage, sport), Rentrée (papeterie, sacs, enfant)</td><td>Jan–Fév</td></tr>
+              <tr><td>Sep–Oct</td><td>Rentrée scolaire, Halloween (déco, costumes), Automne (maison, bougies)</td><td>Mar–Avr</td></tr>
+              <tr><td>Nov–Déc</td><td class="green">🎄 Black Friday + Noël — PICS TOUS SECTEURS (veilleuses, déco, bijoux, jouets)</td><td>Mai–Juin</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section-group">
+          <div class="section-group-title">📐 Règles de marge dropshipping</div>
+          <table class="ref-table">
+            <thead><tr><th>Verdict</th><th>Marge</th><th>Règle prix</th><th>Exemple</th></tr></thead>
+            <tbody>
+              <tr><td><span class="ref-badge green">🟢 Excellente</span></td><td>≥ 60%</td><td>Prix vente ≥ ×2.5 coût Ali</td><td>Ali 5€ → vente 12.90€+</td></tr>
+              <tr><td><span class="ref-badge yellow">🟡 Correcte</span></td><td>40–59%</td><td>≥ ×1.7 coût Ali</td><td>Ali 5€ → vente 8.50€+</td></tr>
+              <tr><td><span class="ref-badge orange">🟠 Faible</span></td><td>20–39%</td><td>Surveiller frais pub</td><td>Ali 5€ → vente 6.25€+</td></tr>
+              <tr><td><span class="ref-badge red">🔴 Insuffisante</span></td><td>&lt; 20%</td><td>À éviter</td><td>—</td></tr>
+            </tbody>
+          </table>
+          <p class="ref-note">Règle ×3 : prix de vente recommandé = 3× coût AliExpress (marge brute ~66%)</p>
+        </div>
+
+      </div>
+
+      <!-- ═══════════════════════════════ WORKERS ════════════════════════════ -->
+      <div id="tab-workers" class="tab-panel" style="display:none">
+
+        <div class="section-group">
+          <div class="section-group-title">⚙️ Workers Cloudflare — URLs & rôles</div>
+          <table class="ref-table">
+            <thead><tr><th>Worker</th><th>URL</th><th>Rôle</th><th>Actions</th></tr></thead>
+            <tbody id="workers-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="section-group">
+          <div class="section-group-title">🚀 Commandes deploy</div>
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:8px" id="deploy-grid"></div>
+        </div>
+
+      </div>
+
+      <!-- ═══════════════════════════════ PIPELINE ══════════════════════════ -->
+      <div id="tab-pipeline" class="tab-panel" style="display:none">
+
+        <div class="section-group">
+          <div class="section-group-title">🔄 Pipeline V35 — Étapes complètes</div>
+          <div id="pipeline-steps"></div>
+        </div>
+
+        <div class="section-group">
+          <div class="section-group-title">✅ Checklist avant clonage d'une boutique</div>
+          <div id="checklist-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px"></div>
+        </div>
+
+      </div>
+
     </div>
   </div>
 </div>
@@ -97,6 +209,41 @@
 .fp-item:hover{background:rgba(99,102,241,.15)}
 .fp-pct{font-size:10px;color:var(--muted)}
 .fp-name{font-weight:600}
+
+/* Benchmarks & tables */
+.ref-table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px}
+.ref-table th{font-size:10px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);font-weight:700;padding:7px 10px;border-bottom:1px solid var(--border);text-align:left;background:var(--surface2)}
+.ref-table td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+.ref-table tr:last-child td{border-bottom:none}
+.ref-table td.green{color:#22c55e;font-weight:700}
+.ref-note{font-size:11px;color:var(--muted);margin:4px 0 0;font-style:italic}
+.ref-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.ref-badge.green{background:rgba(34,197,94,.15);color:#22c55e}
+.ref-badge.yellow{background:rgba(234,179,8,.15);color:#eab308}
+.ref-badge.orange{background:rgba(249,115,22,.15);color:#f97316}
+.ref-badge.red{background:rgba(239,68,68,.15);color:#ef4444}
+
+/* Workers */
+.worker-row td:nth-child(2){font-family:monospace;font-size:11px}
+.deploy-cmd{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:11px}
+.deploy-cmd-title{font-size:11px;font-weight:700;margin-bottom:6px;color:var(--muted)}
+.deploy-cmd-code{font-family:monospace;font-size:10px;color:#a5b4fc;word-break:break-all;line-height:1.5}
+
+/* Pipeline */
+.pipeline-step{display:flex;gap:12px;margin-bottom:10px;align-items:flex-start}
+.pipeline-num{width:28px;height:28px;border-radius:50%;background:#6366f1;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px}
+.pipeline-body{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px;flex:1}
+.pipeline-title{font-size:12px;font-weight:700;margin-bottom:3px}
+.pipeline-desc{font-size:11px;color:var(--muted);line-height:1.5}
+.pipeline-worker{font-size:10px;font-family:monospace;color:#a5b4fc;margin-top:4px}
+
+/* Checklist */
+.checklist-item{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:10px 14px}
+.checklist-item label{display:flex;align-items:flex-start;gap:8px;font-size:12px;cursor:pointer}
+.checklist-item input[type=checkbox]{margin-top:2px;accent-color:#6366f1;flex-shrink:0}
+.checklist-item .ci-ok{color:#22c55e}
+.checklist-item .ci-warn{color:#f59e0b}
+.checklist-item .ci-block{color:#ef4444}
 
 /* Modal */
 .prompt-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
@@ -664,8 +811,68 @@ function promptCard(p) {
   </div>`;
 }
 
+// Extra prompts — titres produits multilingue + traduction bulk
+const PROMPTS_EXTRA = [
+  {
+    id: 'titres_produits',
+    icon: '🏷️',
+    title: 'Titres Produits SEO Multilingue',
+    desc: 'Transforme des titres produits FR en titres longue traîne optimisés pour un pays cible. Keyword-first, 6-8 mots, 1 titre par produit.',
+    prompt: `SYSTEM ROLE:
+Tu es un **Expert SEO Multilingue**.
+Tu transformes une liste de titres produits français en titres optimisés longue traîne pour un pays cible.
+1 seul titre final par produit — keyword-first, 6-8 mots, naturel, unique.
+
+PROCESSUS INTERNE :
+1. Extraction attributs (matière, taille, couleur, usage)
+2. Adaptation linguistique locale (pas traduction littérale)
+3. 10 variantes candidats internes
+4. Anti-doublon
+5. Sélection finale meilleur titre
+
+FORMAT DE SORTIE (uniquement ce JSON) :
+{"country_target":"[PAYS]","language_target":"[LANG]","products":[{"original_fr":"titre original","title_final":"titre optimisé"}]}
+
+IMPORTANT : Compte les titres input → output MÊME NOMBRE. Pas de texte hors JSON.
+
+/generate
+pays: [PAYS]
+langue: [LANG]
+titres_fr:
+- "[TITRE 1]"
+- "[TITRE 2]"`
+  },
+  {
+    id: 'meta_bulk',
+    icon: '🔍',
+    title: 'Meta Titles + Descriptions Bulk',
+    desc: 'Génère meta title (55-60 car.) + meta description (145-155 car.) SEO pour une liste de pages. Keyword-first, sans superlatifs.',
+    prompt: `Tu es un expert SEO technique e-commerce.
+
+MISSION : Générer meta title + meta description pour chaque page fournie.
+
+RÈGLES :
+- Meta title : 55-60 caractères, keyword-first, sans "meilleur/top/premium"
+- Meta description : 145-155 caractères, inclure CTA implicite, keyword naturel
+- Langue : [LANGUE] | Pays : [PAYS]
+- Chaque meta unique (pas de copier-coller)
+
+FORMAT JSON :
+[
+  {
+    "page": "nom ou URL de la page",
+    "meta_title": "...",
+    "meta_description": "..."
+  }
+]
+
+Pages à traiter :
+[LISTE_PAGES]`
+  },
+];
+
 document.getElementById('grid-cro').innerHTML = PROMPTS_CRO.map(promptCard).join('');
-document.getElementById('grid-seo').innerHTML = PROMPTS_SEO.map(promptCard).join('');
+document.getElementById('grid-seo').innerHTML = [...PROMPTS_SEO, ...PROMPTS_EXTRA].map(promptCard).join('');
 
 // ── JULES ─────────────────────────────────────────────────────────────────────
 
@@ -725,6 +932,105 @@ window.copyDorks = function() {
   navigator.clipboard.writeText(all);
   toast('Tous les dorks copiés', 'success');
 };
+
+// ── WORKERS ──────────────────────────────────────────────────────────────────
+
+const WORKERS_LIST = [
+  { name:'v35-build-api',        url:'https://v35-build-api.ernestpedanou.workers.dev',        role:'API principale — boutiques, KV, PATCHES, BOUTIQUES_SEED', dir:'agents/build-api' },
+  { name:'v35-site-server',      url:'https://v35-site-server.ernestpedanou.workers.dev',      role:'Serveur plateforme — sert les fichiers HTML/JS/CSS', dir:'agents/site-server' },
+  { name:'v35-content-ai',       url:'https://v35-content-ai.ernestpedanou.workers.dev',       role:'Génération contenu — homepage, collections, blog, SEO', dir:'agents/content-ai' },
+  { name:'v35-supplier-resolver',url:'https://v35-supplier-resolver.ernestpedanou.workers.dev',role:'Résolution AliExpress par niche ou titre produit', dir:'agents/supplier-resolver' },
+  { name:'v35-orchestrateur',    url:'https://v35-orchestrateur.ernestpedanou.workers.dev',    role:'Pipeline complet — scrape→ali_resolve→images→content→i18n', dir:'agents/orchestrateur' },
+  { name:'v35-build-scraper',    url:'https://v35-build-scraper.ernestpedanou.workers.dev',    role:'Scraping Shopify — collections, produits, images, dorks', dir:'agents/build-scraper' },
+  { name:'v35-shopify-push',     url:'https://v35-shopify-push.ernestpedanou.workers.dev',     role:'Push Shopify — titres, collections, descriptions, metafields', dir:'agents/shopify-push' },
+  { name:'v35-market-intel',     url:'https://v35-market-intel.ernestpedanou.workers.dev',     role:'Market Intel — margin, Google Trends, Ad Spy, validation', dir:'agents/market-intel' },
+  { name:'v35-aged-domain-finder',url:'https://v35-aged-domain-finder.ernestpedanou.workers.dev',role:'Recherche domaines expirés — RDAP, age, disponibilité', dir:'agents/aged-domain-finder' },
+  { name:'v35-skeleton-builder', url:'https://v35-skeleton-builder.ernestpedanou.workers.dev', role:'Génération squelette Shopify (PHP/HTML template)', dir:'agents/skeleton-builder' },
+  { name:'v35-platform-api',     url:'https://v35-platform-api.ernestpedanou.workers.dev',     role:'API plateforme — auth, vault, sessions', dir:'agents/platform-api' },
+  { name:'v35-site-discover',    url:'https://v35-site-discover.ernestpedanou.workers.dev',    role:'Découverte boutiques — qualification CMS + AliExpress + score', dir:'agents/site-discover' },
+  { name:'v35-gemini-proxy',     url:'https://v35-gemini-proxy.ernestpedanou.workers.dev',     role:'Proxy Gemini — rotation clés, cache, fallback', dir:'agents/gemini-proxy' },
+  { name:'v35-optimiseur',       url:'https://v35-optimiseur.ernestpedanou.workers.dev',       role:'Optimisation SEO on-page — scores, suggestions', dir:'agents/optimiseur' },
+  { name:'v35-seo-engine',       url:'https://v35-seo-engine.ernestpedanou.workers.dev',       role:'Moteur SEO — keywords, volume, SERP analysis', dir:'agents/seo-engine' },
+  { name:'v35-sentinelle',       url:'https://v35-sentinelle.ernestpedanou.workers.dev',       role:'Monitoring — uptime, alertes, health check', dir:'agents/sentinelle' },
+  { name:'v35-data-store',       url:'https://v35-data-store.ernestpedanou.workers.dev',       role:'Stockage KV centralisé — cache, sessions', dir:'agents/data-store' },
+  { name:'v35-color-palette',    url:'https://v35-color-palette.ernestpedanou.workers.dev',    role:'Extraction palette couleurs depuis images', dir:'agents/color-palette' },
+];
+
+const TOKEN = 'CLOUDFLARE_API_TOKEN';
+
+document.getElementById('workers-tbody').innerHTML = WORKERS_LIST.map(w => `
+  <tr class="worker-row">
+    <td><b>${w.name}</b></td>
+    <td><a href="${w.url}" target="_blank" style="color:#a5b4fc">${w.url.replace('https://','')}</a></td>
+    <td style="font-size:11px;color:var(--muted)">${w.role}</td>
+    <td>
+      <button class="btn btn-xs" onclick="navigator.clipboard.writeText('${w.url}');toast('URL copiée','success')">URL</button>
+    </td>
+  </tr>
+`).join('');
+
+document.getElementById('deploy-grid').innerHTML = WORKERS_LIST.map(w => `
+  <div class="deploy-cmd">
+    <div class="deploy-cmd-title">${w.name}</div>
+    <div class="deploy-cmd-code">CLOUDFLARE_API_TOKEN=${TOKEN.slice(0,8)}… npx wrangler deploy --config ${w.dir}/wrangler.toml</div>
+    <button class="btn btn-xs" style="margin-top:6px" onclick="navigator.clipboard.writeText('CLOUDFLARE_API_TOKEN=${TOKEN} npx wrangler deploy --config ${w.dir}/wrangler.toml');toast('Commande copiée','success')">Copier</button>
+  </div>
+`).join('');
+
+// ── PIPELINE ──────────────────────────────────────────────────────────────────
+
+const PIPELINE_STEPS = [
+  { num:1, icon:'🔍', title:'Découverte', desc:'Trouver la boutique cible (dorks Google, jules_dur, footprints). Vérifier : CMS Shopify/WooCommerce, AliExpress ≥80%, âge ≥2 ans, score ≥6.5.', worker:'build-scraper /api/qualify' },
+  { num:2, icon:'📋', title:'Scraping collections + produits', desc:'Extraire toutes les collections et produits de la boutique source via API Shopify (/products.json, /collections.json). Stocker blueprint.', worker:'build-scraper /scrape' },
+  { num:3, icon:'🛒', title:'Résolution AliExpress (ali_resolve)', desc:'Mapper chaque collection/produit vers une URL AliExpress. DDG search par titre produit. Bulk endpoint (50 produits max).', worker:'supplier-resolver /resolve/products/bulk' },
+  { num:4, icon:'🖼️', title:'Images', desc:'Télécharger et optimiser les images produits. WebP, 800px max, compression 85%.', worker:'orchestrateur step: images' },
+  { num:5, icon:'🌍', title:'Contenu SEO multilingue', desc:'Générer homepage, titres collections, intros KORAY, descriptions produits. Multi-langue via OpenRouter/Gemini rotation.', worker:'content-ai /api/homepage + /api/collections' },
+  { num:6, icon:'🌐', title:'i18n — Traduction', desc:'Traduire titres H1, collections, descriptions dans les langues cibles (DE, ES, IT, NL…). Batch 500 items par requête.', worker:'content-ai /api/product-titles' },
+  { num:7, icon:'🏗️', title:'Squelette', desc:'Générer le template PHP/HTML Shopify avec le blueprint, les collections et le contenu traduit.', worker:'skeleton-builder /build' },
+  { num:8, icon:'🚀', title:'Push Shopify', desc:'Pousser titres, collections, descriptions, metafields vers le store Shopify via API REST. Batch par 50.', worker:'shopify-push /push/batch' },
+];
+
+document.getElementById('pipeline-steps').innerHTML = PIPELINE_STEPS.map(s => `
+  <div class="pipeline-step">
+    <div class="pipeline-num">${s.num}</div>
+    <div class="pipeline-body">
+      <div class="pipeline-title">${s.icon} ${s.title}</div>
+      <div class="pipeline-desc">${s.desc}</div>
+      <div class="pipeline-worker">→ ${s.worker}</div>
+    </div>
+  </div>
+`).join('');
+
+const CHECKLIST = [
+  { text:'Score V35 ≥ 6.5 /10', level:'block', detail:'Stopper si score < 6.5' },
+  { text:'AliExpress ≥ 80% des produits', level:'block', detail:'Vérifier avec supplier-resolver' },
+  { text:'CMS Shopify ou WooCommerce', level:'warn', detail:'PrestaShop = effort supplémentaire' },
+  { text:'Domaine ≥ 2 ans', level:'warn', detail:'< 2 ans = risque pénalité Google' },
+  { text:'Site en ligne (HTTP 200)', level:'block', detail:'Si 404/403 = source inaccessible' },
+  { text:'≥ 20 collections scrappables', level:'warn', detail:'< 20 = catalogue trop mince' },
+  { text:'≥ 50 produits', level:'warn', detail:'Volume minimal viable' },
+  { text:'Pas de copyright évident (marques)', level:'block', detail:'Nike, Adidas, Apple → STOP' },
+  { text:'Produits AliExpress < 15€ coût', level:'warn', detail:'Marge cible ≥ 60% → prix vente ×2.5' },
+  { text:'Niche identifiée dans NICHES_CFG', level:'warn', detail:'CPC connu = CA estimé fiable' },
+  { text:'blueprint.json exporté', level:'block', detail:'Requis pour le pipeline' },
+  { text:'ali_map généré (ali_resolve)', level:'block', detail:'Requis pour fulfillment commandes' },
+];
+
+const levelClass = { block:'ci-block', warn:'ci-warn', ok:'ci-ok' };
+document.getElementById('checklist-grid').innerHTML = CHECKLIST.map(c => `
+  <div class="checklist-item">
+    <label>
+      <input type="checkbox">
+      <span>
+        <span class="${levelClass[c.level]}">
+          ${c.level==='block'?'🔴':c.level==='warn'?'🟡':'🟢'}
+        </span>
+        <b style="margin-left:4px">${c.text}</b>
+        <br><span style="font-size:10px;color:var(--muted);margin-left:16px">${c.detail}</span>
+      </span>
+    </label>
+  </div>
+`).join('');
 
 // ── TABS ──────────────────────────────────────────────────────────────────────
 
