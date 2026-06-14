@@ -460,34 +460,77 @@ function createPromo(){
 
 /* ── ANALYTICS ───────────────────────────────────────────── */
 function renderStats(){
-  set('<div class="hd"><h1>Analytics</h1><span class="slug-tag">'+SLUG+'</span></div>'+
-  '<div class="card"><div class="card-hd">Visites par jour (30 derniers jours)</div><div id="stats-l"><span class="spin"></span></div></div>'+
-  '<div class="card"><div class="card-hd">Informations site</div><div id="stats-meta"><span class="spin"></span></div></div>');
-  apiFetch('/analytics?slug='+SLUG).then(function(r){return r.json();}).then(function(d){
-    var rows=d.days||[];
-    if(!rows.length){document.getElementById('stats-l').innerHTML='<p class="empty">Aucune donnée disponible (les visites s\'accumulent progressivement).</p>';}
-    else{
-      var total=rows.reduce(function(s,r){return s+r.views},0);
-      var h='<div style="margin-bottom:.8rem;font-size:.78rem;color:#888">Total: <strong style="color:#111">'+total+' visites</strong></div>';
-      h+='<table style="width:100%;border-collapse:collapse;font-size:.8rem">';
-      rows.forEach(function(r){
-        var pct=Math.round((r.views/Math.max(...rows.map(function(x){return x.views})))*100);
-        h+='<tr style="border-bottom:1px solid #f5f5f3"><td style="padding:.4rem .6rem;font-family:monospace;color:#555;width:110px">'+r.date+'</td>'+
-           '<td style="padding:.4rem .6rem"><div style="background:var(--p,#b45309);height:10px;width:'+pct+'%;min-width:4px;border-radius:2px;opacity:.7"></div></td>'+
-           '<td style="padding:.4rem .6rem;text-align:right;font-weight:600;color:#111;width:60px">'+r.views+'</td></tr>';
-      });
-      h+='</table>';
-      document.getElementById('stats-l').innerHTML=h;
-    }
-    var m=d.meta||{};
-    document.getElementById('stats-meta').innerHTML=
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;font-size:.82rem">'+
-      '<div style="padding:.6rem;background:#fafaf8;border-radius:3px"><div style="color:#aaa;font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.25rem">Pages</div><strong>'+( m.pages||'—')+'</strong></div>'+
-      '<div style="padding:.6rem;background:#fafaf8;border-radius:3px"><div style="color:#aaa;font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.25rem">Niche</div><strong>'+(m.niche||'—')+'</strong></div>'+
-      '<div style="padding:.6rem;background:#fafaf8;border-radius:3px"><div style="color:#aaa;font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.25rem">Langue</div><strong>'+(m.lang||'—')+'</strong></div>'+
-      '<div style="padding:.6rem;background:#fafaf8;border-radius:3px"><div style="color:#aaa;font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.25rem">Déployé le</div><strong style="font-size:.75rem">'+(m.deployedAt?m.deployedAt.slice(0,10):'—')+'</strong></div>'+
-      '</div>';
-  }).catch(function(){document.getElementById('stats-l').innerHTML='<p style="color:red">Erreur</p>';});
+  var dSel='<select id="days-sel" onchange="renderStats()" style="font-size:.75rem;padding:.2rem .5rem;border:1px solid #e0dbd4;border-radius:4px;background:#fff;margin-left:.5rem">'
+    +['7','14','30','60','90'].map(function(d){return '<option value="'+d+'"'+(d==='30'?' selected':'')+'>'+d+' jours</option>';}).join('')+'</select>';
+  set('<div class="hd"><h1>Analytics</h1><span class="slug-tag">'+SLUG+'</span>'+dSel+'</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.8rem;margin-bottom:1rem" id="stats-kpis"><span class="spin"></span></div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">'
+    +'<div class="card"><div class="card-hd">Visites / jour</div><div id="stats-timeline"><span class="spin"></span></div></div>'
+    +'<div class="card"><div class="card-hd">Top pages</div><div id="stats-pages"><span class="spin"></span></div></div>'
+    +'<div class="card"><div class="card-hd">Top référents</div><div id="stats-refs"><span class="spin"></span></div></div>'
+    +'<div class="card"><div class="card-hd">Évènements</div><div id="stats-events"><span class="spin"></span></div></div>'
+    +'</div>');
+
+  var days=document.getElementById('days-sel')?.value||'30';
+  apiFetch('/analytics?slug='+SLUG+'&days='+days).then(function(r){return r.json();}).then(function(d){
+    var timeline=d.timeline||[];
+    var topPages=d.top_pages||[];
+    var topRefs=d.top_referrers||[];
+    var events=d.events||{};
+    var meta=d.meta||{};
+    var total=d.total||0;
+    var avg=d.avg_per_day||0;
+
+    // KPIs
+    function kpi(label,val,sub){return '<div style="background:#fafaf8;border:1px solid #ece8e3;border-radius:6px;padding:.8rem 1rem"><div style="font-size:.65rem;text-transform:uppercase;letter-spacing:.1em;color:#aaa;margin-bottom:.3rem">'+label+'</div><div style="font-size:1.4rem;font-weight:700;color:#111;font-family:Georgia,serif">'+val+'</div>'+(sub?'<div style="font-size:.7rem;color:#aaa;margin-top:.15rem">'+sub+'</div>':'')+'</div>';}
+    document.getElementById('stats-kpis').innerHTML=
+      kpi('Total visites',total.toLocaleString('fr-FR'),days+'j')+
+      kpi('Moy / jour',avg,'')+
+      kpi('Pages indexées',meta.pages||'—',meta.niche||'')+
+      kpi('Déployé',meta.deployedAt?meta.deployedAt.slice(0,10):'—','');
+
+    // Timeline bar chart
+    var maxV=Math.max(1,...timeline.map(function(r){return r.views;}));
+    var th='';
+    timeline.forEach(function(r){
+      var pct=Math.round((r.views/maxV)*100);
+      var isToday=r.date===new Date().toISOString().slice(0,10);
+      th+='<div style="display:flex;align-items:center;gap:.5rem;padding:.25rem 0;border-bottom:1px solid #f5f5f3">'
+        +'<span style="font-family:monospace;font-size:.72rem;color:#888;width:90px;flex-shrink:0">'+r.date.slice(5)+(isToday?' ●':'')+'</span>'
+        +'<div style="flex:1;background:#f0eeeb;border-radius:2px;height:8px"><div style="background:var(--ac,#b45309);height:8px;border-radius:2px;width:'+pct+'%;min-width:'+(r.views?4:0)+'px"></div></div>'
+        +'<span style="font-weight:600;font-size:.75rem;color:#111;width:35px;text-align:right">'+r.views+'</span></div>';
+    });
+    document.getElementById('stats-timeline').innerHTML=th||'<p class="empty">Aucune donnée — les visites s\'accumulent dès que les sites sont visités.</p>';
+
+    // Top pages
+    var ph=topPages.length?topPages.map(function(p,i){
+      var maxPV=topPages[0].views||1;
+      return '<div style="padding:.35rem 0;border-bottom:1px solid #f5f5f3;font-size:.78rem">'
+        +'<div style="display:flex;justify-content:space-between;margin-bottom:.2rem">'
+        +'<span style="color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:75%">'+(i===0?'🏆 ':'')+p.path+'</span>'
+        +'<strong>'+p.views+'</strong></div>'
+        +'<div style="background:#f0eeeb;border-radius:2px;height:4px"><div style="background:var(--p,#b45309);height:4px;border-radius:2px;width:'+Math.round(p.views/maxPV*100)+'%"></div></div>'
+        +'</div>';
+    }).join(''):'<p class="empty">Aucune page vue encore.</p>';
+    document.getElementById('stats-pages').innerHTML=ph;
+
+    // Top référents
+    var rh=topRefs.length?topRefs.map(function(r){
+      return '<div style="display:flex;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid #f5f5f3;font-size:.78rem">'
+        +'<span style="color:#555">🔗 '+r.ref+'</span><strong>'+r.hits+'</strong></div>';
+    }).join(''):'<p class="empty">Aucun référent détecté.</p>';
+    document.getElementById('stats-refs').innerHTML=rh;
+
+    // Évènements
+    var ev=Object.entries(events);
+    var eh=ev.length?ev.sort(function(a,b){return b[1]-a[1];}).map(function(e){
+      var icon={'add_to_cart':'🛒','purchase':'💰','signup':'📧'}[e[0]]||'⚡';
+      return '<div style="display:flex;justify-content:space-between;padding:.35rem 0;border-bottom:1px solid #f5f5f3;font-size:.78rem">'
+        +'<span style="color:#555">'+icon+' '+e[0]+'</span><strong>'+e[1]+'</strong></div>';
+    }).join(''):'<p class="empty">Aucun évènement enregistré.</p>';
+    document.getElementById('stats-events').innerHTML=eh;
+
+  }).catch(function(){document.getElementById('stats-kpis').innerHTML='<p style="color:red;font-size:.8rem">Erreur chargement analytics</p>';});
 }
 
 function deletePromo(code){

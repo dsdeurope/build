@@ -18,3 +18,7 @@ service = "v35-orchestrator"
 [[services]]
 binding = "SENTINELLE"
 service = "v35-sentinelle"
+
+[[services]]
+binding = "ANALYTICS"
+service = "v35-analytics"

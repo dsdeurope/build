@@ -263,21 +263,22 @@ export default{
       return ok(d);
     }
 
-    // GET /analytics
+    // GET /analytics — proxy vers v35-analytics worker
     if(request.method==='GET'&&path==='/analytics'){
       const sl=url.searchParams.get('slug');if(!sl)return err('slug required');
-      const days=[];
-      const now=new Date();
-      for(let i=0;i<30;i++){
-        const d=new Date(now-i*86400000).toISOString().slice(0,10);
-        const v=await env.KV.get('analytics:'+sl+':'+d).catch(()=>null);
-        if(v)days.push({date:d,views:parseInt(v)});
-      }
-      days.reverse();
+      const days=parseInt(url.searchParams.get('days')||'30');
+      // Meta site depuis R2
       const metaRaw=await env.R2.get(sl+'/__meta.json').catch(()=>null);
       let meta={};
       if(metaRaw){try{meta=JSON.parse(await new Response(metaRaw.body).text());}catch{}}
-      return ok({slug:sl,days,meta});
+      // Stats depuis analytics worker via service binding
+      let stats={total:0,timeline:[],top_pages:[],top_referrers:[],events:{}};
+      if(env.ANALYTICS){
+        const tok=env.API_TOKEN||'';
+        const r=await env.ANALYTICS.fetch(new Request(`https://analytics/stats?s=${encodeURIComponent(sl)}&days=${days}`,{headers:{'Authorization':'Bearer '+tok}})).catch(()=>null);
+        if(r){try{const d=await r.json();if(d.total!==undefined)stats=d;}catch{}}
+      }
+      return ok({slug:sl,meta,...stats});
     }
 
     // Promo endpoints (auth required)
