@@ -143,8 +143,44 @@ a{text-decoration:none;color:inherit}img{max-width:100%;display:block}
 .legal h2{font-size:.95rem;font-weight:700;margin:2.2rem 0 .5rem;color:#111;letter-spacing:.03em;text-transform:uppercase}
 .legal p{color:#555;font-size:.9rem;margin-bottom:1rem}
 @media(max-width:1024px){.pg4{grid-template-columns:repeat(2,1fr)}.feat-grid{grid-template-columns:repeat(2,1fr)}.ftr-top{grid-template-columns:1fr 1fr;gap:2.5rem}}
-@media(max-width:768px){.nav-l{display:none}.trust-i{grid-template-columns:1fr 1fr}.rev-grid{grid-template-columns:1fr}.about-i{grid-template-columns:1fr;gap:2rem}.about-img{height:280px;font-size:5rem}.ftr-top{grid-template-columns:1fr;gap:2rem}.feat-grid{grid-template-columns:1fr}.hero{min-height:70vh}}
-@media(max-width:480px){.pg4{grid-template-columns:1fr 1fr}.trust-i{grid-template-columns:1fr 1fr}.hero h1{font-size:1.9rem}}
+@media(max-width:768px){.nav-l{display:none}.trust-i{grid-template-columns:1fr 1fr}.rev-grid{grid-template-columns:1fr}.about-i{grid-template-columns:1fr;gap:2rem}.about-img{height:280px;font-size:5rem}.ftr-top{grid-template-columns:1fr;gap:2rem}.feat-grid{grid-template-columns:1fr}.hero{min-height:70vh}.ham-btn{display:flex}.pg4{grid-template-columns:1fr 1fr}.pdp-grid{grid-template-columns:1fr;gap:2rem}.pdp-gallery{position:static}.pdp-main-img{height:380px}}
+@media(max-width:480px){.pg4{grid-template-columns:1fr 1fr}.trust-i{grid-template-columns:1fr 1fr}.hero h1{font-size:1.85rem}.hero-ctas{flex-direction:column;align-items:center}.btn-w,.btn-o{width:100%;max-width:280px;text-align:center}}
+.ham-btn{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:none;padding:.45rem;z-index:10}
+.ham-btn span{display:block;width:22px;height:2px;background:#333;transition:all .25s;border-radius:1px}
+.mob-nav{position:fixed;top:0;left:0;bottom:0;width:min(300px,85vw);z-index:600;background:#fff;padding:2rem 1.5rem;transform:translateX(-100%);transition:transform .32s cubic-bezier(.4,0,.2,1);overflow-y:auto;box-shadow:4px 0 24px rgba(0,0,0,.12)}
+.mob-nav.open{transform:translateX(0)}
+.mob-nav-close{position:absolute;top:1.2rem;right:1.2rem;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#444;padding:.3rem;line-height:1}
+.mob-nav-links a{display:block;padding:.9rem 0;border-bottom:1px solid #f0eeeb;font-size:.95rem;color:#111;letter-spacing:.04em;transition:color .18s}
+.mob-nav-links a:hover{color:var(--p)}
+.mob-nav-brand{font:normal .72rem Georgia,serif;letter-spacing:.25em;text-transform:uppercase;color:#ccc;margin-top:2.2rem}
+.mob-ov{position:fixed;inset:0;z-index:599;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:opacity .32s}
+.mob-ov.open{opacity:1;pointer-events:all}
+.pcard{position:relative;overflow:hidden}
+.pc-quick{position:absolute;bottom:0;left:0;right:0;padding:.7rem;background:rgba(0,0,0,.82);color:#fff;text-align:center;font-size:.64rem;letter-spacing:.16em;text-transform:uppercase;transform:translateY(100%);transition:transform .22s ease;cursor:pointer;border:none;width:100%;font-family:inherit}
+.pcard:hover .pc-quick{transform:translateY(0)}
+.mob-cart-bar{position:fixed;bottom:-80px;left:0;right:0;z-index:300;background:var(--p);padding:.9rem 1.5rem;display:flex;justify-content:space-between;align-items:center;color:#fff;box-shadow:0 -4px 20px rgba(0,0,0,.18);transition:bottom .3s ease}
+.mob-cart-bar.show{bottom:0}
+.mob-cart-info{display:flex;flex-direction:column;min-width:0}
+.mob-cart-name{font-size:.72rem;opacity:.8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mob-cart-price{font:normal 1.1rem Georgia,serif}
+.mob-cart-btn{background:#fff;color:var(--p);border:none;padding:.65rem 1.2rem;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;font-family:inherit}
+.btt{position:fixed;bottom:5.5rem;right:1.5rem;width:42px;height:42px;background:#111;color:#fff;border:none;cursor:pointer;font-size:.85rem;display:none;align-items:center;justify-content:center;z-index:299;opacity:.7;transition:opacity .2s;box-shadow:0 4px 14px rgba(0,0,0,.22)}
+.btt.show{display:flex}
+.btt:hover{opacity:1}
+.pc-img{position:relative}
+.pc-img-real{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.pdp-main-img{position:relative}
+.pdp-main-img-real{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.vid-wrap{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:#111;margin:3rem 0}
+.vid-inner{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10rem;animation:kburn 14s ease-in-out infinite alternate}
+@keyframes kburn{0%{transform:scale(1.04) translate(0,0)}100%{transform:scale(1.13) translate(-2%,-1%)}}
+.vid-ov{position:absolute;inset:0;background:linear-gradient(to right,rgba(0,0,0,.5),rgba(0,0,0,.15) 60%)}
+.vid-cap{position:absolute;bottom:2rem;left:2rem;color:#fff;z-index:2;max-width:480px}
+.vid-cap h2{font:normal clamp(1.2rem,3vw,2rem)/1.25 Georgia,serif;margin-bottom:.5rem}
+.vid-cap p{font-size:.85rem;opacity:.82;margin-bottom:1rem}
+.vid-play{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:2}
+.vid-playbtn{width:64px;height:64px;background:rgba(255,255,255,.15);border:2px solid rgba(255,255,255,.65);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.5rem;cursor:pointer;backdrop-filter:blur(4px);transition:all .25s}
+.vid-playbtn:hover{background:rgba(255,255,255,.28);transform:scale(1.08)}
 .pdp-wrap{max-width:1280px;margin:0 auto}
 .pdp-grid{display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:start;padding:3rem 1.5rem}
 .pdp-gallery{position:sticky;top:80px}
@@ -282,14 +318,21 @@ a{text-decoration:none;color:inherit}img{max-width:100%;display:block}
 @media(max-width:768px){.blog-g{grid-template-columns:1fr}.cf{top:0}}`;
 }
 
+function pageJS(){return `<script>
+function toggleMobNav(){var mn=document.getElementById('mob-nav'),ov=document.getElementById('mob-ov');if(!mn)return;var o=mn.classList.toggle('open');if(ov)ov.classList.toggle('open',o);document.body.style.overflow=o?'hidden':'';}
+function scrollTop(){window.scrollTo({top:0,behavior:'smooth'});}
+window.addEventListener('scroll',function(){var b=document.getElementById('btt');if(b)b.classList.toggle('show',window.scrollY>400);var m=document.getElementById('mob-cart-bar');if(m)m.classList.toggle('show',window.scrollY>280);});
+(function(){var chips=document.querySelectorAll('.cf-c'),cards=document.querySelectorAll('.pcard');chips.forEach(function(c){c.addEventListener('click',function(){chips.forEach(function(x){x.classList.remove('on')});c.classList.add('on');var f=c.dataset.filter;cards.forEach(function(p){var t=p.dataset.tags||'';p.style.display=(!f||f==='all'||t.indexOf(f)>-1)?'':'none';});});});var sel=document.querySelector('.cf-sort select');if(sel)sel.addEventListener('change',function(){var g=document.querySelector('.pg4');if(!g)return;var cs=Array.from(g.querySelectorAll('.pcard'));var m=this.value;cs.sort(function(a,b){var ap=parseFloat(a.dataset.price||0),bp=parseFloat(b.dataset.price||0);return m==='price-asc'?ap-bp:m==='price-desc'?bp-ap:0;});cs.forEach(function(c){g.appendChild(c);});});})();
+<\/script>`;}
+
 const layout=(title,desc,url,ld,body,p,pd,ac,lang='fr')=>
-  `<!DOCTYPE html><html lang="${lang}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}"><meta property="og:type" content="website"><link rel="canonical" href="${url}"><script type="application/ld+json">${ld}</script><style>${css(p,pd,ac)}</style></head><body>${body}</body></html>`;
+  `<!DOCTYPE html><html lang="${lang}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}"><meta property="og:type" content="website"><link rel="canonical" href="${url}"><script type="application/ld+json">${ld}</script><style>${css(p,pd,ac)}</style></head><body>${body}<button class="btt" id="btt" onclick="scrollTop()">↑</button>${pageJS()}</body></html>`;
 
 const SVG_HEART=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
 const SVG_BAG=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`;
 function navBar(b,lang){
   const e=lang==='en';
-  return `<nav class="nav"><div class="nav-i"><div class="nav-l"><a href="/collections/">${e?'Collections':'Collections'}</a><a href="/collections/new-arrivals/">${e?'New Arrivals':'Nouveautés'}</a><a href="/blog/">${e?'Journal':'Blog'}</a></div><a href="/" class="logo">${esc(b)}</a><div class="nav-r"><a href="/cgv/">${e?'Terms':'CGV'}</a><span class="nav-icon">${SVG_HEART}</span><span class="nav-icon">${SVG_BAG}</span></div></div></nav>`;
+  return `<nav class="nav"><div class="nav-i"><button class="ham-btn" onclick="toggleMobNav()"><span></span><span></span><span></span></button><div class="nav-l"><a href="/collections/">${e?'Collections':'Collections'}</a><a href="/collections/new-arrivals/">${e?'New Arrivals':'Nouveautés'}</a><a href="/blog/">${e?'Journal':'Blog'}</a></div><a href="/" class="logo">${esc(b)}</a><div class="nav-r"><a href="/cgv/">${e?'Terms':'CGV'}</a><span class="nav-icon">${SVG_HEART}</span><span class="nav-icon">${SVG_BAG}</span></div></div></nav><div id="mob-nav" class="mob-nav"><button class="mob-nav-close" onclick="toggleMobNav()">✕</button><div class="mob-nav-links"><a href="/collections/">${e?'Collections':'Collections'}</a><a href="/collections/new-arrivals/">${e?'New Arrivals':'Nouveautés'}</a><a href="/blog/">${e?'Journal':'Blog'}</a><a href="/cgv/">${e?'Terms':'CGV'}</a></div><div class="mob-nav-brand">${esc(b)}</div></div><div id="mob-ov" class="mob-ov" onclick="toggleMobNav()"></div>`;
 }
 
 function promoBar(niche,lang){
@@ -311,10 +354,11 @@ function trustSection(lang){
 }
 
 const prodSlug=n=>n.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
-function prodCard(name,price,orig,em,lang,badge='',href=''){
+function prodCard(name,price,orig,em,lang,badge='',href='',tags=''){
   const e=lang==='en';
-  const inner=`<div class="pc-img"><div class="pci">${em}</div>${badge?`<span class="pc-badge">${badge}</span>`:''}</div><div class="pc-bd"><p class="pc-nm">${esc(name)}</p><p class="pc-pr">€${price}${orig?`<span class="pc-orig">€${orig}</span>`:''}</p><button class="pc-btn" onclick="event.stopPropagation();location.href='/checkout/'">${e?'Add to Cart':'Ajouter'}</button></div>`;
-  return href?`<a class="pcard" href="${href}" style="display:block;color:inherit">${inner}</a>`:`<div class="pcard">${inner}</div>`;
+  const inner=`<div class="pc-img"><div class="pci">${em}</div>${badge?`<span class="pc-badge">${badge}</span>`:''}<button class="pc-quick" onclick="event.stopPropagation();location.href='/checkout/'">${e?'Quick Add':'Ajouter vite'}</button></div><div class="pc-bd"><p class="pc-nm">${esc(name)}</p><p class="pc-pr">€${price}${orig?`<span class="pc-orig">€${orig}</span>`:''}</p><button class="pc-btn" onclick="event.stopPropagation();location.href='/checkout/'">${e?'Add to Cart':'Ajouter'}</button></div>`;
+  const attrs=`data-price="${price}" data-tags="${tags}"`;
+  return href?`<a class="pcard" href="${href}" ${attrs} style="display:block;color:inherit">${inner}</a>`:`<div class="pcard" ${attrs}>${inner}</div>`;
 }
 
 function genNewArrivals(cols,em,lang){
@@ -729,7 +773,8 @@ function genProduct(prod,col,niche,domain,lang){
   const desc=e?`Buy ${title} — ${b}. Free delivery from €39. 30-day returns.`:`Acheter ${title} — ${b}. Livraison offerte dès 39€. Retours 30 jours.`;
   const inStock=`<span class="pdp-stock"><span class="pdp-stock-dot"></span>${e?'In stock — ships today':'En stock — expédié aujourd\'hui'}</span>`;
   const social=`<p class="pdp-social-proof">${e?'🔥 12 people bought this in the last 24h':'🔥 12 personnes ont acheté ça ces dernières 24h'}</p>`;
-  const body=`${promoBar(niche,lang)}${navBar(b,lang)}<div class="bc"><div class="bc-i"><a href="/">${e?'Home':'Accueil'}</a> › <a href="/collections/">${e?'Collections':'Collections'}</a> › <a href="${col.path}/">${esc(col.title)}</a> › ${esc(title)}</div></div><div class="pdp-wrap"><div class="pdp-grid"><div class="pdp-gallery">${mainImg}<div class="pdp-thumbs">${thumbs}</div></div><div class="pdp-info">${inStock}<p class="pdp-eye">${esc(col.title)}</p><h1>${esc(title)}</h1><div class="pdp-rating"><span class="pdp-stars">★★★★★</span><span class="pdp-rating-cnt">4.8</span><a href="#t3" class="pdp-rating-link">(47 ${e?'reviews':'avis'})</a></div><div class="pdp-price-row"><span class="pdp-price-now">€${price}</span>${orig?`<span class="pdp-price-orig">€${orig}</span><span class="pdp-price-save">${e?'−':'−'}€${saveAmt}</span>`:''}</div>${social}${bulletsHTML}${varHTML}<div class="pdp-qty"><button id="qm">−</button><span id="qv">1</span><button id="qp">+</button></div><button class="btn-cart" id="addCart" onclick="location.href='/checkout/'">${e?`Add to Cart — €${price}`:`Ajouter au panier — €${price}`}</button><button class="btn-wish">${SVG_HEART} ${e?'Add to Wishlist':'Ajouter à ma liste'}</button>${trustRow}<div class="pdp-dlv">${SVG_TRUCK} ${dlv}</div></div></div></div>${tabs}${related}${footerSection(b,domain,lang)}${js}`;
+  const mobCart=`<div id="mob-cart-bar" class="mob-cart-bar"><div class="mob-cart-info"><span class="mob-cart-name">${esc(title)}</span><span class="mob-cart-price">€${price}</span></div><button class="mob-cart-btn" onclick="location.href='/checkout/'">${e?'Buy Now':'Acheter'}</button></div>`;
+  const body=`${promoBar(niche,lang)}${navBar(b,lang)}<div class="bc"><div class="bc-i"><a href="/">${e?'Home':'Accueil'}</a> › <a href="/collections/">${e?'Collections':'Collections'}</a> › <a href="${col.path}/">${esc(col.title)}</a> › ${esc(title)}</div></div><div class="pdp-wrap"><div class="pdp-grid"><div class="pdp-gallery">${mainImg}<div class="pdp-thumbs">${thumbs}</div></div><div class="pdp-info">${inStock}<p class="pdp-eye">${esc(col.title)}</p><h1>${esc(title)}</h1><div class="pdp-rating"><span class="pdp-stars">★★★★★</span><span class="pdp-rating-cnt">4.8</span><a href="#t3" class="pdp-rating-link">(47 ${e?'reviews':'avis'})</a></div><div class="pdp-price-row"><span class="pdp-price-now">€${price}</span>${orig?`<span class="pdp-price-orig">€${orig}</span><span class="pdp-price-save">${e?'−':'−'}€${saveAmt}</span>`:''}</div>${social}${bulletsHTML}${varHTML}<div class="pdp-qty"><button id="qm">−</button><span id="qv">1</span><button id="qp">+</button></div><button class="btn-cart" id="addCart" onclick="location.href='/checkout/'">${e?`Add to Cart — €${price}`:`Ajouter au panier — €${price}`}</button><button class="btn-wish">${SVG_HEART} ${e?'Add to Wishlist':'Ajouter à ma liste'}</button>${trustRow}<div class="pdp-dlv">${SVG_TRUCK} ${dlv}</div></div></div></div>${tabs}${related}${footerSection(b,domain,lang)}${mobCart}${js}`;
   return layout(`${esc(title)} | ${b}`,desc,url,ld,body,p,pd,ac,lang);
 }
 
