@@ -87,6 +87,7 @@ const NAV_ITEMS = [
   { href: '/domaines-footprints.html',   icon: '◎', label: 'Footprints' },
   { href: '/dorks.html',                 icon: '🔍', label: 'Dorks' },
   { href: '/market-intel.html',          icon: '📊', label: 'Market Intel' },
+  { href: '/memoire.html',               icon: '📌', label: 'Pour mémoire' },
   { href: '/sites.html',                 icon: '✦', label: 'Sites' },
   { href: '/contenu.html',               icon: '⌁', label: 'Contenu' },
   { href: '/domaines.html',              icon: '⏣', label: 'Domaines' },

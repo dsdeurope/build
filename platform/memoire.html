@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Pour mémoire</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Pour mémoire</span>
+      <div class="topbar-right">
+        <input type="search" id="q-global" placeholder="Rechercher…" class="filter-input" oninput="filterAll()" style="min-width:200px">
+      </div>
+    </header>
+    <div class="content">
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:20px;flex-wrap:wrap">
+        <button class="tab-btn active" onclick="switchTab('prompts',this)">📝 Prompts</button>
+        <button class="tab-btn" onclick="switchTab('jules',this)">🛒 Jules_dur (167)</button>
+        <button class="tab-btn" onclick="switchTab('footprints',this)">🔍 Footprints</button>
+      </div>
+
+      <!-- ═══════════════════════════════ PROMPTS ═══════════════════════════ -->
+      <div id="tab-prompts" class="tab-panel">
+
+        <div class="section-group">
+          <div class="section-group-title">🛍 CRO Produit</div>
+          <div class="cards-grid" id="grid-cro"></div>
+        </div>
+
+        <div class="section-group">
+          <div class="section-group-title">📦 SEO Bulk</div>
+          <div class="cards-grid" id="grid-seo"></div>
+        </div>
+
+        <div class="section-group">
+          <div class="section-group-title">🏠 Page Homepage</div>
+          <div class="cards-grid" id="grid-homepage"></div>
+        </div>
+
+      </div>
+
+      <!-- ═══════════════════════════════ JULES ════════════════════════════ -->
+      <div id="tab-jules" class="tab-panel" style="display:none">
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+          <span class="badge badge-info">167 boutiques @jules_dur</span>
+          <input type="search" id="q-jules" placeholder="Filtrer domaines…" class="filter-input" oninput="filterJules()" style="max-width:260px">
+          <button class="btn btn-sm" onclick="copyJules()">Copier tous</button>
+        </div>
+        <div id="jules-grid" class="domains-grid"></div>
+      </div>
+
+      <!-- ═══════════════════════════════ FOOTPRINTS ═══════════════════════ -->
+      <div id="tab-footprints" class="tab-panel" style="display:none">
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <span class="badge badge-info">50+ signatures techniques</span>
+          <button class="btn btn-sm" onclick="copyDorks()">Copier tous les dorks</button>
+        </div>
+        <div id="footprints-grid"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<style>
+.tab-btn{padding:8px 16px;border:none;background:none;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;font-size:13px;font-weight:500;transition:.15s;margin-bottom:-1px}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:#6366f1;border-bottom-color:#6366f1}
+
+.section-group{margin-bottom:28px}
+.section-group-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px}
+
+.prompt-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;transition:.15s}
+.prompt-card:hover{border-color:#6366f1;box-shadow:0 0 0 1px #6366f144}
+.prompt-card-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--surface2);border-bottom:1px solid var(--border)}
+.prompt-card-title{font-size:12px;font-weight:700;display:flex;align-items:center;gap:6px}
+.prompt-card-body{padding:12px 14px;font-size:11px;color:var(--muted);line-height:1.5;max-height:80px;overflow:hidden;text-overflow:ellipsis;white-space:pre-wrap;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical}
+.prompt-card-footer{padding:8px 14px;display:flex;gap:6px;border-top:1px solid var(--border);background:var(--surface2)}
+
+.domains-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px}
+.domain-item{display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:12px;gap:6px}
+.domain-item:hover{border-color:#6366f1}
+.domain-link{color:var(--text);text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.domain-link:hover{color:#6366f1}
+
+.fp-section{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden}
+.fp-section-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:var(--surface2);border-bottom:1px solid var(--border);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+.fp-rows{padding:8px 14px;display:flex;flex-wrap:wrap;gap:6px}
+.fp-item{display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--surface2);border-radius:5px;font-size:11px;cursor:pointer}
+.fp-item:hover{background:rgba(99,102,241,.15)}
+.fp-pct{font-size:10px;color:var(--muted)}
+.fp-name{font-weight:600}
+
+/* Modal */
+.prompt-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
+.prompt-modal.open{display:flex}
+.prompt-modal-box{background:var(--surface);border:1px solid var(--border);border-radius:12px;width:100%;max-width:760px;overflow:hidden}
+.prompt-modal-header{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:var(--surface2);border-bottom:1px solid var(--border)}
+.prompt-modal-title{font-size:14px;font-weight:700}
+.prompt-modal-body{padding:0}
+.prompt-textarea{width:100%;min-height:460px;max-height:70vh;font-family:monospace;font-size:12px;line-height:1.6;border:none;background:var(--bg);color:var(--text);padding:16px;resize:vertical;outline:none;box-sizing:border-box}
+.prompt-modal-footer{padding:12px 18px;display:flex;gap:8px;justify-content:flex-end;border-top:1px solid var(--border);background:var(--surface2)}
+</style>
+
+<!-- Prompt viewer modal -->
+<div class="prompt-modal" id="pm" onclick="if(event.target===this)closePM()">
+  <div class="prompt-modal-box" onclick="event.stopPropagation()">
+    <div class="prompt-modal-header">
+      <span class="prompt-modal-title" id="pm-title">—</span>
+      <button class="modal-close" onclick="closePM()">✕</button>
+    </div>
+    <div class="prompt-modal-body">
+      <textarea class="prompt-textarea" id="pm-text" spellcheck="false"></textarea>
+    </div>
+    <div class="prompt-modal-footer">
+      <button class="btn btn-sm" onclick="closePM()">Fermer</button>
+      <button class="btn btn-primary" onclick="copyPM()">Copier le prompt</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { checkAuth, buildNav, toast } from '/assets/platform.js';
+checkAuth(); buildNav();
+
+// ── DATA ──────────────────────────────────────────────────────────────────────
+
+const PROMPTS_CRO = [
+  {
+    id: 'bulletpoints',
+    icon: '•',
+    title: 'Bullet Points',
+    desc: 'Génère 4 bullet points ultra persuasifs (7 mots max) à partir d\'un titre produit. Structure : bénéfice principal chiffré, économie, réassurance, concrétisation.',
+    prompt: `Tu es un copywriter expert en e-commerce conversion.
+
+Ta mission : générer 4 bullet points ultra persuasifs (7 mots max chacun), en français, à partir d'un TITRE PRODUIT fourni.
+
+⚙️ ADAPTATION AUTOMATIQUE
+Tu dois :
+1. Identifier automatiquement la **catégorie de produit** (mode femme, mode homme, accessoire, tech, beauté, maison, sport, voyage, cuisine, organisation, etc.)
+2. Adapter le type d'arguments en fonction :
+   - de ce qui pousse vraiment à l'achat pour cette catégorie
+   - des bénéfices réels recherchés par l'acheteur
+   - des objections typiques pour ce type de produit
+
+🎯 STRUCTURE DES 4 BULLETS (OBLIGATOIRE)
+Tu génères exactement 4 bullets, dans cet ordre :
+
+1) BULLET 1 = BÉNÉFICE PRINCIPAL CHIFFRÉ
+2) BULLET 2 = ÉCONOMIE (argent, temps, effort)
+3) BULLET 3 = RÉASSURANCE / PREUVE
+4) BULLET 4 = CONCRÉTISATION / VISUALISATION
+
+📏 RÈGLES
+- Français uniquement | 7 mots max | Aucun emoji | Pas de superlatifs
+
+🧱 FORMAT JSON OBLIGATOIRE
+{
+  "product_title": "...",
+  "bullets": [
+    { "role": "benefice_principal", "text": "..." },
+    { "role": "economie", "text": "..." },
+    { "role": "reassurance", "text": "..." },
+    { "role": "concretisation", "text": "..." }
+  ]
+}
+
+📥 ENTRÉE : [TITRE_PRODUIT] = "[TITRE_PRODUIT]"`
+  },
+  {
+    id: 'description_produit',
+    icon: '📄',
+    title: 'Description Produit',
+    desc: 'Copywriter e-commerce senior, style Sac-Cabine. Description complète + titre SEO + bullets + FAQ + schema.org.',
+    prompt: `<|im_start|>system
+Tu es un copywriter e-commerce senior, spécialisé en descriptions produits compatibles Merchant Center, avec style Sac-Cabine.
+
+MISSION : À partir d'un SEUL titre produit, générer :
+1. Titre SEO optimisé (55-65 car.)
+2. Description courte (150-180 mots, CRO)
+3. Description longue (300-400 mots, SEO)
+4. 4 bullet points (bénéfice, économie, preuve, projection)
+5. FAQ 3 questions/réponses
+6. Schema.org JSON-LD Product
+
+OUTPUT : JSON strict
+{
+  "title_seo": "...",
+  "short_desc": "...",
+  "long_desc": "...",
+  "bullets": ["...","...","...","..."],
+  "faq": [{"q":"...","a":"..."}],
+  "schema_org": {}
+}
+
+[TITRE_PRODUIT] = "[TITRE_PRODUIT]"
+<|im_end|>`
+  },
+  {
+    id: 'slogan',
+    icon: '💬',
+    title: 'Slogan',
+    desc: 'Génère 5 slogans pour une boutique e-commerce. Court, mémorable, différenciant. Format JSON.',
+    prompt: `<|im_start|>system
+Tu es un copywriter e-commerce senior spécialisé en brand identity et slogans haute conversion.
+
+MISSION : À partir d'un nom de boutique + niche, générer 5 slogans mémorables.
+
+RÈGLES :
+- 3 à 8 mots maximum par slogan
+- Éviter : "qualité", "premium", "excellence", "découvrez", "le meilleur"
+- Ton : direct, bénéfice concret, émotionnel ou chiffré
+- Variants : 1 rationnel, 1 émotionnel, 1 humour, 1 aspirationnel, 1 FOMO
+
+OUTPUT JSON :
+{
+  "boutique": "...",
+  "niche": "...",
+  "slogans": [
+    { "type": "rationnel", "slogan": "..." },
+    { "type": "emotionnel", "slogan": "..." },
+    { "type": "humour", "slogan": "..." },
+    { "type": "aspirationnel", "slogan": "..." },
+    { "type": "fomo", "slogan": "..." }
+  ]
+}
+
+INPUT :
+Boutique : [NOM_BOUTIQUE]
+Niche : [NICHE]
+<|im_end|>`
+  },
+  {
+    id: 'cro',
+    icon: '⚡',
+    title: '5 Blocks CRO',
+    desc: 'Génère 5 blocs de conversion (urgence, social proof, réassurance, objection, CTA) pour une page produit.',
+    prompt: `<|im_start|>system
+Tu es un copywriter e-commerce senior, expert en structure CRO et en conformité Google Merchant Center.
+Tu analyses un titre produit pour produire 5 blocs CRO en JSON.
+
+BLOCS OBLIGATOIRES :
+1. URGENCE — créer la rareté ou l'urgence temporelle (sans fake)
+2. SOCIAL PROOF — témoignage synthétique crédible (avec prénom + ville)
+3. RÉASSURANCE — livraison, retours, paiement sécurisé (adapté FR)
+4. OBJECTION PRINCIPALE — identifier + réfuter en 1 phrase
+5. CTA FINAL — bouton + micro-texte de réassurance sous le bouton
+
+OUTPUT JSON :
+{
+  "product_title": "...",
+  "urgence": { "headline": "...", "body": "..." },
+  "social_proof": { "name": "...", "location": "...", "text": "..." },
+  "reassurance": ["...", "...", "..."],
+  "objection": { "objection": "...", "reponse": "..." },
+  "cta": { "button": "...", "sous_texte": "..." }
+}
+
+[TITRE_PRODUIT] = "[TITRE_PRODUIT]"
+<|im_end|>`
+  },
+  {
+    id: 'avis',
+    icon: '⭐',
+    title: 'Comparatif / Avis',
+    desc: 'Génère des avis clients ultra-naturels + tableau comparatif "Notre produit vs Alternatives".',
+    prompt: `<|im_start|>system
+Tu es spécialisé dans la génération d'avis clients ultra-naturels et de tableaux comparatifs CRO.
+
+PARTIE 1 — AVIS CLIENTS (3 avis)
+- Ton naturel (pas marketing), longueur variable 40-120 mots
+- Prénom + ville française + note /5
+- Mentionne un défaut mineur pour crédibilité
+- Format JSON array
+
+PARTIE 2 — COMPARATIF
+- Tableau "Notre produit vs Concurrent A vs Concurrent B"
+- 6 critères pertinents pour la catégorie
+- Format JSON
+
+OUTPUT :
+{
+  "product_title": "...",
+  "avis": [
+    { "prenom": "...", "ville": "...", "note": 4.5, "texte": "..." }
+  ],
+  "comparatif": {
+    "criteres": ["Prix", "Qualité", "Livraison", "SAV", "..."],
+    "notre_produit": ["✅", "✅", "..."],
+    "concurrent_a": ["❌", "⚠️", "..."],
+    "concurrent_b": ["⚠️", "✅", "..."]
+  }
+}
+
+[TITRE_PRODUIT] = "[TITRE_PRODUIT]"
+<|im_end|>`
+  },
+  {
+    id: 'faq',
+    icon: '❓',
+    title: 'FAQ Produit',
+    desc: 'Génère une FAQ 5-8 questions/réponses optimisées SEO et schema FAQ pour une page produit.',
+    prompt: `Tu es un assistant spécialisé en e-commerce, conversion (CRO) et conformité Google Merchant Center.
+
+TA MISSION : Générer une FAQ complète pour une page produit.
+
+RÈGLES :
+- 5 à 8 questions selon la complexité du produit
+- Questions réelles d'acheteurs (pas génériques)
+- Réponses : 40-80 mots, directes, utiles
+- Inclure : livraison, retours, taille/compatibilité, matière/qualité, utilisation
+- Finir avec schema FAQ JSON-LD
+
+OUTPUT JSON :
+{
+  "product_title": "...",
+  "faq": [
+    { "question": "...", "reponse": "..." }
+  ],
+  "schema_faq": {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      { "@type": "Question", "name": "...", "acceptedAnswer": { "@type": "Answer", "text": "..." } }
+    ]
+  }
+}
+
+[TITRE_PRODUIT] = "[TITRE_PRODUIT]"`
+  },
+];
+
+const PROMPTS_SEO = [
+  {
+    id: 'homepage',
+    icon: '🏠',
+    title: 'Homepage',
+    desc: 'Contenu complet d\'une homepage e-commerce : hero, value props, intro collections, trust, meta, schema.org.',
+    prompt: `SYSTEM ROLE: Tu es un expert en copywriting e-commerce haute conversion et UX writing.
+
+Génère le contenu complet d'une homepage de boutique e-commerce en français.
+Domaine : [DOMAINE]
+Niche : [NICHE]
+Collections disponibles : [LISTE_COLLECTIONS]
+
+EXIGENCES :
+1. HERO : titre (max 8 mots, keyword-first), sous-titre (max 18 mots), CTA (3-4 mots)
+2. VALUE PROPS : 3 avantages (icône + titre 3-4 mots + desc 15-20 mots)
+3. COLLECTIONS INTRO : 2 phrases, 40-60 mots, sans hype
+4. TRUST : 4 éléments (livraison, retours, paiement, service)
+5. META : title (55-60 car.), meta description (145-155 car.)
+6. SCHEMA ORG : JSON-LD WebSite + Organization
+
+INTERDITS : "Découvrez", "Explorez", "qualité premium", "Leader mondial"
+
+OUTPUT JSON :
+{
+  "hero": { "title": "...", "subtitle": "...", "cta": "..." },
+  "value_props": [{ "icon": "...", "title": "...", "desc": "..." }],
+  "collections_intro": "...",
+  "trust": [{ "icon": "...", "label": "...", "detail": "..." }],
+  "meta": { "title": "...", "description": "..." },
+  "schema_org": {}
+}`
+  },
+  {
+    id: 'collections',
+    icon: '📁',
+    title: 'Collections (titres)',
+    desc: 'Transforme des noms de collections FR en titres SEO optimisés pour le pays cible. 1 titre par collection, keyword-first.',
+    prompt: `SYSTEM ROLE: Tu es un Expert SEO Collections Multilingue International.
+Tu transformes une liste de noms de collections français en titres SEO optimisés pour un pays cible.
+
+CONTRAINTES :
+- 1 seul titre par collection : mot-clé principal natif en début
+- 3–7 mots max, naturel, ressemble à une vraie recherche Google locale
+- Éviter superlatifs : blacklist = beste, premium, perfekt, top, billig, etc.
+- Chaque titre unique dans le batch
+
+FORMAT DE SORTIE :
+{
+  "country_target": "[PAYS]",
+  "language_target": "[LANGUE]",
+  "collections": [
+    { "original_fr": "nom original", "title_final": "titre optimisé" }
+  ]
+}
+
+/generate_collections
+pays: [PAYS]
+langue: [LANGUE]
+collections_fr:
+[LISTE_COLLECTIONS]`
+  },
+  {
+    id: 'collections_intro',
+    icon: '📝',
+    title: 'Collections Intro (KORAY)',
+    desc: 'Short + long description KORAY-STYLE pour pages catégories. Short 18-32 mots, Long 90-160 mots, 2 paragraphes. Pas de marketing.',
+    prompt: `SYSTEM / DEVELOPER PROMPT — UNIVERSAL ECOMMERCE CATEGORY INTRO ENGINE (KORAY-STYLE)
+
+You are a "Category Page Semantic Writer". You write concise, descriptive category introductions. NOT marketing copy.
+
+RULES:
+- SHORT DESCRIPTION: 18–32 words, 1-2 sentences, head_term + key modifier, defines what the collection contains
+- LONG DESCRIPTION: 90–160 words, 2 paragraphs. P1: define scope. P2: selection logic. NO bullet lists.
+- Anti-LLM: NEVER use "Discover/Explore/Shop/Find the perfect", "Designed for/Ideal for", "premium/ultimate/best"
+- Noun-led sentences, concrete terms, varied syntax, restrained tone
+
+OUTPUT FORMAT (JSON array only):
+[
+  {
+    "category": "original category name",
+    "short_description": "18-32 word description",
+    "long_description": "90-160 word description in 2 paragraphs"
+  }
+]
+
+categories: [LISTE_CATEGORIES]
+language: "[LANGUE]"
+country: "[PAYS]"`
+  },
+  {
+    id: 'collections_long',
+    icon: '📖',
+    title: 'Collections Long SEO',
+    desc: 'Long description SEO pour pages catégories. Top intro + 3 paragraphes + FAQ 3Q + meta. Semantic depth, topical authority.',
+    prompt: `You are a "Semantic Category Page Writer" specialized in ecommerce category/collection pages.
+Your mission: process a list of category titles and generate for EACH:
+1. Short top intro (40-60 words)
+2. Long body (200-300 words, 3 paragraphs, no bullets)
+3. FAQ 3 questions related to the category
+4. Meta title (55-60 chars) + meta description (145-155 chars)
+
+RULES:
+- No marketing fluff, no "discover", no superlatives
+- Focus on semantic depth, topical authority (Koray Tugberk style)
+- Natural language for the target country
+
+OUTPUT JSON array:
+[
+  {
+    "category": "...",
+    "short_intro": "...",
+    "long_body": "...",
+    "faq": [{"q":"...","a":"..."}],
+    "meta": {"title":"...","description":"..."}
+  }
+]
+
+language: "[LANGUE]"
+country: "[PAYS]"
+categories: [LISTE_CATEGORIES]`
+  },
+  {
+    id: 'description_bulk',
+    icon: '📋',
+    title: 'Descriptions Bulk',
+    desc: 'Génère des descriptions SEO+CRO pour plusieurs produits en une requête. Multilingue, adaptatif par niche.',
+    prompt: `You are a multilingual e-commerce SEO + CRO copywriter.
+You generate MULTIPLE product descriptions in one request.
+
+For EACH product, generate:
+1. SEO title (keyword-first, 55-65 chars)
+2. Short description (120-150 words, CRO-focused)
+3. Long description (280-350 words, SEO-focused)
+4. Meta description (145-155 chars)
+
+RULES:
+- Adapt tone to the product category automatically
+- No "discover", "explore", "premium", "best" superlatives
+- Keyword in first sentence of both descriptions
+- Include social proof signal (usage context, popularity hint)
+- French output unless specified
+
+OUTPUT JSON array:
+[
+  {
+    "product_title": "...",
+    "seo_title": "...",
+    "short_desc": "...",
+    "long_desc": "...",
+    "meta_desc": "..."
+  }
+]
+
+products: [LISTE_PRODUITS]
+langue: [LANGUE]`
+  },
+  {
+    id: 'slugs',
+    icon: '🔗',
+    title: 'Slugs SEO',
+    desc: 'Génère des slugs SEO techniques pour collections et produits. Lowercase, tirets, keyword-first, sans stopwords.',
+    prompt: `SYSTEM / ROLE
+Tu es un agent SEO technique spécialisé en génération de slugs e-commerce.
+
+RÈGLES ABSOLUES :
+- Lowercase uniquement
+- Séparateurs : tirets (-), jamais underscore
+- Supprimer stopwords FR : le, la, les, de, du, des, un, une, et, ou, à, en, pour, par, sur, dans, avec
+- Keyword principal en premier
+- Max 5 mots significatifs
+- Pas d'accents, pas de caractères spéciaux
+- Unique par page
+
+FORMAT OUTPUT JSON :
+[
+  {
+    "original": "nom original",
+    "slug": "slug-genere",
+    "keywords": ["kw1", "kw2"]
+  }
+]
+
+INPUT — Liste à traiter :
+[LISTE_NOMS]`
+  },
+  {
+    id: 'backlinks',
+    icon: '🔗',
+    title: 'Backlinks Prompts',
+    desc: 'Génère des commentaires HTML pour articles de blog avec liens de redirection. Ancres variées, style Koray + Laurent Bourrelly.',
+    prompt: `Je vais poster des commentaires sur des articles de blog (qui m'appartiennent aussi). Obligation : intégrer un lien de redirection vers mes boutiques.
+
+Tableau 2 colonnes : articles de blog | boutiques
+Traiter ligne par ligne.
+
+LONGUEUR (aléatoire) : 25% 100 mots, 25% 150 mots, 25% 200 mots, 25% 250 mots, 10% 300 mots
+
+ANCRE :
+- 35% semi-optimisée
+- 15% optimisée
+- 50% non optimisée
+
+Le lien doit être dans les 80 premiers mots, idéalement dans un h1 ou h2.
+Style : informations d'expert, cousin de l'article, topical authority (Koray) + cocon sémantique (Laurent Bourrelly).
+
+FORMAT HTML :
+<div contenteditable="true" class="tiptap ProseMirror">
+  <p style="..."><span style="color:#000000"><a href="URL_BOUTIQUE" style="text-decoration:none;">TEXTE_ANCRE</a></span></p>
+</div>
+
+Output : JSON avec { url_blog: "...", commentaire_html: "..." } pour chaque ligne.
+
+Tableau :
+[BLOG | BOUTIQUE]`
+  },
+  {
+    id: 'blog_pillar',
+    icon: '✍️',
+    title: 'Blog Pillar + Cluster',
+    desc: 'THE ULTIMATE TOPICAL AUTHORITY ENGINE — Pilier + clusters complets. Live search, EEAT, B2C. 150k+ tokens.',
+    prompt: `SYSTEM PROMPT — THE ULTIMATE LIVE GROUNDED & LOCALIZED TOPICAL AUTHORITY ENGINE (ORCHESTRATOR MODE)
+
+You are an "Information Retrieval & Localized SEO Architect" + "Senior B2C E-commerce Merchant".
+
+MISSION : Générer un "Topical Authority Pack" :
+- 1 article pilier (2500-4000 mots)
+- 3-5 articles cluster (1500-2500 mots chacun)
+
+CORE RULES (applicables à tous les articles) :
+1. Live Search — recherches réelles + localisation FR
+2. EEAT — expertise, autorité, fiabilité B2C
+3. Architecture éditoriale — H1/H2/H3, tableaux, FAQ, listes
+4. Profondeur maximale — pas de résumés, contenu original
+5. Aucun LLM-isme : pas de "plonger dans", "en conclusion", "il est crucial"
+
+STRUCTURE PILIER :
+- H1 : mot-clé principal (intention informationnelle)
+- Introduction 150-200 mots sans "bienvenue"
+- 5-8 sections H2 avec H3
+- FAQ 5 questions (schema.org)
+- Conclusion + CTA interne
+
+OUTPUT : Article Markdown complet, puis JSON avec meta + plan clusters
+
+Niche : [NICHE]
+Mot-clé pilier : [KW_PILIER]
+Pays : France
+Langue : Français`
+  },
+];
+
+const PROMPTS_HOME = [
+  // Re-use the homepage prompt from SEO section but as standalone
+];
+
+const JULES_DOMAINS = ["sambottes.fr","ateliermocassin.com","lampadaire-salon.com","elyride.com","universfit.com","instruments-zen.fr","ambiance-led.com","sandale.co","saqado.fr","ma-pochette-ordinateur.com","le-old-money.com","halezia.com","mes-petites-boucles.com","surplus-militaires.fr","monbeauberet.com","malampechampignon.fr","univers-viking.com","moment-cocooning.com","voitures-telecommandees.com","veste-moumoute.com","plafonniermoderne.com","matabledappoint.com","repaire-des-tableaux.com","doudouetpeluche.com","coussinea.fr","confortorthopedique.fr","essence-du-bois.com","bouddha-bouddhisme.com","rc-bolides.com","guirlande-de-noel.com","sac-au-feminin.com","cuisine-inspirante.com","sac-chat.com","cannedemarche.com","meubletvandco.com","maison-du-plafonnier.com","maison-du-plug.fr","celesta-bijoux.com","sosiege.com","lemondedupapierpeint.fr","happinessrangement.com","hydrova.fr","poignee-de-porte.com","verasco.fr","pusolve.com","univers-etendoir.com","luppa.fr","masacocherando.com","lesactransparent.fr","maison-vannerie.com","zenyopi.com","votre-salle-de-bain.fr","atelier-des-lumieres.fr","decoboheme.com","douxreveils.com","sac-one.com","maisonboudoir.fr","la-galette-de-chaise.fr","horlova.com","rayonnour.com","luminaire-suspendu.fr","le-mitigeur.com","laboutiquedupoledance.com","esprit-gothique.fr","cintrelia.com","taieensoie.fr","secret-satin.com","votre-pochette-ordinateur.com","cabinmate.fr","la-maison-du-tableau.com","salonium.fr","latelierdesrideaux.com","vase-cute.fr","horlogedesign.fr","matta-tapis.com","chaussettespourtous.com","modulenko.com","peluche-avenue.com","suspensia.fr","maisontextile.fr","be-shine.fr","maison-de-la-lumiere.com","mapetiteveilleuse.com","sourisi.com","veldom.fr","les-maitres-du-puzzle.com","le-sac-isotherme.fr","pochettechic.com","lamaisondeshousses.fr","atelierluisiano.com","hike-boutique.com","parcbebe.com","lampera.fr","topsacados.com","madouceveilleuse.com","boutique-tresses-de-lit.com","protege-matelas.com","revedeparure.com","tendreveilleuse.com","ma-troussedetoilette.com","lerefugedesoiseaux.com","la-baignoire-bebe.fr","labellehorloge.com","outils-reno-brico.com","benamorbijoux.com","latabledepoker.com","kitdubricoleur.com","ma-deco-feline.fr","hijab-chic.com","maisonelvira.com","boutique-mocassin.com","boutique-maillotdebain.com","luminadesign.fr","boutique-kimono.fr","tenteetco.com","sensuelle-a-souhait.com","lecoeurdelamaison.com","baraylis.com","amaccas.com","veilleusedereve.com","trousseup.com","lumiova.com","boz-eyewear.fr","hikinghavens.com","la-lampe-de-chevet.com","flow-damour.com","votreappliquemurale.fr","support-plante.com","soutiengorgewow.com","mon-beurrier.fr","zephyrtrack.com","robe-rose.com","le-tapis-de-bain.com","ma-cafetiere-italienne.com","lasacochedeparis.com","taiyoa.com","montapisdemarche.com","lamaisondupyjama.fr","brochiva.com","fluensbain.fr","nation-vintage.com","mocassin-femme.com","maison-intime.fr","maison-catamarca.fr","mon-panier-a-linge.com","mapetitegourde.com","stringhomme.fr","maison-satin-paris.com","sackdos.com","cagoule-style.com","miss-hijab.fr","univers-coussin-oreiller.fr","vintage-univers.com","perruqueavenue.fr","etui-cigarette.fr","statue-family.com","housse-design.com","maisondespatissiers.com","kimikono.com","serviettes-et-bain.fr","peluworld.com","mini-car.fr","lesdouxraveurs.fr","houssesethousses.fr","cage-mma.com","echiquier-boutique.com","monde-du-boulier.com"];
+
+const FOOTPRINTS = {
+  "PAIEMENT": [
+    { name:"Stripe", pct:6, dork:`intext:"stripe.com" "cdn.shopify.com" site:.fr` },
+    { name:"PayPal", pct:4, dork:`intext:"paypal.com" "cdn.shopify.com" site:.fr` },
+    { name:"Klarna", pct:14, dork:`intext:"klarna.com" "cdn.shopify.com" site:.fr` },
+    { name:"Apple Pay", pct:68, dork:`intext:"apple-pay" "cdn.shopify.com" site:.fr` },
+    { name:"Google Pay", pct:13, dork:`intext:"google-pay" "cdn.shopify.com" site:.fr` },
+    { name:"Payplug", pct:1, dork:`intext:"payplug.com" "cdn.shopify.com" site:.fr` },
+  ],
+  "ANALYTICS": [
+    { name:"GA4", pct:81, dork:`intext:"G-" "cdn.shopify.com" intitle:"boutique" site:.fr` },
+    { name:"GTM", pct:27, dork:`intext:"googletagmanager.com" "cdn.shopify.com" site:.fr` },
+    { name:"Facebook Pixel", pct:6, dork:`intext:"connect.facebook.net" "cdn.shopify.com" site:.fr` },
+    { name:"TikTok Pixel", pct:3, dork:`intext:"analytics.tiktok.com" "cdn.shopify.com" site:.fr` },
+    { name:"Hotjar", pct:4, dork:`intext:"hotjar.com" "cdn.shopify.com" site:.fr` },
+    { name:"Clarity", pct:16, dork:`intext:"clarity.ms" "cdn.shopify.com" site:.fr` },
+    { name:"Pinterest Tag", pct:7, dork:`intext:"pintrk" "cdn.shopify.com" site:.fr` },
+  ],
+  "APPS SHOPIFY": [
+    { name:"Klaviyo", pct:56, dork:`intext:"klaviyo.com" "cdn.shopify.com" site:.fr` },
+    { name:"Judge.me", pct:33, dork:`intext:"judge.me" "cdn.shopify.com" site:.fr` },
+    { name:"Loox", pct:10, dork:`intext:"loox.io" "cdn.shopify.com" site:.fr` },
+    { name:"Privy", pct:4, dork:`intext:"privy.com" "cdn.shopify.com" site:.fr` },
+    { name:"Omnisend", pct:5, dork:`intext:"omnisend.com" "cdn.shopify.com" site:.fr` },
+  ],
+  "REVIEWS": [
+    { name:"Trustpilot", pct:4, dork:`intext:"trustpilot.com" "cdn.shopify.com" site:.fr` },
+    { name:"Avis Vérifiés", pct:1, dork:`intext:"avis-verifies.com" "cdn.shopify.com" site:.fr` },
+  ],
+  "LIVRAISON": [
+    { name:"Livraison express", pct:34, dork:`intext:"livraison express" "cdn.shopify.com" site:.fr` },
+    { name:"Livraison gratuite FR", pct:84, dork:`intext:"livraison gratuite" "cdn.shopify.com" site:.fr` },
+    { name:"Colissimo", pct:2, dork:`intext:"colissimo" "cdn.shopify.com" site:.fr` },
+  ],
+  "CHAT": [
+    { name:"Tidio", pct:1, dork:`intext:"tidio.com" "cdn.shopify.com" site:.fr` },
+    { name:"Gorgias", pct:1, dork:`intext:"gorgias.com" "cdn.shopify.com" site:.fr` },
+  ],
+  "SEO / INTERNATIONAL": [
+    { name:"Hreflang", pct:17, dork:`intext:"hreflang" "cdn.shopify.com" site:.fr` },
+    { name:"Schema Product", pct:1, dork:`intext:"schema.org/Product" "cdn.shopify.com" site:.fr` },
+  ],
+  "CDN / INFRA": [
+    { name:"Cloudflare", pct:15, dork:`intext:"cloudflare.com" "cdn.shopify.com" site:.fr` },
+    { name:"BunnyCDN", pct:1, dork:`intext:"bunnycdn.com" "cdn.shopify.com" site:.fr` },
+  ],
+  "COMBOS HAUTE VALEUR": [
+    { name:"Klaviyo + Judge.me", pct:null, dork:`intext:"klaviyo" intext:"judge.me" "cdn.shopify.com" site:.fr` },
+    { name:"TikTok + Klaviyo", pct:null, dork:`intext:"tiktok" intext:"klaviyo" "cdn.shopify.com" site:.fr` },
+    { name:"Apple Pay + Klarna", pct:null, dork:`intext:"apple-pay" intext:"klarna" "cdn.shopify.com" site:.fr` },
+    { name:"Clarity + GA4", pct:null, dork:`intext:"clarity.ms" intext:"G-" "cdn.shopify.com" site:.fr` },
+  ],
+};
+
+// ── RENDER PROMPTS ────────────────────────────────────────────────────────────
+
+function promptCard(p) {
+  return `<div class="prompt-card" data-search="${p.title.toLowerCase()} ${p.desc.toLowerCase()}">
+    <div class="prompt-card-header">
+      <div class="prompt-card-title"><span>${p.icon}</span> ${p.title}</div>
+    </div>
+    <div class="prompt-card-body">${esc(p.desc)}</div>
+    <div class="prompt-card-footer">
+      <button class="btn btn-sm" onclick="openPM(${JSON.stringify(p.title)}, ${JSON.stringify(p.prompt)})">Voir</button>
+      <button class="btn btn-primary btn-sm" onclick="copyPrompt(${JSON.stringify(p.prompt)})">Copier</button>
+    </div>
+  </div>`;
+}
+
+document.getElementById('grid-cro').innerHTML = PROMPTS_CRO.map(promptCard).join('');
+document.getElementById('grid-seo').innerHTML = PROMPTS_SEO.map(promptCard).join('');
+
+// ── JULES ─────────────────────────────────────────────────────────────────────
+
+function renderJules(list) {
+  document.getElementById('jules-grid').innerHTML = list.map((d,i) => `
+    <div class="domain-item">
+      <span style="font-size:10px;color:var(--muted);min-width:24px">${i+1}</span>
+      <a href="https://${d}" target="_blank" class="domain-link">${d}</a>
+      <button class="btn btn-xs" onclick="nav.clipboard.writeText('${d}');toast('Copié','success')" title="Copier">⎘</button>
+    </div>
+  `).join('');
+}
+renderJules(JULES_DOMAINS);
+
+window.filterJules = function() {
+  const q = document.getElementById('q-jules').value.toLowerCase();
+  const filtered = JULES_DOMAINS.filter(d => d.includes(q));
+  renderJules(filtered);
+};
+
+window.copyJules = function() {
+  navigator.clipboard.writeText(JULES_DOMAINS.join('\n'));
+  toast(`167 domaines copiés`, 'success');
+};
+
+// ── FOOTPRINTS ────────────────────────────────────────────────────────────────
+
+function renderFootprints() {
+  const html = Object.entries(FOOTPRINTS).map(([cat, items]) => `
+    <div class="fp-section">
+      <div class="fp-section-header">
+        <span>${cat}</span>
+        <span class="badge badge-info">${items.length} signatures</span>
+      </div>
+      <div class="fp-rows">
+        ${items.map(item => `
+          <div class="fp-item" onclick="copyDork(${JSON.stringify(item.dork)})" title="Cliquer pour copier le dork">
+            <span class="fp-name">${item.name}</span>
+            ${item.pct !== null ? `<span class="fp-pct">${item.pct}%</span>` : ''}
+            <span style="font-size:9px;color:#6366f1">dork</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('footprints-grid').innerHTML = html;
+}
+renderFootprints();
+
+window.copyDork = function(dork) {
+  navigator.clipboard.writeText(dork);
+  toast('Dork copié !', 'success');
+};
+
+window.copyDorks = function() {
+  const all = Object.values(FOOTPRINTS).flat().map(f => f.dork).join('\n');
+  navigator.clipboard.writeText(all);
+  toast('Tous les dorks copiés', 'success');
+};
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+
+window.switchTab = function(tab, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+tab).style.display = '';
+  btn.classList.add('active');
+};
+
+// ── MODAL ─────────────────────────────────────────────────────────────────────
+
+window.openPM = function(title, prompt) {
+  document.getElementById('pm-title').textContent = title;
+  document.getElementById('pm-text').value = prompt;
+  document.getElementById('pm').classList.add('open');
+};
+window.closePM = function() { document.getElementById('pm').classList.remove('open'); };
+window.copyPM = function() {
+  navigator.clipboard.writeText(document.getElementById('pm-text').value);
+  toast('Prompt copié !', 'success');
+};
+window.copyPrompt = function(prompt) {
+  navigator.clipboard.writeText(prompt);
+  toast('Prompt copié !', 'success');
+};
+
+// ── GLOBAL FILTER ─────────────────────────────────────────────────────────────
+window.filterAll = function() {
+  const q = document.getElementById('q-global').value.toLowerCase();
+  document.querySelectorAll('.prompt-card').forEach(card => {
+    card.style.display = card.dataset.search.includes(q) ? '' : 'none';
+  });
+};
+
+function esc(s) { const d=document.createElement('div'); d.textContent=String(s||''); return d.innerHTML; }
+</script>
+</body>
+</html>
