@@ -634,7 +634,8 @@ function updateShipping(){
   var c=sel.value;
   var ship=calcShipping(c);
   var isEn=${e?'true':'false'};
-  var total2=(baseAmount+ship).toFixed(2);
+  var disc=typeof _discount!=='undefined'?_discount:0;
+  var total2=Math.max(0,(baseAmount-disc+ship)).toFixed(2);
   var sc=document.getElementById('ship-cost');
   var ct=document.getElementById('ck-total');
   var pt=document.getElementById('payTxt');
@@ -648,7 +649,41 @@ document.addEventListener('DOMContentLoaded',function(){updateShipping();});
 <\/script>`;
   const form=`<div class="ck-sec"><h3 class="ck-sec-h">${e?'Contact':'Contact'}</h3><div class="ck-f"><label class="ck-lb">${e?'Email':'Email'}</label><input class="ck-i" type="email" placeholder="${e?'name@example.com':'prenom@exemple.fr'}" autocomplete="email"></div><label class="ck-chk"><input type="checkbox" checked> ${e?'Send me news and offers':'M\'envoyer les offres et nouveautés'}</label></div><div class="ck-sec"><h3 class="ck-sec-h">${e?'Delivery address':'Adresse de livraison'}</h3><div class="ck-f"><label class="ck-lb">${e?'Country / Region':'Pays / Région'}</label><select class="ck-i ck-sel" id="ck-country" autocomplete="country" onchange="updateShipping()">${e?COUNTRIES_EN:COUNTRIES_FR}</select></div><div class="ck-2c"><div class="ck-f"><label class="ck-lb">${e?'First name':'Prénom'}</label><input class="ck-i" type="text" autocomplete="given-name"></div><div class="ck-f"><label class="ck-lb">${e?'Last name':'Nom'}</label><input class="ck-i" type="text" autocomplete="family-name"></div></div><div class="ck-f"><label class="ck-lb">${e?'Address':'Adresse'}</label><input class="ck-i" type="text" autocomplete="address-line1"></div><div class="ck-2c"><div class="ck-f"><label class="ck-lb">${e?'Postcode':'Code postal'}</label><input class="ck-i" type="text" autocomplete="postal-code"></div><div class="ck-f"><label class="ck-lb">${e?'City':'Ville'}</label><input class="ck-i" type="text" autocomplete="address-level2"></div></div></div><div class="ck-sec"><h3 class="ck-sec-h">${e?'Shipping method':'Mode de livraison'}</h3><label class="ck-ship act" id="s1"><input type="radio" name="ship" checked><div class="ck-ship-i"><span>${e?'Standard — 3–5 business days':'Standard — 3–5 jours ouvrés'}</span><small style="display:block;font-size:.72rem;color:#aaa;margin-top:.2rem">${e?'Free in your country · +5€ Europe · +10€ worldwide':'Gratuit dans votre pays · +5€ Europe · +10€ monde'}</small></div><strong id="s1lbl">${e?'Free':'Gratuit'}</strong></label><label class="ck-ship" id="s2"><input type="radio" name="ship"><div class="ck-ship-i"><span>${e?'Express — 1–2 business days':'Express — 1–2 jours ouvrés'}</span></div><strong>4.99€</strong></label></div><div class="ck-sec" id="ck-pay"><h3 class="ck-sec-h">${e?'Payment':'Paiement'}</h3><p class="ck-sec-note">${SVG_LOCK} ${e?'All transactions are secure and encrypted':'Toutes les transactions sont sécurisées et chiffrées'}</p>${xpay}<div class="ck-f ck-card-w"><label class="ck-lb">${e?'Card number':'Numéro de carte'}</label><div style="position:relative"><input class="ck-i" id="cnum" type="text" placeholder="1234 5678 9012 3456" maxlength="19" inputmode="numeric" autocomplete="cc-number"><span class="ck-ctype" id="ctype"></span></div></div><div class="ck-f"><label class="ck-lb">${e?'Name on card':'Nom sur la carte'}</label><input class="ck-i" type="text" placeholder="${e?'JOHN DOE':'JEAN DUPONT'}" autocomplete="cc-name"></div><div class="ck-2c"><div class="ck-f"><label class="ck-lb">${e?'Expiry':'Expiration'}</label><input class="ck-i" id="cexp" type="text" placeholder="MM / YY" maxlength="7" inputmode="numeric" autocomplete="cc-exp"></div><div class="ck-f"><label class="ck-lb">CVV</label><input class="ck-i" type="text" placeholder="123" maxlength="4" inputmode="numeric" autocomplete="cc-csc"></div></div></div><button class="ck-pay-btn" id="payBtn" onclick="doPay(this)">${SVG_LOCK} <span id="payTxt">${e?`Pay securely — ${total}€`:`Payer sécurisé — ${total}€`}</span></button><div class="ck-trust-r">${SVG_LOCK}<small>${e?'SSL Secure':'SSL Sécurisé'}</small><span>·</span>${SVG_RETURN}<small>${e?'30-day returns':'Retours 30j'}</small><span>·</span><small>${e?'Satisfaction guaranteed':'Satisfait ou remboursé'}</small></div>${shippingJS}`;
   const items=`<div class="ck-prod"><div class="ck-pimg">${em}<span class="ck-pqty">1</span></div><span class="ck-pnm">${esc(it1.n)}</span><span class="ck-ppr">${it1.pr}€</span></div><div class="ck-prod"><div class="ck-pimg">${em}<span class="ck-pqty">1</span></div><span class="ck-pnm">${esc(it2.n)}</span><span class="ck-ppr">${it2.pr}€</span></div>`;
-  const summary=`<div class="ck-sum"><div class="ck-coupon"><input class="ck-i" type="text" placeholder="${e?'Discount code':'Code promo'}" id="cpn"><button class="ck-cpn-btn" onclick="document.getElementById('cpn').value&&alert('${e?'10% discount applied!':'-10% appliqué !'}')">${e?'Apply':'Appliquer'}</button></div><div class="ck-prods">${items}</div><div class="ck-tots"><div class="ck-tr"><span>${e?'Subtotal':'Sous-total'}</span><span id="ck-base" data-amount="${total}">${total}€</span></div><div class="ck-tr"><span>${e?'Shipping':'Livraison'}</span><span id="ship-cost" style="color:#16a34a;font-weight:600">${e?'Free':'Gratuit'}</span></div><div class="ck-tr ck-tot-f"><span>${e?'Total':'Total'}<small>${e?' (incl. VAT)':' (TVA incluse)'}</small></span><span id="ck-total">${total}€</span></div></div><div class="ck-pmethods"><span class="pay-b pay-visa" style="opacity:.7">VISA</span><span class="pay-b pay-mc" style="opacity:.7;position:relative"><span class="mc-c1"></span><span class="mc-c2"></span></span><span class="pay-b pay-amex" style="opacity:.7">AMEX</span><span class="pay-b pay-pp" style="opacity:.7">PayPal</span><span class="pay-b pay-cb" style="opacity:.7">CB</span></div></div>`;
+  const promoJS=`<script>
+var _discount=0,_promoApplied=false;
+var _siteSlug='${slug(domain)}';
+async function applyPromo(){
+  var code=(document.getElementById('cpn').value||'').trim().toUpperCase();
+  var msg=document.getElementById('cpn-msg');
+  if(!code){if(msg)msg.textContent='';return;}
+  if(_promoApplied){if(msg){msg.textContent='${e?'Remove current code first':'Supprimez le code actuel d\'abord'}';msg.style.color='#dc2626';}return;}
+  var base=parseFloat(document.getElementById('ck-base').getAttribute('data-amount'))||0;
+  try{
+    var r=await fetch('https://v35-admin.ernestpedanou.workers.dev/promo/validate?slug='+_siteSlug+'&code='+encodeURIComponent(code)+'&total='+base);
+    var d=await r.json();
+    if(!d.ok){if(msg){msg.textContent=d.error||'${e?'Invalid code':'Code invalide'}';msg.style.color='#dc2626';}_discount=0;}
+    else{
+      _discount=d.discount;_promoApplied=true;
+      if(msg){msg.textContent=d.label;msg.style.color='#16a34a';}
+      var dr=document.getElementById('ck-discount-row');
+      var dc=document.getElementById('ck-discount-val');
+      var cc=document.getElementById('ck-cpn-lbl');
+      if(dr)dr.style.display='flex';
+      if(dc)dc.textContent='-'+d.discount.toFixed(2)+'€';
+      if(cc)cc.textContent='('+code+')';
+    }
+  }catch(e2){if(msg){msg.textContent='${e?'Error':'Erreur'}';msg.style.color='#dc2626';}}
+  updateShipping();
+}
+function removePromo(){
+  _discount=0;_promoApplied=false;
+  var cpn=document.getElementById('cpn');if(cpn)cpn.value='';
+  var msg=document.getElementById('cpn-msg');if(msg)msg.textContent='';
+  var dr=document.getElementById('ck-discount-row');if(dr)dr.style.display='none';
+  updateShipping();
+}
+<\/script>`;
+  const summary=`<div class="ck-sum"><div class="ck-coupon"><input class="ck-i" type="text" placeholder="${e?'Discount code':'Code promo'}" id="cpn"><button class="ck-cpn-btn" onclick="applyPromo()">${e?'Apply':'Appliquer'}</button></div><div id="cpn-msg" style="font-size:.75rem;margin:-1rem 0 .7rem;min-height:1rem"></div><div class="ck-prods">${items}</div><div class="ck-tots"><div class="ck-tr"><span>${e?'Subtotal':'Sous-total'}</span><span id="ck-base" data-amount="${total}">${total}€</span></div><div class="ck-tr" id="ck-discount-row" style="display:none"><span>${e?'Promo code':'Code promo'} <span id="ck-cpn-lbl" style="color:#16a34a;font-family:monospace;font-size:.75rem"></span> <button onclick="removePromo()" style="background:none;border:none;color:#dc2626;cursor:pointer;font-size:.7rem;padding:0 .2rem">✕</button></span><span id="ck-discount-val" style="color:#16a34a;font-weight:600"></span></div><div class="ck-tr"><span>${e?'Shipping':'Livraison'}</span><span id="ship-cost" style="color:#16a34a;font-weight:600">${e?'Free':'Gratuit'}</span></div><div class="ck-tr ck-tot-f"><span>${e?'Total':'Total'}<small>${e?' (incl. VAT)':' (TVA incluse)'}</small></span><span id="ck-total">${total}€</span></div></div><div class="ck-pmethods"><span class="pay-b pay-visa" style="opacity:.7">VISA</span><span class="pay-b pay-mc" style="opacity:.7;position:relative"><span class="mc-c1"></span><span class="mc-c2"></span></span><span class="pay-b pay-amex" style="opacity:.7">AMEX</span><span class="pay-b pay-pp" style="opacity:.7">PayPal</span><span class="pay-b pay-cb" style="opacity:.7">CB</span></div></div>${promoJS}`;
   const modal=`<div class="ck-ok" id="ckOk" style="display:none"><div class="ck-ok-box"><div class="ck-ok-ico">✓</div><h2>${e?'Order confirmed!':'Commande confirmée !'}</h2><p>${e?'Thank you! A confirmation has been sent to your email.':'Merci ! Une confirmation a été envoyée par email.'}</p><p style="font-weight:700;color:var(--p);margin:.8rem 0 1.5rem">${e?'Order':'Commande'} #${Math.floor(1e5+Math.random()*9e5)}</p><a href="/" class="ck-pay-btn" style="text-decoration:none;display:flex;width:fit-content;padding:.9rem 2rem;margin:0 auto">${e?'Continue Shopping':'Continuer'}</a></div></div>`;
   const ckCss=`<style>
 .ck-hd{background:#fff;border-bottom:1px solid #e8e4df;padding:.9rem 1.5rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:200}

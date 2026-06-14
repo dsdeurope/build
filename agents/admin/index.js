@@ -114,6 +114,7 @@ a.back:hover{color:#111}
     <li><a onclick="showTab('cols')" id="n-cols">📦 Collections</a></li>
     <li><a onclick="showTab('pages')" id="n-pages">📄 Toutes les pages</a></li>
     <li><a onclick="showTab('media')" id="n-media">🖼 Médias</a></li>
+    <li><a onclick="showTab('promos')" id="n-promos">🏷 Codes promo</a></li>
     <li><a onclick="showTab('bk')" id="n-bk">💾 Sauvegardes</a></li>
   </ul>
   <div class="sb-sep" id="sb-sep" style="display:none"></div>
@@ -147,7 +148,7 @@ function loadSite(){
 }
 
 function showTab(tab){
-  ['home','cols','pages','media','bk'].forEach(function(t){
+  ['home','cols','pages','media','promos','bk'].forEach(function(t){
     var el=document.getElementById('n-'+t);
     if(el)el.classList.toggle('act',t===tab);
   });
@@ -155,6 +156,7 @@ function showTab(tab){
   else if(tab==='cols')renderCols();
   else if(tab==='pages')renderPages();
   else if(tab==='media')renderMedia();
+  else if(tab==='promos')renderPromos();
   else if(tab==='bk')renderBk();
 }
 
@@ -384,6 +386,76 @@ function restoreBk(dt){
   });
 }
 
+/* ── CODES PROMO ─────────────────────────────────────────── */
+function renderPromos(){
+  set('<div class="hd"><h1>Codes promo</h1><span class="slug-tag">'+SLUG+'</span></div>'+
+  '<div class="card"><div class="card-hd">Créer un code</div>'+
+  '<div class="grid2">'+
+  '<div class="field"><label>Code (ex: SUMMER20)</label><input id="p-code" placeholder="NOVA10" style="text-transform:uppercase"></div>'+
+  '<div class="field"><label>Type</label><select id="p-type" class="field input" style="width:100%;padding:.6rem .75rem;border:1px solid #e0e0db;border-radius:3px;font-size:.85rem"><option value="percent">% remise</option><option value="fixed">€ fixe</option></select></div>'+
+  '<div class="field"><label>Valeur (ex: 10 = 10% ou 10€)</label><input id="p-val" type="number" min="1" placeholder="10"></div>'+
+  '<div class="field"><label>Commande min. (0 = aucune)</label><input id="p-min" type="number" min="0" value="0" placeholder="0"></div>'+
+  '<div class="field"><label>Utilisations max. (0 = illimitée)</label><input id="p-max" type="number" min="0" value="0" placeholder="0"></div>'+
+  '<div class="field"><label>Expire le (vide = jamais)</label><input id="p-exp" type="date"></div>'+
+  '</div>'+
+  '<div class="brow"><button class="btn bp" onclick="createPromo()">Créer le code</button></div></div>'+
+  '<div class="card"><div class="card-hd">Codes actifs</div><div id="promo-l"><span class="spin"></span></div></div>');
+  loadPromos();
+}
+
+function loadPromos(){
+  apiFetch('/promo/list?slug='+SLUG).then(function(r){return r.json();}).then(function(d){
+    var promos=d.promos||[];
+    if(!promos.length){document.getElementById('promo-l').innerHTML='<p class="empty">Aucun code promo.</p>';return;}
+    var h='<table style="width:100%;border-collapse:collapse;font-size:.8rem">'+
+      '<tr style="border-bottom:2px solid #e5e5e0"><th style="text-align:left;padding:.4rem .6rem;color:#888;font-size:.68rem;letter-spacing:.1em;text-transform:uppercase">Code</th>'+
+      '<th style="text-align:left;padding:.4rem .6rem;color:#888;font-size:.68rem;text-transform:uppercase">Réduction</th>'+
+      '<th style="text-align:left;padding:.4rem .6rem;color:#888;font-size:.68rem;text-transform:uppercase">Min.</th>'+
+      '<th style="text-align:left;padding:.4rem .6rem;color:#888;font-size:.68rem;text-transform:uppercase">Utilisations</th>'+
+      '<th style="text-align:left;padding:.4rem .6rem;color:#888;font-size:.68rem;text-transform:uppercase">Expire</th>'+
+      '<th></th></tr>';
+    promos.forEach(function(p){
+      var badge=p.active?'<span style="background:#dcfce7;color:#15803d;padding:.15rem .45rem;border-radius:20px;font-size:.65rem;font-weight:700">ACTIF</span>':'<span style="background:#fef2f2;color:#dc2626;padding:.15rem .45rem;border-radius:20px;font-size:.65rem">INACTIF</span>';
+      var disc=p.type==='percent'?p.value+'%':p.value+'€';
+      var uses=p.maxUses>0?p.uses+'/'+p.maxUses:p.uses+' (illim.)';
+      h+='<tr style="border-bottom:1px solid #f5f5f3">'+
+        '<td style="padding:.55rem .6rem;font-family:monospace;font-weight:700;color:#111">'+esc(p.code)+'</td>'+
+        '<td style="padding:.55rem .6rem;color:#b45309;font-weight:600">-'+disc+'</td>'+
+        '<td style="padding:.55rem .6rem;color:#888">'+p.minOrder+'€</td>'+
+        '<td style="padding:.55rem .6rem;color:#555">'+uses+'</td>'+
+        '<td style="padding:.55rem .6rem;color:#888">'+(p.expiresAt?p.expiresAt.slice(0,10):'—')+'</td>'+
+        '<td style="padding:.55rem .6rem"><button class="btn bd" style="padding:.3rem .6rem;font-size:.65rem" onclick="deletePromo(\''+esc(p.code)+'\')">Supprimer</button></td>'+
+        '</tr>';
+    });
+    document.getElementById('promo-l').innerHTML=h+'</table>';
+  });
+}
+
+function createPromo(){
+  var code=(document.getElementById('p-code').value||'').trim().toUpperCase();
+  var type=document.getElementById('p-type').value;
+  var value=parseFloat(document.getElementById('p-val').value)||0;
+  var minOrder=parseFloat(document.getElementById('p-min').value)||0;
+  var maxUses=parseInt(document.getElementById('p-max').value)||0;
+  var expiresAt=document.getElementById('p-exp').value||null;
+  if(!code){toast('Code requis',false);return;}
+  if(!value){toast('Valeur requise',false);return;}
+  apiFetch('/promo/create',{method:'POST',body:JSON.stringify({slug:SLUG,code,type,value,minOrder,maxUses,expiresAt})})
+  .then(function(r){return r.json();}).then(function(d){
+    toast(d.ok?'Code "'+code+'" créé ✓':'Erreur: '+d.error,d.ok);
+    if(d.ok){document.getElementById('p-code').value='';document.getElementById('p-val').value='';loadPromos();}
+  });
+}
+
+function deletePromo(code){
+  if(!confirm('Supprimer le code '+code+' ?'))return;
+  apiFetch('/promo/delete',{method:'POST',body:JSON.stringify({slug:SLUG,code})})
+  .then(function(r){return r.json();}).then(function(d){
+    toast(d.ok?'Code supprimé ✓':'Erreur: '+d.error,d.ok);
+    if(d.ok)loadPromos();
+  });
+}
+
 function set(html){document.getElementById('main').innerHTML=html;}
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 </script></body></html>`;
@@ -392,15 +464,32 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 export default{
   async fetch(request,env){
     if(request.method==='OPTIONS')return new Response(null,{status:204,headers:CORS});
-    if(!auth(request,env)&&new URL(request.url).pathname!=='/')return err('Unauthorized',401);
 
     const url=new URL(request.url);
     const path=url.pathname.replace(/\/+$/,'')||'/';
     const token=env.API_TOKEN||'dde0d1b0dfdc9546c0e3464e9939fa4c0fc138e8d5f43df3';
 
-    // Serve admin UI
+    // Serve admin UI (no auth for UI itself — token embedded in page)
     if(request.method==='GET'&&path==='/'){
       return new Response(adminHTML(token),{headers:{'Content-Type':'text/html;charset=UTF-8','Cache-Control':'no-store'}});
+    }
+
+    // Public endpoint — checkout calls this from browser
+    if(request.method==='GET'&&path==='/promo/validate'){
+      const sl=url.searchParams.get('slug'),code=(url.searchParams.get('code')||'').toUpperCase(),total=parseFloat(url.searchParams.get('total'))||0;
+      if(!sl||!code)return new Response(JSON.stringify({ok:false,error:'slug + code required'}),{status:400,headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      const raw=await env.KV.get('promo:'+sl+':'+code).catch(()=>null);
+      if(!raw)return new Response(JSON.stringify({ok:false,error:'Code invalide'}),{headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      const p=JSON.parse(raw);
+      if(!p.active)return new Response(JSON.stringify({ok:false,error:'Code désactivé'}),{headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      if(p.expiresAt&&new Date(p.expiresAt)<new Date())return new Response(JSON.stringify({ok:false,error:'Code expiré'}),{headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      if(p.maxUses>0&&p.uses>=p.maxUses)return new Response(JSON.stringify({ok:false,error:'Code épuisé'}),{headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      if(total>0&&p.minOrder>0&&total<p.minOrder)return new Response(JSON.stringify({ok:false,error:'Minimum de commande: '+p.minOrder+'€'}),{headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      const discount=p.type==='percent'?parseFloat((total*p.value/100).toFixed(2)):Math.min(p.value,total);
+      const label=p.type==='percent'?'-'+p.value+'% appliqué !':'-'+p.value+'€ appliqué !';
+      p.uses=(p.uses||0)+1;
+      await env.KV.put('promo:'+sl+':'+code,JSON.stringify(p),{expirationTtl:86400*365}).catch(()=>{});
+      return new Response(JSON.stringify({ok:true,discount,label,type:p.type,value:p.value}),{headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
     }
 
     if(!auth(request,env))return err('Unauthorized',401);
@@ -547,6 +636,39 @@ export default{
       const r=await fetch(ENH_URL+'/cro-ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug,path:pg,lang:'en'})});
       const d=await r.json();
       return ok(d);
+    }
+
+    // Promo endpoints (auth required)
+    if(path==='/promo/list'){
+      const sl=url.searchParams.get('slug');if(!sl)return err('slug required');
+      const idxRaw=await env.KV.get('promo:index:'+sl).catch(()=>null);
+      const codes=idxRaw?JSON.parse(idxRaw):[];
+      const promos=[];
+      for(const c of codes){const r=await env.KV.get('promo:'+sl+':'+c).catch(()=>null);if(r)promos.push(JSON.parse(r));}
+      return ok({slug:sl,promos,count:promos.length});
+    }
+
+    if(path==='/promo/create'){
+      const{slug,code,type='percent',value,minOrder=0,maxUses=0,expiresAt=null}=body;
+      if(!slug||!code||!value)return err('slug, code, value required');
+      const c=code.toUpperCase().replace(/[^A-Z0-9]/g,'');
+      const promo={code:c,type,value:parseFloat(value),minOrder:parseFloat(minOrder)||0,maxUses:parseInt(maxUses)||0,uses:0,expiresAt:expiresAt||null,active:true,createdAt:new Date().toISOString()};
+      await env.KV.put('promo:'+slug+':'+c,JSON.stringify(promo),{expirationTtl:86400*365});
+      const idxRaw=await env.KV.get('promo:index:'+slug).catch(()=>null);
+      const idx=idxRaw?JSON.parse(idxRaw):[];
+      if(!idx.includes(c))idx.push(c);
+      await env.KV.put('promo:index:'+slug,JSON.stringify(idx),{expirationTtl:86400*365}).catch(()=>{});
+      return ok({slug,code:c,promo});
+    }
+
+    if(path==='/promo/delete'){
+      const{slug,code}=body;if(!slug||!code)return err('slug + code required');
+      const c=code.toUpperCase();
+      await env.KV.delete('promo:'+slug+':'+c).catch(()=>{});
+      const idxRaw=await env.KV.get('promo:index:'+slug).catch(()=>null);
+      const idx=idxRaw?JSON.parse(idxRaw):[];
+      await env.KV.put('promo:index:'+slug,JSON.stringify(idx.filter(x=>x!==c)),{expirationTtl:86400*365}).catch(()=>{});
+      return ok({slug,code:c,deleted:true});
     }
 
     return err('Unknown endpoint',404);
