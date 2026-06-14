@@ -446,6 +446,60 @@ const DORKS = {
     'intext:"opencart" "Ajouter au panier" site:.fr',
     'inurl:"route=common/home" site:.fr',
   ],
+  // ── Footprints qualité (issus de l'analyse de 140 boutiques réelles) ──────
+  qualite: [
+    // Klaviyo = email marketing actif → CA sérieux (56% des shops analysés)
+    'intext:"klaviyo.com" "cdn.shopify.com" site:.fr',
+    'intext:"klaviyo.com" "cdn.shopify.com" site:.de',
+    'intext:"klaviyo.com" "cdn.shopify.com" site:.es',
+    'intext:"klaviyo.com" "cdn.shopify.com" site:.com',
+    // Judge.me = reviews actives (33%)
+    'intext:"judge.me" "cdn.shopify.com" site:.fr',
+    'intext:"judge.me" "cdn.shopify.com" site:.com',
+    // Combo Klaviyo + Judge.me = shop mature avec audience fidèle
+    'intext:"klaviyo" intext:"judge.me" "cdn.shopify.com" site:.fr',
+    'intext:"klaviyo" intext:"judge.me" "cdn.shopify.com" site:.com',
+    // Loox = photos reviews clients (10%)
+    'intext:"loox.io" "cdn.shopify.com" site:.fr',
+    // Clarity = heatmaps Microsoft → optimisation active (16%)
+    'intext:"clarity.ms" "cdn.shopify.com" site:.fr',
+    // TikTok pixel = acquisition payante TikTok active (3% → forte croissance)
+    'intext:"analytics.tiktok.com" "cdn.shopify.com" site:.fr',
+    'intext:"tiktok" intext:"klaviyo" "cdn.shopify.com" site:.fr',
+    // GA4 + Klaviyo + Judge.me = stack complet boutique pro
+    'intext:"G-" intext:"klaviyo" intext:"judge.me" "cdn.shopify.com" site:.fr',
+  ],
+  bnpl: [
+    // BNPL = panier moyen élevé (Klarna 14%, Alma FR, Google Pay 13%)
+    'intext:"klarna.com" "cdn.shopify.com" site:.fr',
+    'intext:"klarna.com" "cdn.shopify.com" site:.de',
+    'intext:"klarna.com" "cdn.shopify.com" site:.es',
+    'intext:"almapay.com" "cdn.shopify.com" site:.fr',
+    'intext:"alma.eu" inurl:"/collections" site:.fr',
+    'intext:"almapay" intext:"klaviyo" site:.fr',
+    // Apple Pay = checkout rapide → conversion mobile élevée (68%)
+    'intext:"ApplePaySession" "cdn.shopify.com" site:.fr',
+    'intext:"apple-pay-button" "cdn.shopify.com" site:.fr',
+    // Google Pay (13%)
+    'intext:"google.com/pay" "cdn.shopify.com" site:.fr',
+  ],
+  scale: [
+    // Hreflang = multi-pays (17% des shops → internationalisation)
+    'intext:"hreflang" "cdn.shopify.com" site:.fr',
+    'intext:"hreflang=" inurl:"/collections" "shopify"',
+    'intext:"x-default" intext:"hreflang" "cdn.shopify.com"',
+    // Pinterest = trafic organique visuel (7%)
+    'intext:"ct.pinterest.com" "cdn.shopify.com" site:.fr',
+    'intext:"pintrk" "cdn.shopify.com" site:.fr',
+    // Criteo = retargeting avancé → budget pub conséquent
+    'intext:"static.criteo.net" inurl:"/collections" site:.fr',
+    'intext:"criteo" "cdn.shopify.com" site:.fr',
+    // Omnisend = automation email avancée (5%)
+    'intext:"omnisend.com" "cdn.shopify.com" site:.fr',
+    // Livraison express = positionnement premium (34%)
+    'intext:"livraison express" "cdn.shopify.com" site:.fr',
+    'intext:"livraison en 24h" inurl:"/collections" site:.fr',
+  ],
   generic: [
     'intitle:"boutique en ligne" "livraison gratuite" site:.fr -site:amazon.fr -site:cdiscount.com',
     'intitle:"boutique" "Ajouter au panier" site:.fr -site:amazon.fr',

@@ -21,9 +21,9 @@
 
       <div class="kpi-grid-sm">
         <div class="kpi-card-sm"><div class="kpi-value" id="k-total">—</div><div class="kpi-label">Total dorks</div></div>
-        <div class="kpi-card-sm"><div class="kpi-value text-blue" id="k-cms">—</div><div class="kpi-label">Types CMS</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value text-blue" id="k-cms">—</div><div class="kpi-label">Catégories</div></div>
         <div class="kpi-card-sm"><div class="kpi-value text-green" id="k-selected">0</div><div class="kpi-label">Sélectionnés</div></div>
-        <div class="kpi-card-sm"><div class="kpi-value" id="k-custom">0</div><div class="kpi-label">Personnalisés</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value text-yellow" id="k-qualite">—</div><div class="kpi-label">Dorks qualité ⭐</div></div>
       </div>
 
       <div class="filters-bar">
@@ -34,6 +34,12 @@
         <select id="f-op" onchange="render()" class="filter-select">
           <option value="">Tous opérateurs</option>
           <option>intitle</option><option>inurl</option><option>intext</option><option>site</option>
+        </select>
+        <select id="f-quality" onchange="render()" class="filter-select">
+          <option value="">Toutes catégories</option>
+          <option value="qualite">⭐ Qualité (footprints réels)</option>
+          <option value="bnpl">💳 BNPL / Panier élevé</option>
+          <option value="scale">🌍 Scale / International</option>
         </select>
         <input id="niche-custom" class="filter-input" placeholder="Niche (ex: lingerie)" oninput="render()">
         <input id="tld-custom" class="filter-input" style="max-width:100px" placeholder="TLD (.fr)" oninput="render()">
@@ -101,18 +107,20 @@ async function loadDorks() {
   cms.forEach(c => { const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
   document.getElementById('k-total').textContent = Object.values(_dorks).flat().length;
   document.getElementById('k-cms').textContent = cms.length;
+  const qualiteCount = (_dorks.qualite||[]).length + (_dorks.bnpl||[]).length + (_dorks.scale||[]).length;
+  document.getElementById('k-qualite').textContent = qualiteCount;
   render();
 }
 
 window.render = function() {
   const q = document.getElementById('q').value.toLowerCase();
-  const fCms = document.getElementById('f-cms').value;
+  const fCms = document.getElementById('f-cms').value || document.getElementById('f-quality').value;
   const fOp = document.getElementById('f-op').value;
   const niche = document.getElementById('niche-custom').value.trim();
   const tld = document.getElementById('tld-custom').value.trim();
   const grid = document.getElementById('dorks-grid');
   let html = '';
-  const CMS_ICONS = { shopify:'🛍', woocommerce:'🔌', prestashop:'🔷', wix:'🟦', webflow:'🌊', squarespace:'◼', bigcommerce:'🛒', magento:'🟠', opencart:'🟡', jimdo:'⬡', weebly:'🟩', godaddy:'🐙', drupal:'💧', joomla:'🟤', generic:'🌐' };
+  const CMS_ICONS = { shopify:'🛍', woocommerce:'🔌', prestashop:'🔷', wix:'🟦', webflow:'🌊', squarespace:'◼', bigcommerce:'🛒', magento:'🟠', opencart:'🟡', jimdo:'⬡', weebly:'🟩', godaddy:'🐙', drupal:'💧', joomla:'🟤', generic:'🌐', qualite:'⭐', bnpl:'💳', scale:'🌍' };
   Object.entries(_dorks).forEach(([cms, dorks]) => {
     if (fCms && cms !== fCms) return;
     const filtered = dorks.filter(d => {
