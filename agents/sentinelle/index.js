@@ -7,13 +7,18 @@
  */
 
 const WORKERS = {
-  'site-server':   'https://v35-site-server.ernestpedanou.workers.dev/',
-  'site-factory':  'https://v35-site-factory.ernestpedanou.workers.dev/',
-  'orchestrator':  'https://v35-orchestrator.ernestpedanou.workers.dev/runs',
-  'content-ai':    'https://v35-content-ai.ernestpedanou.workers.dev/',
-  'admin':         'https://v35-admin.ernestpedanou.workers.dev/',
-  'backup':        'https://v35-backup.ernestpedanou.workers.dev/status',
-  'sequenceur':    'https://v35-sequenceur.ernestpedanou.workers.dev/',
+  'site-server':        'https://v35-site-server.ernestpedanou.workers.dev/',
+  'site-factory':       'https://v35-site-factory.ernestpedanou.workers.dev/',
+  'orchestrator':       'https://v35-orchestrator.ernestpedanou.workers.dev/runs',
+  'content-ai':         'https://v35-content-ai.ernestpedanou.workers.dev/',
+  'admin':              'https://v35-admin.ernestpedanou.workers.dev/',
+  'backup':             'https://v35-backup.ernestpedanou.workers.dev/status',
+  'sequenceur':         'https://v35-sequenceur.ernestpedanou.workers.dev/',
+  'clone-intel':        'https://v35-clone-intel.ernestpedanou.workers.dev/health',
+  'fulfillment':        'https://v35-fulfillment.ernestpedanou.workers.dev/health',
+  'image-processor':    'https://v35-image-processor.ernestpedanou.workers.dev/health',
+  'scrape-orchestrator':'https://v35-scrape-orchestrator.ernestpedanou.workers.dev/health',
+  'site-discover':      'https://v35-site-discover.ernestpedanou.workers.dev/api/health',
 };
 
 // Workers critiques → alerte si DOWN (les autres = warning seulement)
