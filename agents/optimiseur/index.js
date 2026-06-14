@@ -3,7 +3,20 @@
  * Ajustement dynamique — rate limiting, proxies, paramètres workers.
  */
 
-import { getErrorRate, logInfo } from '../../lib/logger.js';
+// Inline helpers (lib/logger.js n'existe pas — Workers CF = fichier unique)
+async function getErrorRate(env, worker, windowMs) {
+  try {
+    const raw = await env.LOGS.get(`errors:${worker}`);
+    if (!raw) return 0;
+    const entries = JSON.parse(raw);
+    const cutoff = Date.now() - windowMs;
+    const recent = entries.filter(e => e.ts > cutoff);
+    return recent.length;
+  } catch { return 0; }
+}
+async function logInfo(env, agent, event, data) {
+  try { await env.KV.put(`log:${agent}:${event}`, JSON.stringify({ ts: new Date().toISOString(), ...data }), { expirationTtl: 86400 }); } catch {}
+}
 
 const DEFAULT_CONFIG = {
   rateLimit: { requestsPerMinute: 20, delayMs: 3000 },

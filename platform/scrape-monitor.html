@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Scrape Monitor</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Scrape Monitor</span>
+      <div class="topbar-right">
+        <div id="slot-indicator" style="font-size:11px;color:var(--muted);margin-right:12px">— / 3 slots</div>
+        <button class="btn btn-primary" onclick="openModal('modal-new')">+ Nouveau scraping</button>
+        <button class="btn btn-sm" id="pause-btn" onclick="togglePoll()" title="Pause auto-refresh">⏸</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <!-- Slots en cours -->
+      <div style="margin-bottom:20px">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:.5px;margin-bottom:10px">SLOTS ACTIFS (3 max)</div>
+        <div id="slots-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px"></div>
+      </div>
+
+      <!-- Queue -->
+      <div id="queue-section" style="margin-bottom:20px;display:none">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:.5px;margin-bottom:10px">FILE D'ATTENTE</div>
+        <div id="queue-list"></div>
+      </div>
+
+      <!-- Logs temps réel -->
+      <div class="panel" style="margin-bottom:20px">
+        <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center">
+          <span>⚡ Logs temps réel</span>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span id="log-status" style="font-size:10px;color:var(--muted)"></span>
+            <button class="btn btn-xs" onclick="document.getElementById('log-body').innerHTML=''">Vider</button>
+          </div>
+        </div>
+        <div id="log-body" style="font-family:monospace;font-size:11px;line-height:1.7;max-height:260px;overflow-y:auto;padding:10px 14px;background:var(--bg);border-radius:0 0 8px 8px">
+          <span style="color:var(--muted)">En attente de jobs…</span>
+        </div>
+      </div>
+
+      <!-- Jobs terminés -->
+      <div>
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:.5px;margin-bottom:10px">JOBS TERMINÉS</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Domaine</th><th>CMS</th><th>Produits</th><th>Durée</th><th>Issues SEO</th><th>Terminé</th><th>Outputs</th><th></th></tr></thead>
+            <tbody id="done-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- New job modal -->
+<div class="modal" id="modal-new">
+  <div class="modal-box" style="max-width:480px">
+    <div class="modal-header"><span>+ Nouveau scraping</span><button class="modal-close" onclick="closeModal('modal-new')">✕</button></div>
+    <div class="modal-body">
+      <div class="form-group"><label class="form-label">Domaine cible</label>
+        <input id="new-domain" class="form-input" placeholder="moncornerb.com" onkeydown="if(event.key==='Enter')createJob()">
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Sans https:// — ex: boutique-exemple.fr</div>
+      </div>
+      <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:6px;padding:10px 14px;font-size:12px;margin-top:12px">
+        <b style="color:#818cf8">Ce qui sera extrait :</b><br>
+        <span style="color:var(--muted)">CMS · Tous les produits + prix · Audit SEO (5 pages) · Design & fonts · Stack technique · Stockage sécurisé R2</span>
+      </div>
+      <div id="slots-warn" style="display:none;background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:6px;padding:8px 12px;font-size:12px;color:#eab308;margin-top:10px">
+        ⚠ 3/3 slots occupés — le job sera mis en file d'attente
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-new')">Annuler</button>
+      <button class="btn btn-primary" onclick="createJob()">⚡ Lancer le scraping</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.slot-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;min-height:160px;position:relative;transition:border-color .3s}
+.slot-card.running{border-color:rgba(99,102,241,.4)}
+.slot-card.free{border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;flex-direction:column;gap:6px}
+.slot-card.queued{border-color:rgba(234,179,8,.4)}
+.slot-domain{font-size:13px;font-weight:800;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.slot-cms{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px}
+.slot-step{font-size:11px;color:#818cf8;margin-bottom:8px;font-weight:600}
+.progress-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:10px}
+.progress-fill{height:100%;background:linear-gradient(90deg,#6366f1,#a5b4fc);border-radius:2px;transition:width .5s ease}
+.slot-log{font-size:10px;color:var(--muted);font-family:monospace;line-height:1.5;max-height:60px;overflow:hidden}
+.step-dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;flex-shrink:0}
+.step-done{background:var(--green)}
+.step-running{background:#6366f1;animation:pulse .8s ease-in-out infinite}
+.step-pending{background:var(--border)}
+.step-failed{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.steps-row{display:flex;gap:4px;margin-bottom:8px;align-items:center}
+.queue-item{display:flex;align-items:center;gap:10px;padding:8px 12px;background:rgba(234,179,8,.06);border:1px solid rgba(234,179,8,.2);border-radius:6px;margin-bottom:6px;font-size:12px}
+.log-line{display:block;padding:1px 0;border-bottom:1px solid rgba(99,102,241,.06)}
+.log-line:last-child{border-bottom:none}
+.log-ts{color:var(--muted);margin-right:8px;user-select:none}
+.log-domain{color:#818cf8;margin-right:6px;font-weight:700}
+.badge-cms{padding:2px 7px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase}
+.cms-shopify{background:rgba(149,191,71,.2);color:#95bf47}
+.cms-woocommerce{background:rgba(150,88,138,.2);color:#96588a}
+.cms-prestashop{background:rgba(55,138,204,.2);color:#378acc}
+.cms-custom{background:rgba(99,102,241,.1);color:#818cf8}
+.elapsed{font-size:10px;color:var(--muted);font-family:monospace}
+</style>
+
+<script type="module">
+import { checkAuth, buildNav, toast, openModal, closeModal } from '/assets/platform.js';
+checkAuth(); buildNav();
+window.openModal = openModal; window.closeModal = closeModal;
+
+const API = 'https://v35-scrape-orchestrator.ernestpedanou.workers.dev';
+let _polling = true;
+let _pollTimer = null;
+let _seenLogs = new Set(); // dedup log entries across all jobs
+
+const CMS_LABELS = { shopify:'Shopify', woocommerce:'WooCommerce', prestashop:'PrestaShop', wix:'Wix', webflow:'Webflow', custom:'Custom' };
+const STEP_LABELS = { cms_detection:'CMS', products:'Produits', seo_audit:'SEO', design_stack:'Design & Stack', storing:'R2 Store' };
+
+function cmsBadge(cms) {
+  const cls = `cms-${cms||'custom'}`;
+  return `<span class="badge-cms ${cls}">${CMS_LABELS[cms]||cms||'—'}</span>`;
+}
+
+// ── Main poll ─────────────────────────────────────────────────────────────────
+async function poll() {
+  try {
+    const r = await fetch(`${API}/jobs`);
+    const d = await r.json();
+    if (!d.ok) return;
+    renderSlots(d.jobs || []);
+    renderQueue(d.jobs || []);
+    renderLogs(d.jobs || []);
+    renderDone(d.jobs || []);
+    const running = d.running || 0;
+    document.getElementById('slot-indicator').textContent = `${running}/3 slots`;
+    document.getElementById('slot-indicator').style.color = running === 3 ? 'var(--red)' : running > 0 ? '#818cf8' : 'var(--muted)';
+    // Update modal warn
+    const warn = document.getElementById('slots-warn');
+    if (warn) warn.style.display = running >= 3 ? 'block' : 'none';
+  } catch {}
+}
+
+window.togglePoll = function() {
+  _polling = !_polling;
+  document.getElementById('pause-btn').textContent = _polling ? '⏸' : '▶';
+  document.getElementById('log-status').textContent = _polling ? '' : 'PAUSÉ';
+  if (_polling) schedulePoll();
+};
+
+function schedulePoll() {
+  clearTimeout(_pollTimer);
+  if (_polling) _pollTimer = setTimeout(async () => { await poll(); schedulePoll(); }, 2000);
+}
+
+// ── Slots ─────────────────────────────────────────────────────────────────────
+function renderSlots(jobs) {
+  const active = jobs.filter(j => j.status==='running' || j.status==='queued').slice(0, 3);
+  const slots = Array(3).fill(null).map((_, i) => active[i] || null);
+  document.getElementById('slots-grid').innerHTML = slots.map(j => j ? renderSlotCard(j) : `
+    <div class="slot-card free">
+      <div style="font-size:24px;opacity:.3">◯</div>
+      <div>SLOT LIBRE</div>
+    </div>
+  `).join('');
+}
+
+function renderSlotCard(j) {
+  const steps = j.steps || [];
+  const stepsHtml = steps.map(s => `<span class="step-dot step-${s.status}" title="${STEP_LABELS[s.name]||s.name}"></span>`).join('');
+  const progress = j.progress || 0;
+  const lastLog = j.logs?.[0];
+  const elapsed = j.started_at ? Math.round((Date.now() - new Date(j.started_at).getTime())/1000) : 0;
+  const statusColor = j.status === 'running' ? 'var(--accent)' : 'var(--yellow)';
+  return `
+    <div class="slot-card ${j.status}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px">
+        <div class="slot-domain" title="${esc(j.domain)}">${esc(j.domain)}</div>
+        <span class="elapsed">${elapsed > 0 ? elapsed+'s' : ''}</span>
+      </div>
+      <div class="slot-cms">${j.cms ? cmsBadge(j.cms) : '<span style="font-size:10px;color:var(--muted)">Détection…</span>'}</div>
+      <div class="steps-row">${stepsHtml}</div>
+      <div class="progress-bar"><div class="progress-fill" style="width:${progress}%"></div></div>
+      <div class="slot-step" style="color:${statusColor}">
+        ${j.status==='running' ? '● ' : '🟡 '} ${j.current_step ? (STEP_LABELS[j.current_step]||j.current_step) : (j.status==='queued'?'En file d\'attente':'Démarrage…')}
+        ${progress > 0 ? `<span style="color:var(--muted);font-weight:400"> — ${progress}%</span>` : ''}
+      </div>
+      <div class="slot-log">${lastLog ? `<span style="color:var(--muted)">${lastLog.ts}</span> ${esc(lastLog.msg)}` : ''}</div>
+    </div>
+  `;
+}
+
+// ── Queue ─────────────────────────────────────────────────────────────────────
+function renderQueue(jobs) {
+  const queued = jobs.filter(j => j.status==='queued');
+  const sec = document.getElementById('queue-section');
+  const list = document.getElementById('queue-list');
+  sec.style.display = queued.length ? 'block' : 'none';
+  list.innerHTML = queued.map((j, i) => `
+    <div class="queue-item">
+      <span style="color:var(--yellow);font-weight:700">#${i+1}</span>
+      <span style="font-weight:600">${esc(j.domain)}</span>
+      <span style="color:var(--muted);font-size:11px">🟡 En attente d'un slot libre</span>
+      <button class="btn btn-xs btn-danger" style="margin-left:auto" onclick="deleteJob('${esc(j.id)}')">✕</button>
+    </div>
+  `).join('');
+}
+
+// ── Logs ─────────────────────────────────────────────────────────────────────
+function renderLogs(jobs) {
+  const running = jobs.filter(j => j.status==='running');
+  if (!running.length) return;
+  const logBody = document.getElementById('log-body');
+  const entries = [];
+  running.forEach(j => {
+    (j.logs || []).forEach(l => {
+      const key = `${j.domain}:${l.ts}:${l.msg}`;
+      if (!_seenLogs.has(key)) { _seenLogs.add(key); entries.push({ domain: j.domain, ts: l.ts, msg: l.msg }); }
+    });
+  });
+  if (!entries.length) return;
+  // Keep _seenLogs bounded
+  if (_seenLogs.size > 500) _seenLogs.clear();
+  const existing = logBody.innerHTML === '<span style="color:var(--muted)">En attente de jobs…</span>' ? '' : logBody.innerHTML;
+  const newLines = entries.map(e => `<span class="log-line"><span class="log-ts">${e.ts}</span><span class="log-domain">[${esc(e.domain)}]</span>${esc(e.msg)}</span>`).join('');
+  logBody.innerHTML = newLines + existing;
+  // Keep max 200 lines
+  const lines = logBody.querySelectorAll('.log-line');
+  if (lines.length > 200) Array.from(lines).slice(200).forEach(l => l.remove());
+}
+
+// ── Done table ────────────────────────────────────────────────────────────────
+function renderDone(jobs) {
+  const done = jobs.filter(j => j.status==='completed'||j.status==='failed').slice(0, 30);
+  document.getElementById('done-tbody').innerHTML = done.map(j => `
+    <tr>
+      <td style="font-weight:600">${esc(j.domain)}</td>
+      <td>${cmsBadge(j.cms)}</td>
+      <td style="font-weight:600;color:var(--green)">${j.products||'—'}</td>
+      <td class="text-muted" style="font-size:11px">${j.elapsed ? j.elapsed+'s' : '—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${j.seo_issues||'—'}</td>
+      <td class="text-muted" style="font-size:11px">${j.completed_at ? new Date(j.completed_at).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+      <td>
+        ${j.status==='completed' ? `
+          <a href="${API}/jobs/${j.id}/download?format=json" class="btn btn-xs" download>JSON</a>
+          <a href="${API}/jobs/${j.id}/download?format=csv"  class="btn btn-xs" style="margin-left:4px" download>CSV</a>
+          <a href="/clone-intel.html?domain=${esc(j.domain)}" class="btn btn-xs" style="margin-left:4px">Brief →</a>
+        ` : '<span style="color:var(--red);font-size:11px">Échoué</span>'}
+      </td>
+      <td><button class="btn btn-xs btn-danger" onclick="deleteJob('${esc(j.id)}')">✕</button></td>
+    </tr>
+  `).join('') || '<tr><td colspan="8" class="text-center text-muted" style="padding:24px">Aucun job terminé</td></tr>';
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+window.createJob = async function() {
+  const domain = document.getElementById('new-domain').value.trim().replace(/^https?:\/\//,'').replace(/\/.*$/,'');
+  if (!domain) return toast('Domaine requis', 'error');
+  try {
+    const r = await fetch(`${API}/jobs`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ domain }) });
+    const d = await r.json();
+    if (!d.ok) return toast(d.error, 'error');
+    toast(`Job ${d.status==='running'?'démarré':'en file d\'attente'} : ${domain}`, 'success');
+    closeModal('modal-new');
+    document.getElementById('new-domain').value = '';
+    await poll();
+  } catch(e) { toast(e.message, 'error'); }
+};
+
+window.deleteJob = async function(id) {
+  if (!confirm('Supprimer ce job et ses outputs R2 ?')) return;
+  await fetch(`${API}/jobs/${id}`, { method:'DELETE' });
+  toast('Supprimé', 'success');
+  await poll();
+};
+
+function esc(s) { const d=document.createElement('div'); d.textContent=String(s||''); return d.innerHTML; }
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+// Si lancé depuis cloner.html avec ?domain=xxx
+const urlP = new URLSearchParams(location.search);
+const autoDomain = urlP.get('domain');
+if (autoDomain) {
+  document.getElementById('new-domain').value = autoDomain;
+  setTimeout(() => openModal('modal-new'), 500);
+}
+
+poll();
+schedulePoll();
+document.getElementById('log-status').textContent = '';
+</script>
+</body>
+</html>

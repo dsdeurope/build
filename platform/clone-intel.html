@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Clone Intel</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Clone Intel</span>
+      <div class="topbar-right">
+        <input id="domain-in" class="form-input" style="width:260px" placeholder="moncornerb.com" onkeydown="if(event.key==='Enter')run()">
+        <button class="btn btn-primary" id="run-btn" onclick="run()">⚡ Analyser</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <!-- Empty state -->
+      <div id="empty-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 20px;text-align:center;gap:16px">
+        <div style="font-size:48px">🔬</div>
+        <div style="font-size:1.4rem;font-weight:800">Clone Intel</div>
+        <div style="color:var(--muted);max-width:420px;font-size:13px;line-height:1.7">
+          Analyse un concurrent pour extraire les signaux clés — structure, produits, stack technique, lacunes SEO.<br>
+          <b>Philosophie :</b> on ne copie pas, on améliore immédiatement.
+        </div>
+        <button class="btn btn-primary" onclick="document.getElementById('domain-in').focus()">Entrer un domaine</button>
+      </div>
+
+      <!-- Loading -->
+      <div id="loading" style="display:none;text-align:center;padding:60px">
+        <div class="spinner" style="margin:0 auto 20px"></div>
+        <div id="load-step" style="color:var(--muted);font-size:13px">Initialisation…</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:8px">Analyse parallèle : produits + SEO + design + stack</div>
+      </div>
+
+      <!-- Results -->
+      <div id="results" style="display:none">
+
+        <!-- Tabs -->
+        <div class="tabs" style="margin-bottom:20px">
+          <button class="tab active" data-tab="brief">📋 Brief</button>
+          <button class="tab" data-tab="products">📦 Produits</button>
+          <button class="tab" data-tab="seo">🎯 SEO</button>
+          <button class="tab" data-tab="design">🎨 Design</button>
+          <button class="tab" data-tab="stack">⚙️ Stack</button>
+        </div>
+
+        <!-- ── BRIEF ── -->
+        <div id="tab-brief" class="tab-panel">
+          <div class="kpi-grid-sm" id="kpi-brief"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px">
+            <div class="panel">
+              <div class="panel-header">🚀 Actions prioritaires (impact/effort)</div>
+              <div class="panel-body" id="actions-list"></div>
+            </div>
+            <div>
+              <div class="panel" style="margin-bottom:12px">
+                <div class="panel-header">✅ À reproduire</div>
+                <div class="panel-body" id="to-replicate"></div>
+              </div>
+              <div class="panel">
+                <div class="panel-header">🚫 Ne pas copier</div>
+                <div class="panel-body" id="not-copy" style="font-size:12px;color:var(--muted)"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── PRODUCTS ── -->
+        <div id="tab-products" class="tab-panel" style="display:none">
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap">
+            <input id="q-prod" class="form-input" placeholder="Filtrer produits…" style="width:220px" oninput="renderProducts()">
+            <select id="f-type" class="filter-select" onchange="renderProducts()"><option value="">Tous types</option></select>
+            <label style="font-size:12px;display:flex;align-items:center;gap:6px">
+              <input type="checkbox" id="f-nodesc" onchange="renderProducts()"> Sans description seulement
+            </label>
+            <span id="prod-count" style="font-size:12px;color:var(--muted);margin-left:auto"></span>
+            <button class="btn btn-sm" onclick="exportProducts()">⬇ Export CSV</button>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>Titre</th><th>Type</th><th>Prix</th><th>Variantes</th><th>Images</th><th>Desc.</th><th>Ali Query</th></tr></thead>
+              <tbody id="tbody-prod"></tbody>
+            </table>
+          </div>
+          <div id="prod-pagination"></div>
+        </div>
+
+        <!-- ── SEO ── -->
+        <div id="tab-seo" class="tab-panel" style="display:none">
+          <div class="kpi-grid-sm" style="margin-bottom:16px" id="kpi-seo"></div>
+          <div class="panel" style="margin-bottom:16px">
+            <div class="panel-header">🔴 Problèmes SEO (triés par impact)</div>
+            <div class="panel-body" id="seo-improvements"></div>
+          </div>
+          <div id="seo-pages"></div>
+        </div>
+
+        <!-- ── DESIGN ── -->
+        <div id="tab-design" class="tab-panel" style="display:none">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+            <div class="panel">
+              <div class="panel-header">🎨 Palette couleurs</div>
+              <div class="panel-body" id="colors-panel"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-header">📝 Typographie & UX</div>
+              <div class="panel-body" id="ux-panel"></div>
+            </div>
+          </div>
+          <div class="panel" style="margin-top:16px">
+            <div class="panel-header">🛡 Éléments de confiance</div>
+            <div class="panel-body" id="trust-panel"></div>
+          </div>
+        </div>
+
+        <!-- ── STACK ── -->
+        <div id="tab-stack" class="tab-panel" style="display:none">
+          <div id="stack-grid"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.tab{background:none;border:none;padding:8px 16px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent}
+.tab.active{color:var(--text);border-bottom-color:var(--accent)}
+.tab-panel{animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.action-row{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--border)}
+.action-row:last-child{border-bottom:none}
+.action-num{min-width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.action-text{font-size:12px;line-height:1.5}
+.badge-impact{padding:2px 6px;border-radius:3px;font-size:9px;font-weight:700;text-transform:uppercase}
+.bi-high{background:rgba(239,68,68,.15);color:#ef4444}
+.bi-medium{background:rgba(234,179,8,.15);color:#eab308}
+.bi-low{background:rgba(99,102,241,.15);color:#818cf8}
+.bi-critical{background:rgba(239,68,68,.3);color:#ef4444}
+.color-swatch{display:inline-block;width:32px;height:32px;border-radius:6px;border:1px solid var(--border);cursor:pointer;vertical-align:middle;margin:3px}
+.color-swatch:hover::after{content:attr(data-hex);position:absolute;background:#000;color:#fff;font-size:10px;padding:2px 6px;border-radius:3px;margin-left:4px}
+.stack-cat{margin-bottom:16px}
+.stack-cat-title{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);letter-spacing:.5px;margin-bottom:8px}
+.stack-tag{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:10px;font-size:11px;font-weight:600;background:rgba(99,102,241,.12);color:#818cf8;border:1px solid rgba(99,102,241,.2);margin:3px}
+.stack-empty{font-size:11px;color:var(--muted)}
+.issue-row{display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border)}
+.issue-row:last-child{border-bottom:none}
+.seo-page-card{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:14px;margin-bottom:10px}
+.seo-page-url{font-size:11px;color:var(--muted);margin-bottom:8px;font-family:monospace}
+.seo-field{display:flex;gap:6px;margin-bottom:4px;font-size:12px}
+.seo-label{min-width:100px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.3px}
+.prod-ali{font-size:10px;background:rgba(255,102,0,.1);color:#f97316;padding:2px 6px;border-radius:3px;font-family:monospace;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.no-desc-badge{font-size:9px;background:rgba(239,68,68,.15);color:#ef4444;padding:1px 5px;border-radius:3px;font-weight:700}
+</style>
+
+<script type="module">
+import { checkAuth, buildNav, toast, paginationHtml } from '/assets/platform.js';
+checkAuth(); buildNav();
+
+const API = 'https://v35-clone-intel.ernestpedanou.workers.dev';
+let DATA = null;
+let _prodPage = 1;
+
+// ── Run ───────────────────────────────────────────────────────────────────────
+window.run = async function() {
+  const domain = document.getElementById('domain-in').value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  if (!domain) return toast('Entrer un domaine', 'error');
+
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('results').style.display = 'none';
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('run-btn').disabled = true;
+
+  const steps = ['Détection CMS…', 'Extraction produits (API)…', 'Audit SEO pages…', 'Design + Stack…', 'Génération du brief…'];
+  let si = 0;
+  const stepInt = setInterval(() => { document.getElementById('load-step').textContent = steps[Math.min(si++, steps.length - 1)]; }, 2500);
+
+  try {
+    const r = await fetch(`${API}/discover`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain }) });
+    const d = await r.json();
+    clearInterval(stepInt);
+    if (!d.ok) return toast(d.error, 'error');
+    DATA = d;
+    renderAll(d);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('results').style.display = 'block';
+  } catch(e) {
+    clearInterval(stepInt);
+    toast(e.message, 'error');
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('empty-state').style.display = 'block';
+  } finally {
+    document.getElementById('run-btn').disabled = false;
+  }
+};
+
+// ── Tab switching ─────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(x => x.style.display = 'none');
+  t.classList.add('active');
+  document.getElementById('tab-' + t.dataset.tab).style.display = 'block';
+}));
+
+// ── RENDER ALL ────────────────────────────────────────────────────────────────
+function renderAll(d) {
+  renderBrief(d.brief, d.products, d.seo);
+  renderProducts(d.products);
+  renderSEO(d.seo);
+  renderDesign(d.design);
+  renderStack(d.stack);
+}
+
+// ── BRIEF ─────────────────────────────────────────────────────────────────────
+function renderBrief(b, products, seo) {
+  document.getElementById('kpi-brief').innerHTML = [
+    { val: b.cms?.toUpperCase() || '?', label: 'CMS' },
+    { val: b.stats?.products || '—', label: 'Produits' },
+    { val: b.stats?.collections || '—', label: 'Collections' },
+    { val: b.clone_time || '—', label: '⏱ Clone estimé' },
+    { val: b.stats?.seo_issues || '—', label: '⚠ Issues SEO', color: 'var(--red)' },
+    { val: b.stats?.no_description || '—', label: '📝 Sans desc.', color: 'var(--yellow)' },
+  ].map(k => `<div class="kpi-card-sm"><div class="kpi-value" style="${k.color ? 'color:' + k.color : ''}">${k.val}</div><div class="kpi-label">${k.label}</div></div>`).join('');
+
+  document.getElementById('actions-list').innerHTML = (b.priority_actions || []).map((a, i) => `
+    <div class="action-row">
+      <div class="action-num">${a.priority || i + 1}</div>
+      <div>
+        <div class="action-text">${esc(a.action)}</div>
+        <div style="margin-top:4px;display:flex;gap:4px">
+          <span class="badge-impact bi-${a.impact}">${a.impact}</span>
+          <span style="font-size:10px;color:var(--muted)">effort: ${a.effort}</span>
+        </div>
+      </div>
+    </div>
+  `).join('') || '<div class="text-muted" style="font-size:12px">Aucune action générée</div>';
+
+  const rep = b.to_replicate || {};
+  document.getElementById('to-replicate').innerHTML = `
+    ${rep.stack?.length ? `<div style="font-size:12px;margin-bottom:8px">Apps : ${rep.stack.map(s => `<span class="stack-tag">${s}</span>`).join('')}</div>` : ''}
+    ${rep.free_shipping_threshold ? `<div style="font-size:12px;margin-bottom:6px">🚚 Livraison gratuite dès <b>${rep.free_shipping_threshold}€</b></div>` : ''}
+    ${rep.announcement_bar ? `<div style="font-size:11px;color:var(--muted)">Barre annonce : "${esc(rep.announcement_bar)}"</div>` : ''}
+  ` || '<div class="text-muted" style="font-size:12px">—</div>';
+
+  document.getElementById('not-copy').innerHTML = (b.not_worth_copying || []).map(n => `<div style="margin-bottom:3px">❌ ${n}</div>`).join('');
+}
+
+// ── PRODUCTS ─────────────────────────────────────────────────────────────────
+function renderProducts(data) {
+  if (!data && DATA) data = DATA.products;
+  if (!data) return;
+  window._prodData = data;
+  // Populate type filter
+  const types = [...new Set((data.products || []).map(p => p.type).filter(Boolean))].sort();
+  const sel = document.getElementById('f-type');
+  if (sel.options.length <= 1) types.forEach(t => { const o = document.createElement('option'); o.value = t; o.textContent = t; sel.appendChild(o); });
+  renderProductsTable();
+}
+
+window.renderProducts = function() { renderProductsTable(); };
+
+function renderProductsTable() {
+  const data = window._prodData;
+  if (!data) return;
+  const q = document.getElementById('q-prod').value.toLowerCase();
+  const fType = document.getElementById('f-type').value;
+  const noDesc = document.getElementById('f-nodesc').checked;
+  let list = data.products || [];
+  if (q) list = list.filter(p => p.title.toLowerCase().includes(q) || p.ali_query.toLowerCase().includes(q));
+  if (fType) list = list.filter(p => p.type === fType);
+  if (noDesc) list = list.filter(p => !p.has_description);
+  document.getElementById('prod-count').textContent = `${list.length} produits`;
+  const per = 50;
+  const pages = Math.ceil(list.length / per) || 1;
+  _prodPage = Math.min(_prodPage, pages);
+  const slice = list.slice((_prodPage - 1) * per, _prodPage * per);
+  document.getElementById('tbody-prod').innerHTML = slice.map((p, i) => `
+    <tr>
+      <td style="color:var(--muted);font-size:11px">${(_prodPage - 1) * per + i + 1}</td>
+      <td style="max-width:200px">
+        <a href="${esc(p.url)}" target="_blank" style="font-size:12px;font-weight:600;color:var(--text)">${esc(p.title)}</a>
+      </td>
+      <td style="font-size:11px;color:var(--muted)">${esc(p.type || '—')}</td>
+      <td style="font-weight:600;white-space:nowrap">
+        ${p.price.toFixed(2)}€
+        ${p.compare_price > p.price ? `<span style="color:var(--muted);text-decoration:line-through;font-size:10px;margin-left:4px">${p.compare_price.toFixed(2)}€</span>` : ''}
+      </td>
+      <td style="font-size:11px;color:var(--muted)">${p.variants_count || p.variants?.length || '—'}</td>
+      <td style="font-size:11px;color:var(--muted)">${p.images_count || p.images?.length || '—'}</td>
+      <td>${p.has_description ? '<span style="font-size:10px;color:var(--green)">✓</span>' : '<span class="no-desc-badge">MANQUANT</span>'}</td>
+      <td>
+        <a href="https://fr.aliexpress.com/wholesale?SearchText=${encodeURIComponent(p.ali_query)}" target="_blank" class="prod-ali" title="${esc(p.ali_query)}">${esc(p.ali_query)}</a>
+      </td>
+    </tr>
+  `).join('') || '<tr><td colspan="8" class="text-center text-muted">Aucun produit</td></tr>';
+  document.getElementById('prod-pagination').innerHTML = paginationHtml(_prodPage, pages, 'window._goPage');
+  window._goPage = p => { _prodPage = p; renderProductsTable(); };
+}
+
+window.exportProducts = function() {
+  const d = window._prodData?.products || [];
+  const csv = ['title,type,price,compare_price,available,has_description,ali_query,url', ...d.map(p => [p.title, p.type, p.price, p.compare_price, p.available, p.has_description, p.ali_query, p.url].map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(','))].join('\n');
+  const a = document.createElement('a'); a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `products-${DATA?.brief?.domain || 'export'}.csv`; a.click();
+};
+
+// ── SEO ───────────────────────────────────────────────────────────────────────
+function renderSEO(seo) {
+  document.getElementById('kpi-seo').innerHTML = [
+    { val: seo.pages_audited, label: 'Pages auditées' },
+    { val: seo.critical, label: '🔴 Critiques', color: 'var(--red)' },
+    { val: seo.high, label: '🟠 Important', color: 'var(--yellow)' },
+    { val: seo.improvements?.length || 0, label: 'Issues totales' },
+  ].map(k => `<div class="kpi-card-sm"><div class="kpi-value" style="${k.color ? 'color:' + k.color : ''}">${k.val}</div><div class="kpi-label">${k.label}</div></div>`).join('');
+
+  const LABELS = { title_missing:'Title manquante', title_too_long:'Title trop longue (>60c)', title_too_short:'Title trop courte', meta_desc_missing:'Meta description absente', meta_desc_too_long:'Meta desc trop longue', h1_missing:'H1 absent', schema_missing:'Aucun schema.org', product_schema_missing:'Schema Product absent', breadcrumb_schema_missing:'Schema Breadcrumb absent', canonical_missing:'Canonical absent', og_image_missing:'OG Image absente', images_missing_alt:'Alt text images manquants', thin_content:'Thin content (<200 mots)' };
+  document.getElementById('seo-improvements').innerHTML = (seo.improvements || []).map(i => `
+    <div class="issue-row">
+      <span class="badge-impact bi-${i.impact}">${i.impact}</span>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:600">${LABELS[i.type] || i.type}</div>
+        ${i.detail ? `<div style="font-size:11px;color:var(--muted)">${esc(i.detail)}</div>` : ''}
+        <div style="font-size:10px;color:var(--muted);font-family:monospace">${esc(i.page)}</div>
+      </div>
+    </div>
+  `).join('') || '<div class="text-muted" style="font-size:12px">Aucun problème détecté</div>';
+
+  document.getElementById('seo-pages').innerHTML = (seo.pages || []).map(p => `
+    <div class="seo-page-card">
+      <div class="seo-page-url">${esc(p.url)}</div>
+      ${p.error ? `<div style="color:var(--red);font-size:12px">Erreur : ${esc(p.error)}</div>` : `
+        <div class="seo-field"><span class="seo-label">Title</span><span>${esc(p.title) || '<em style="color:var(--muted)">absent</em>'} <span style="font-size:10px;color:var(--muted)">(${p.title?.length || 0}c)</span></span></div>
+        <div class="seo-field"><span class="seo-label">Meta desc</span><span style="font-size:11px">${esc(p.meta_desc?.slice(0, 120)) || '<em style="color:var(--red)">absente</em>'}</span></div>
+        <div class="seo-field"><span class="seo-label">H1</span><span style="font-size:11px">${esc(p.h1) || '<em style="color:var(--red)">absent</em>'}</span></div>
+        <div class="seo-field"><span class="seo-label">H2s</span><span style="font-size:11px;color:var(--muted)">${(p.h2s || []).slice(0,3).map(h => esc(h)).join(' · ') || '—'}</span></div>
+        <div class="seo-field"><span class="seo-label">Schema</span><span style="font-size:11px">${(p.schema_types || []).map(s => `<span class="stack-tag" style="font-size:9px">${s}</span>`).join('') || '<em style="color:var(--red)">aucun</em>'}</span></div>
+        <div class="seo-field"><span class="seo-label">Alt ratio</span><span style="font-size:11px;${p.alt_ratio < 50 ? 'color:var(--red)' : 'color:var(--green)'}">${p.alt_ratio}% des images</span></div>
+        <div class="seo-field"><span class="seo-label">Mots</span><span style="font-size:11px;${p.word_count < 200 ? 'color:var(--yellow)' : ''}">${p.word_count}</span></div>
+      `}
+    </div>
+  `).join('');
+}
+
+// ── DESIGN ────────────────────────────────────────────────────────────────────
+function renderDesign(d) {
+  const hexes = d.colors?.hex_palette || [];
+  const vars = d.colors?.css_vars || {};
+  document.getElementById('colors-panel').innerHTML = `
+    <div style="margin-bottom:12px">${hexes.map(c => `<span class="color-swatch" style="background:${c}" title="${c}" data-hex="${c}" onclick="navigator.clipboard.writeText('${c}')"></span>`).join('')}</div>
+    ${Object.keys(vars).length ? `<div style="font-size:11px;color:var(--muted)">${Object.entries(vars).map(([k,v])=>`<div style="margin:2px 0"><code>${k}</code>: <span class="color-swatch" style="background:${v};width:14px;height:14px;border-radius:3px"></span> ${v}</div>`).join('')}</div>` : ''}
+  `;
+  document.getElementById('ux-panel').innerHTML = `
+    ${d.fonts?.length ? `<div style="margin-bottom:10px"><b style="font-size:11px;text-transform:uppercase;color:var(--muted)">Fonts</b><br>${d.fonts.map(f => `<span style="font-size:13px;margin-right:8px">${esc(f)}</span>`).join('')}</div>` : ''}
+    ${d.announcement_bar ? `<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:8px">📢 ${esc(d.announcement_bar)}</div>` : ''}
+    ${d.free_shipping_threshold ? `<div style="font-size:12px;margin-bottom:6px">🚚 Livraison gratuite : <b>${d.free_shipping_threshold}€</b></div>` : ''}
+    ${d.cta_text ? `<div style="font-size:12px">CTA : <b>"${esc(d.cta_text)}"</b></div>` : ''}
+  `;
+  document.getElementById('trust-panel').innerHTML = d.trust_elements?.length
+    ? d.trust_elements.map(t => `<div style="font-size:12px;padding:6px 0;border-bottom:1px solid var(--border)">${esc(t)}</div>`).join('')
+    : '<div class="text-muted" style="font-size:12px">Aucun élément de confiance détecté</div>';
+}
+
+// ── STACK ─────────────────────────────────────────────────────────────────────
+function renderStack(stack) {
+  const LABELS = { pixels:'Pixels & Analytics', email:'Email Marketing', reviews:'Avis clients', bnpl:'BNPL / Paiement', chat:'Live Chat', heatmaps:'Heatmaps', urgency:'Urgence & Social Proof' };
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">';
+  for (const [cat, tools] of Object.entries(LABELS)) {
+    const list = stack[cat] || [];
+    html += `<div class="panel"><div class="panel-header">${tools}</div><div class="panel-body">`;
+    if (!list.length) html += `<span class="stack-empty">Rien détecté</span>`;
+    else list.forEach(t => { html += `<span class="stack-tag">✓ ${esc(t)}</span>`; });
+    html += '</div></div>';
+  }
+  if (stack.ga4_id) html += `<div class="panel"><div class="panel-header">IDs trackers</div><div class="panel-body"><div style="font-size:11px;font-family:monospace">GA4 : ${esc(stack.ga4_id)}</div>${stack.fb_pixel_id ? `<div style="font-size:11px;font-family:monospace">FB Pixel : ${esc(stack.fb_pixel_id)}</div>` : ''}</div></div>`;
+  html += '</div>';
+  document.getElementById('stack-grid').innerHTML = html;
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = String(s || ''); return d.innerHTML; }
+
+// ── Auto-fill domain from URL param ──────────────────────────────────────────
+const urlP = new URLSearchParams(location.search);
+const domP = urlP.get('domain');
+if (domP) { document.getElementById('domain-in').value = domP; setTimeout(run, 300); }
+</script>
+</body>
+</html>

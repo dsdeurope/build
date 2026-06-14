@@ -5,3 +5,4 @@ node_modules/
 dist/
 .claude/
 platform/assets/vault-init.js
+config/secrets.env

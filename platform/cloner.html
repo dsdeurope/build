@@ -123,10 +123,18 @@ async function load() {
           <span style="font-size:.75rem;font-weight:700;color:${clonability(b).color}">⚡ ${clonability(b).label}</span>
         </div>
 
-        <a href="https://${esc(b.domain)}" target="_blank" rel="noopener" class="clone-visit-btn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          Voir le site → ${esc(b.domain)}
-        </a>
+        <div style="display:flex;gap:8px">
+          <a href="https://${esc(b.domain)}" target="_blank" rel="noopener" class="clone-visit-btn" style="flex:1">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            Voir le site
+          </a>
+          <a href="/clone-intel.html?domain=${esc(b.domain)}" class="clone-visit-btn" style="flex:1;background:linear-gradient(135deg,#6366f1,#4f46e5)">
+            🔬 Clone Intel
+          </a>
+          <a href="/scrape-monitor.html?domain=${esc(b.domain)}" class="clone-visit-btn" style="flex:1;background:linear-gradient(135deg,#0f172a,#1e293b);border:1px solid rgba(99,102,241,.3)">
+            📡 Scraper
+          </a>
+        </div>
 
         <div class="clone-meta">
           <div class="clone-stat">

@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Fulfillment</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Fulfillment Tracker</span>
+      <div class="topbar-right">
+        <select id="f-status" onchange="load(1)" class="filter-select">
+          <option value="">Toutes commandes</option>
+          <option value="pending">🟡 En attente</option>
+          <option value="ordered">🔵 Commandé AliExpress</option>
+          <option value="shipped">🚚 Expédié</option>
+          <option value="done">✅ Livré</option>
+        </select>
+        <button class="btn btn-sm" onclick="openModal('modal-add')">+ Commande manuelle</button>
+        <button class="btn btn-sm" onclick="injectTest()">🧪 Test</button>
+      </div>
+    </header>
+    <div class="content">
+
+      <!-- KPIs -->
+      <div class="kpi-grid-sm" id="kpi-row">
+        <div class="kpi-card-sm"><div class="kpi-value text-yellow" id="k-pending">—</div><div class="kpi-label">🟡 En attente</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value text-blue"   id="k-ordered">—</div><div class="kpi-label">🔵 Commandés</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value"             id="k-shipped">—</div><div class="kpi-label">🚚 Expédiés</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value text-green"  id="k-done">—</div><div class="kpi-label">✅ Livrés</div></div>
+        <div class="kpi-card-sm"><div class="kpi-value"             id="k-total">—</div><div class="kpi-label">Total</div></div>
+      </div>
+
+      <!-- Webhook info -->
+      <div class="panel" style="margin-bottom:16px">
+        <div class="panel-header" style="cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'':'none'">
+          ⚙️ Intégration PHP — Comment envoyer les commandes
+        </div>
+        <div class="panel-body" id="integration-info">
+          <p style="font-size:12px;color:var(--muted);margin-bottom:10px">Dans ton script PHP de confirmation de commande, envoie un POST à :</p>
+          <code id="webhook-url" class="code-block">https://v35-fulfillment.ernestpedanou.workers.dev/orders</code>
+          <button class="btn btn-xs" style="margin-left:8px" onclick="navigator.clipboard.writeText(document.getElementById('webhook-url').textContent);toast('URL copiée','success')">Copier</button>
+          <pre class="code-block" style="margin-top:10px;font-size:11px">// PHP — après validation paiement
+$order = [
+  'shop'     => 'ma-boutique.fr',
+  'email'    => $customer['email'],
+  'customer' => ['name'=>$customer['name'], 'city'=>$customer['city'], 'country'=>'FR'],
+  'shipping' => ['address1'=>$addr, 'city'=>$city, 'zip'=>$zip, 'country'=>'France'],
+  'currency' => 'EUR',
+  'items'    => array_map(fn($p) => [
+    'title'    => $p['title'],
+    'quantity' => $p['qty'],
+    'price'    => $p['price'],
+    'sku'      => $p['sku'],
+  ], $cart),
+];
+$ch = curl_init('https://v35-fulfillment.ernestpedanou.workers.dev/orders');
+curl_setopt_array($ch, [
+  CURLOPT_POST => true,
+  CURLOPT_POSTFIELDS => json_encode($order),
+  CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+  CURLOPT_RETURNTRANSFER => true,
+]);
+curl_exec($ch);</pre>
+        </div>
+      </div>
+
+      <!-- Orders table -->
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Commande</th><th>Site</th><th>Client</th>
+            <th>Produits</th><th>Total</th><th>Statut</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div id="pagination"></div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Order detail modal -->
+<div class="modal" id="modal-order">
+  <div class="modal-box" style="max-width:740px">
+    <div class="modal-header">
+      <span id="mod-title">Commande</span>
+      <button class="modal-close" onclick="closeModal('modal-order')">✕</button>
+    </div>
+    <div class="modal-body" id="mod-body"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-order')">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manual order modal -->
+<div class="modal" id="modal-add">
+  <div class="modal-box" style="max-width:560px">
+    <div class="modal-header">
+      <span>+ Commande manuelle</span>
+      <button class="modal-close" onclick="closeModal('modal-add')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid-2">
+        <div class="form-group"><label>Site / Boutique</label><input id="a-shop" class="form-input" placeholder="ma-boutique.fr"></div>
+        <div class="form-group"><label>Réf. commande</label><input id="a-ref" class="form-input" placeholder="#1042"></div>
+        <div class="form-group"><label>Nom client</label><input id="a-name" class="form-input" placeholder="Marie Dupont"></div>
+        <div class="form-group"><label>Email</label><input id="a-email" class="form-input" placeholder="client@email.fr"></div>
+        <div class="form-group"><label>Ville</label><input id="a-city" class="form-input" placeholder="Lyon"></div>
+        <div class="form-group"><label>Pays</label><input id="a-country" class="form-input" value="France"></div>
+      </div>
+      <label class="form-label" style="margin-top:12px">Produits (1 par ligne : <code>Titre produit | qté | prix€</code>)</label>
+      <textarea id="a-items" class="form-input" rows="5" placeholder="Robe fleurie bohème été | 1 | 29.90&#10;Collier pendentif lune argent | 2 | 14.90"></textarea>
+      <label class="form-label">Notes</label>
+      <input id="a-notes" class="form-input" placeholder="Cadeau — ne pas mettre le prix">
+    </div>
+    <div class="modal-footer">
+      <button class="btn" onclick="closeModal('modal-add')">Annuler</button>
+      <button class="btn btn-primary" onclick="createManual()">Créer + Résoudre AliExpress</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.form-group label{display:block;font-size:11px;font-weight:600;text-transform:uppercase;color:var(--muted);margin-bottom:4px;letter-spacing:.4px}
+.code-block{display:block;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-family:monospace;font-size:11px;line-height:1.6;color:#a5b4fc;white-space:pre-wrap;overflow-x:auto}
+.status-badge{padding:3px 8px;border-radius:10px;font-size:10px;font-weight:700;text-transform:uppercase;white-space:nowrap}
+.status-pending{background:rgba(234,179,8,.15);color:#eab308}
+.status-ordered{background:rgba(99,102,241,.15);color:#818cf8}
+.status-shipped{background:rgba(59,130,246,.15);color:#60a5fa}
+.status-done{background:rgba(34,197,94,.15);color:#22c55e}
+.status-cancelled{background:rgba(239,68,68,.15);color:#ef4444}
+.ali-link{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:11px;background:rgba(255,102,0,.12);color:#ff6600;text-decoration:none;border:1px solid rgba(255,102,0,.25)}
+.ali-link:hover{background:rgba(255,102,0,.25)}
+.ali-link.not-found{background:rgba(99,102,241,.1);color:#818cf8;border-color:rgba(99,102,241,.25)}
+.product-row{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border);font-size:12px}
+.product-row:last-child{border-bottom:none}
+.qty-badge{padding:1px 5px;border-radius:3px;background:var(--surface2);font-size:10px;font-weight:700}
+</style>
+
+<script type="module">
+import { checkAuth, buildNav, toast, openModal, closeModal, paginationHtml } from '/assets/platform.js';
+checkAuth(); buildNav();
+window.openModal = openModal; window.closeModal = closeModal;
+
+const API = 'https://v35-fulfillment.ernestpedanou.workers.dev';
+
+function statusBadge(s) {
+  const labels = { pending:'🟡 En attente', ordered:'🔵 Commandé', shipped:'🚚 Expédié', done:'✅ Livré', cancelled:'❌ Annulé' };
+  return `<span class="status-badge status-${s}">${labels[s]||s}</span>`;
+}
+
+function aliLink(li) {
+  if (!li.ali_url) return `<span style="font-size:10px;color:var(--muted)">—</span>`;
+  const cls = li.ali_found ? '' : 'not-found';
+  return `<a href="${li.ali_url}" target="_blank" class="ali-link ${cls}" title="${li.ali_found?'URL directe trouvée':'Recherche générée'}">🛒 ${li.ali_found?'AliExpress':'Chercher'}</a>`;
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+}
+
+// ── LOAD ORDERS ───────────────────────────────────────────────────────────────
+let _page = 1;
+async function load(p = _page) {
+  _page = p;
+  const status = document.getElementById('f-status').value;
+  const params = new URLSearchParams({ page: p, per: 25 });
+  if (status) params.set('status', status);
+  try {
+    const r = await fetch(`${API}/orders?${params}`);
+    const d = await r.json();
+    const tb = document.getElementById('tbody');
+    if (!d.list?.length) {
+      tb.innerHTML = `<tr><td colspan="8" class="text-center text-muted" style="padding:32px">Aucune commande</td></tr>`;
+      return;
+    }
+    tb.innerHTML = d.list.map((o, i) => {
+      const num = (_page - 1) * 25 + i + 1;
+      return `<tr>
+        <td style="color:var(--muted);font-size:11px">${num}</td>
+        <td>
+          <b>${esc(o.order_number)}</b>
+          <div style="font-size:10px;color:var(--muted)">${fmtDate(o.received_at)}</div>
+        </td>
+        <td style="font-size:11px;color:var(--muted)">${esc(o.shop||'—')}</td>
+        <td style="font-size:12px">${esc(o.customer||'—')}</td>
+        <td>
+          <button class="btn btn-xs" onclick="viewOrder('${esc(o.id)}')">Voir produits →</button>
+        </td>
+        <td style="font-weight:600">${o.total ? parseFloat(o.total).toFixed(2)+'€' : '—'}</td>
+        <td>${statusBadge(o.status)}</td>
+        <td class="actions">
+          <button class="btn btn-xs" onclick="viewOrder('${esc(o.id)}')">Détail</button>
+          <select class="filter-select" style="font-size:10px;padding:2px 4px" onchange="updateStatus('${esc(o.id)}',this.value)">
+            <option value="">Statut…</option>
+            <option value="pending">🟡 En attente</option>
+            <option value="ordered">🔵 Commandé</option>
+            <option value="shipped">🚚 Expédié</option>
+            <option value="done">✅ Livré</option>
+            <option value="cancelled">❌ Annulé</option>
+          </select>
+          <button class="btn btn-xs btn-danger" onclick="delOrder('${esc(o.id)}')">✕</button>
+        </td>
+      </tr>`;
+    }).join('');
+    document.getElementById('pagination').innerHTML = paginationHtml(p, d.pages, 'window._load');
+    window._load = load;
+  } catch(e) { toast(e.message, 'error'); }
+}
+
+// ── STATS ─────────────────────────────────────────────────────────────────────
+async function loadStats() {
+  try {
+    const r = await fetch(`${API}/stats`);
+    const d = await r.json();
+    document.getElementById('k-pending').textContent = d.pending ?? '—';
+    document.getElementById('k-ordered').textContent = d.ordered ?? '—';
+    document.getElementById('k-shipped').textContent = d.shipped ?? '—';
+    document.getElementById('k-done').textContent    = d.done    ?? '—';
+    document.getElementById('k-total').textContent   = d.total   ?? '—';
+  } catch {}
+}
+
+// ── ORDER DETAIL ──────────────────────────────────────────────────────────────
+window.viewOrder = async function(id) {
+  try {
+    const r = await fetch(`${API}/orders/${id}`);
+    const d = await r.json();
+    const o = d.order;
+    if (!o) return toast('Commande introuvable', 'error');
+
+    const itemsHtml = (o.line_items || []).map(li => `
+      <div class="product-row">
+        <span class="qty-badge">×${li.quantity}</span>
+        <span style="flex:1">${esc(li.title)}${li.variant ? ` <span style="color:var(--muted);font-size:10px">(${esc(li.variant)})</span>` : ''}</span>
+        <span style="min-width:50px;text-align:right;font-weight:600">${(li.price*li.quantity).toFixed(2)}€</span>
+        ${aliLink(li)}
+      </div>
+    `).join('');
+
+    const ship = o.shipping_address;
+    document.getElementById('mod-title').textContent = `Commande ${o.order_number} — ${o.customer?.name || ''}`;
+    document.getElementById('mod-body').innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Client</div>
+          <div style="font-size:13px"><b>${esc(o.customer?.name||'—')}</b></div>
+          <div style="font-size:12px;color:var(--muted)">${esc(o.customer?.email||'')}</div>
+          <div style="font-size:12px;color:var(--muted)">${esc(o.customer?.city||'')} ${esc(o.customer?.country||'')}</div>
+        </div>
+        <div>
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:6px">Livraison</div>
+          ${ship ? `
+            <div style="font-size:12px">${esc(ship.name||'')}</div>
+            <div style="font-size:12px">${esc(ship.address1||'')} ${esc(ship.address2||'')}</div>
+            <div style="font-size:12px">${esc(ship.zip||'')} ${esc(ship.city||'')}</div>
+            <div style="font-size:12px">${esc(ship.country||'')}</div>
+            ${ship.phone ? `<div style="font-size:12px;color:var(--muted)">${esc(ship.phone)}</div>` : ''}
+          ` : '<div style="font-size:12px;color:var(--muted)">—</div>'}
+        </div>
+      </div>
+
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;color:var(--muted);margin-bottom:8px">
+        Produits à commander sur AliExpress
+      </div>
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;margin-bottom:14px">
+        ${itemsHtml}
+        <div style="display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-weight:700;font-size:13px">
+          <span>Total</span><span>${o.total_price?.toFixed(2)||'—'}${o.currency==='EUR'?'€':' '+o.currency}</span>
+        </div>
+      </div>
+
+      ${o.notes ? `<div style="background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:12px">📝 ${esc(o.notes)}</div>` : ''}
+
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+        ${statusBadge(o.status)}
+        <span style="font-size:11px;color:var(--muted)">Reçue le ${fmtDate(o.received_at)}</span>
+        <button class="btn btn-sm" onclick="reResolve('${esc(o.id)}')">🔄 Re-résoudre AliExpress</button>
+      </div>
+
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <b style="font-size:11px;align-self:center;color:var(--muted)">Changer statut :</b>
+        ${['pending','ordered','shipped','done'].map(s => `
+          <button class="btn btn-sm ${o.status===s?'btn-primary':''}" onclick="updateStatus('${esc(o.id)}','${s}')">
+            ${{pending:'🟡 En attente',ordered:'🔵 Commandé',shipped:'🚚 Expédié',done:'✅ Livré'}[s]}
+          </button>
+        `).join('')}
+      </div>
+
+      ${o.fulfillment_notes ? `<div style="margin-top:10px;font-size:12px;color:var(--muted)">Notes fulfillment : ${esc(o.fulfillment_notes)}</div>` : ''}
+      ${o.tracking ? `<div style="margin-top:6px;font-size:12px">📦 Tracking : <b>${esc(o.tracking)}</b></div>` : ''}
+    `;
+    openModal('modal-order');
+  } catch(e) { toast(e.message, 'error'); }
+};
+
+// ── ACTIONS ───────────────────────────────────────────────────────────────────
+window.updateStatus = async function(id, status) {
+  if (!status) return;
+  try {
+    await fetch(`${API}/orders/${id}/status`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ status }) });
+    toast('Statut mis à jour', 'success');
+    load(_page); loadStats();
+  } catch(e) { toast(e.message, 'error'); }
+};
+
+window.reResolve = async function(id) {
+  toast('Résolution AliExpress en cours…', 'info');
+  try {
+    const r = await fetch(`${API}/orders/${id}/resolve`, { method:'POST' });
+    const d = await r.json();
+    toast(`${d.resolved}/${d.total} produits résolus`, 'success');
+    viewOrder(id);
+  } catch(e) { toast(e.message, 'error'); }
+};
+
+window.delOrder = async function(id) {
+  if (!confirm('Archiver cette commande ?')) return;
+  await fetch(`${API}/orders/${id}`, { method:'DELETE' });
+  toast('Archivée', 'success');
+  load(_page); loadStats();
+};
+
+window.injectTest = async function() {
+  try {
+    const r = await fetch(`${API}/orders/test`, { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' });
+    const d = await r.json();
+    toast('Commande test injectée', 'success');
+    load(1); loadStats();
+  } catch(e) { toast(e.message, 'error'); }
+};
+
+// ── MANUAL CREATE ─────────────────────────────────────────────────────────────
+window.createManual = async function() {
+  const shop    = document.getElementById('a-shop').value.trim();
+  const ref     = document.getElementById('a-ref').value.trim();
+  const name    = document.getElementById('a-name').value.trim();
+  const email   = document.getElementById('a-email').value.trim();
+  const city    = document.getElementById('a-city').value.trim();
+  const country = document.getElementById('a-country').value.trim();
+  const notes   = document.getElementById('a-notes').value.trim();
+  const rawItems= document.getElementById('a-items').value.trim();
+
+  if (!name || !rawItems) return toast('Nom client + produits requis', 'error');
+
+  const items = rawItems.split('\n').map(line => {
+    const parts = line.split('|').map(p => p.trim());
+    return { title: parts[0]||'', quantity: parseInt(parts[1])||1, price: parseFloat(parts[2])||0 };
+  }).filter(i => i.title);
+
+  if (!items.length) return toast('Format produit invalide', 'error');
+
+  const total = items.reduce((s, i) => s + i.price * i.quantity, 0);
+  try {
+    const r = await fetch(`${API}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ shop, order_number: ref, email, customer: { name, email, city, country }, items, total: total.toFixed(2), notes }),
+    });
+    const d = await r.json();
+    if (!d.ok) return toast(d.error, 'error');
+    toast(`Commande créée — ${d.ali_resolved} produits résolus`, 'success');
+    closeModal('modal-add');
+    load(1); loadStats();
+  } catch(e) { toast(e.message, 'error'); }
+};
+
+function esc(s) { const d=document.createElement('div'); d.textContent=String(s||''); return d.innerHTML; }
+
+load(1); loadStats();
+setInterval(() => { loadStats(); load(_page); }, 60000); // auto-refresh 1 min
+</script>
+</body>
+</html>
