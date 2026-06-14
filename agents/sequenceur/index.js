@@ -16,13 +16,14 @@ async function logInfo(env,worker,event,data){
   try{await env.KV.put('log:'+worker+':'+Date.now(),JSON.stringify({worker,event,data,ts:new Date().toISOString()}),{expirationTtl:86400*7});}catch{}
 }
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-};
-const respond = (data, status = 200) =>
-  new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', ...CORS } });
+const ALLOWED_ORIGINS=/^(https?:\/\/[^.]+\.workers\.dev|https?:\/\/[^.]+\.ernestpedanou\.workers\.dev|null)$/;
+function corsHeaders(req){
+  const o=req.headers.get('Origin')||'null';
+  const allowed=ALLOWED_ORIGINS.test(o)||!o||o==='null';
+  return{'Access-Control-Allow-Origin':allowed?o:'https://v35-admin.ernestpedanou.workers.dev','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'Content-Type','Vary':'Origin'};
+}
+const respond=(data,status=200,req=null)=>
+  new Response(JSON.stringify(data),{status,headers:{'Content-Type':'application/json',...corsHeaders(req||new Request('https://x/'))}});
 
 const NK = {
   'Lingerie':['lingerie','dessous','soutien','culotte','bra','swimwear','maillot'],
@@ -185,15 +186,15 @@ export default {
   async scheduled(event, env) { await sequence(env); },
 
   async fetch(request, env) {
-    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(request) });
 
     if (request.method === 'GET') {
       const qs = new URL(request.url).searchParams;
       if (qs.get('action') === 'niches') {
-        try { return respond(JSON.parse(await env.KV.get('niche_map') || '{}')); }
-        catch(e) { return respond({}, 200); }
+        try { return respond(JSON.parse(await env.KV.get('niche_map') || '{}'),200,request); }
+        catch(e) { return respond({},200,request); }
       }
-      return respond({ status: 'ok' });
+      return respond({ status: 'ok' },200,request);
     }
 
     if (request.method === 'POST') {
@@ -201,15 +202,15 @@ export default {
       try { body = await request.json(); } catch {}
       if (body.action === 'analyze-mesh' && body.domain) {
         const result = await analyzeMesh(body.domain, env);
-        return respond(result);
+        return respond(result,200,request);
       }
       if (body.action === 'scrape-collections' && body.domain) {
-        return respond(await scrapeCollections(body.domain));
+        return respond(await scrapeCollections(body.domain),200,request);
       }
     }
 
     const result = await sequence(env);
-    return respond(result);
+    return respond(result,200,request);
   },
 };
 
