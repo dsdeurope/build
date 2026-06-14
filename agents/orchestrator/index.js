@@ -39,19 +39,38 @@ async function stepFactoryFr(s,env){
 }
 
 // ── Étape 2 : sitemap.xml + robots.txt avec hreflang ────────────────────
+// Pages statiques : lastmod figée après 1ère génération (Google ne les recrawle pas inutilement)
+const STATIC_URLS=new Set(['/cgv/','/mentions-legales/','/confidentialite/','/contact/','/a-propos/']);
+
 async function stepSeoAssets(s,env){
   const{slug,domain,blueprint}=s;
   const cols=blueprint.allCollections||[];
   const today=new Date().toISOString().split('T')[0];
+
+  // Charger lastmod précédents (préserve dates pages statiques)
+  const prevObj=await env.R2.get(slug+'/lastmod.json').catch(()=>null);
+  const prev=prevObj?JSON.parse(await new Response(prevObj.body).text()):null;
+
   const urls=['/'];
   cols.forEach(c=>{urls.push('/collections/','/collections/'+c.slug+'/');(c.products||[]).forEach(p=>urls.push('/collections/'+c.slug+'/'+p.slug+'/'));});
   ['/blog/','/cgv/','/mentions-legales/','/confidentialite/','/contact/','/a-propos/'].forEach(u=>urls.push(u));
+
+  // Construire map lastmod : statiques conservent leur date d'origine
+  const lastmod={};
+  urls.forEach(u=>{lastmod[u]=STATIC_URLS.has(u)&&prev?.[u]?prev[u]:today;});
+  // Collections/produits : today (vient d'être générés)
+  // /blog/ : today (contenu frais)
+
   const allL=['fr',...LANGS];
   const hreflang=u=>allL.map(l=>`    <xhtml:link rel="alternate" hreflang="${l}" href="https://${l==='fr'?'www':l}.${domain}${u}"/>`).join('\n')+`\n    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.${domain}${u}"/>`;
-  const sitemap=`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${urls.map(u=>`  <url>\n    <loc>https://www.${domain}${u}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>${u==='/'?'daily':'weekly'}</changefreq>\n    <priority>${u==='/'?'1.0':u.split('/').length<=3?'0.8':'0.6'}</priority>\n${hreflang(u)}\n  </url>`).join('\n')}\n</urlset>`;
+  const sitemap=`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${urls.map(u=>`  <url>\n    <loc>https://www.${domain}${u}</loc>\n    <lastmod>${lastmod[u]}</lastmod>\n    <changefreq>${u==='/'?'daily':STATIC_URLS.has(u)?'yearly':'weekly'}</changefreq>\n    <priority>${u==='/'?'1.0':u.split('/').length<=3?'0.8':'0.6'}</priority>\n${hreflang(u)}\n  </url>`).join('\n')}\n</urlset>`;
   const robots=`User-agent: *\nAllow: /\nDisallow: /api/\nDisallow: /admin/\nDisallow: /checkout/\nDisallow: /suivi/\nSitemap: https://www.${domain}/sitemap.xml\n\n# ── Crawlers IA — blocage entraînement LLM ──\nUser-agent: GPTBot\nDisallow: /\n\nUser-agent: CCBot\nDisallow: /\n\nUser-agent: anthropic-ai\nDisallow: /\n\nUser-agent: Claude-Web\nDisallow: /\n\nUser-agent: Google-Extended\nDisallow: /\n\nUser-agent: Omgili\nDisallow: /\n\nUser-agent: Bytespider\nDisallow: /\n\nUser-agent: FacebookBot\nDisallow: /\n\nUser-agent: PerplexityBot\nDisallow: /\n\nUser-agent: PetalBot\nDisallow: /\n\nUser-agent: Amazonbot\nDisallow: /\n\nUser-agent: DataForSeoBot\nDisallow: /\n\nUser-agent: YouBot\nDisallow: /\n\n# ── SEO spy tools ──\nUser-agent: AhrefsBot\nDisallow: /\n\nUser-agent: SemrushBot\nDisallow: /\n\nUser-agent: MJ12bot\nDisallow: /\n\nUser-agent: DotBot\nDisallow: /\n\nUser-agent: Seekport Crawler\nDisallow: /\n\nUser-agent: MauiBot\nDisallow: /`;
-  await Promise.all([env.R2.put(slug+'/sitemap.xml',sitemap,{httpMetadata:{contentType:'application/xml'}}),env.R2.put(slug+'/robots.txt',robots,{httpMetadata:{contentType:'text/plain'}})]);
-  return{sitemap_urls:urls.length,hreflang_langs:allL.length};
+  await Promise.all([
+    env.R2.put(slug+'/sitemap.xml',sitemap,{httpMetadata:{contentType:'application/xml'}}),
+    env.R2.put(slug+'/robots.txt',robots,{httpMetadata:{contentType:'text/plain'}}),
+    env.R2.put(slug+'/lastmod.json',JSON.stringify(lastmod),{httpMetadata:{contentType:'application/json'}}),
+  ]);
+  return{sitemap_urls:urls.length,hreflang_langs:allL.length,lastmod_preserved:STATIC_URLS.size};
 }
 
 // ── Étape 3 : DNS Cloudflare — 19 sous-domaines CNAME ───────────────────
