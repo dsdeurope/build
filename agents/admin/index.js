@@ -137,6 +137,7 @@ a.back:hover{color:#111}
     <li style="margin-top:.6rem;border-top:1px solid #1a1a1a;padding-top:.6rem"><a onclick="showTab('op')" id="n-op" style="background:rgba(180,83,9,.15);color:#d97706;font-weight:700">⚡ Opération</a></li>
     <li style="margin-top:.3rem"><a onclick="showTab('orch')" id="n-orch" style="color:#7c3aed">🎯 Orchestrateur</a></li>
     <li style="margin-top:.3rem"><a onclick="showTab('bl')" id="n-bl" style="color:#0891b2">🔗 Backlinks</a></li>
+    <li style="margin-top:.3rem"><a onclick="showTab('spot')" id="n-spot" style="color:#059669">📍 Spots</a></li>
   </ul>
   <div class="sb-sep" id="sb-sep" style="display:none"></div>
   <div class="sb-site" id="sb-site"></div>
@@ -171,7 +172,7 @@ function loadSite(){
 }
 
 function showTab(tab){
-  ['home','cols','pages','media','promos','stats','bk','op','orch','bl'].forEach(function(t){
+  ['home','cols','pages','media','promos','stats','bk','op','orch','bl','spot'].forEach(function(t){
     var el=document.getElementById('n-'+t);
     if(el)el.classList.toggle('act',t===tab);
   });
@@ -185,6 +186,7 @@ function showTab(tab){
   else if(tab==='op')renderOperation();
   else if(tab==='orch')renderOrch();
   else if(tab==='bl')renderBacklinks();
+  else if(tab==='spot')renderSpot();
 }
 
 /* ── HOMEPAGE ─────────────────────────────────────────── */
@@ -808,6 +810,139 @@ function delBL(id){
 }
 function pingGoogleBL(){
   apiFetch('/backlinks/ping',{method:'POST',body:JSON.stringify({slug:SLUG})}).then(function(r){return r.json();}).then(function(d){toast(d.ok?'Ping envoyé ✓ (google:'+d.google+', bing:'+d.bing+')':'Erreur: '+(d.error||'?'),d.ok);});
+}
+
+/* ── SPOTS ────────────────────────────────────────────────── */
+var SPOT_TYPE_COL={blog:'#7c3aed',forum:'#0891b2',profile:'#d97706',guestbook:'#059669'};
+function spotAvailable(s){
+  if(s.status==='blacklist')return false;
+  if(!s.last_used)return true;
+  var diff=Math.floor((Date.now()-new Date(s.last_used).getTime())/86400000);
+  return diff>=(s.cooldown||30);
+}
+function spotCooldownLeft(s){
+  if(!s.last_used)return 0;
+  var diff=Math.floor((Date.now()-new Date(s.last_used).getTime())/86400000);
+  return Math.max(0,(s.cooldown||30)-diff);
+}
+function renderSpot(){
+  set('<div class="hd"><h1>📍 Spots</h1><span class="slug-tag">'+SLUG+'</span></div>'+
+    '<div id="spot-dash" style="display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-bottom:1.2rem"></div>'+
+    '<div style="font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#059669;margin-bottom:.8rem">AJOUTER UN SPOT</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.6rem;margin-bottom:.8rem">'+
+    '<div><label class="lbl">Domaine</label><input id="sp-domain" class="inp" placeholder="exemple.com"></div>'+
+    '<div><label class="lbl">URL page cible</label><input id="sp-url" class="inp" placeholder="https://exemple.com/blog/article/"></div>'+
+    '<div><label class="lbl">Type</label><select id="sp-type" class="inp"><option value="blog">Blog</option><option value="forum">Forum</option><option value="profile">Profil/Annuaire</option><option value="guestbook">Guestbook</option></select></div>'+
+    '<div><label class="lbl">Cooldown (jours)</label><input id="sp-cooldown" class="inp" type="number" value="30" min="1" max="365"></div>'+
+    '<div><label class="lbl">DR (>25)</label><input id="sp-dr" class="inp" type="number" placeholder="35"></div>'+
+    '<div><label class="lbl">TF (>15)</label><input id="sp-tf" class="inp" type="number" placeholder="20"></div>'+
+    '<div><label class="lbl">OBL (<50)</label><input id="sp-obl" class="inp" type="number" placeholder="15"></div>'+
+    '<div><label class="lbl">Notes</label><input id="sp-notes" class="inp" placeholder="Accès libre, section commentaires..."></div>'+
+    '</div>'+
+    '<div style="display:flex;gap:.6rem;margin-bottom:1.5rem">'+
+    '<button class="btn" onclick="addSpot()" style="background:#059669">+ Ajouter spot</button>'+
+    '<select id="sp-filter" class="inp" style="width:auto;font-size:.72rem" onchange="loadSpots()">'+
+    '<option value="all">Tous</option><option value="available">Disponibles</option><option value="cooldown">Cooldown</option><option value="blacklist">Blacklist</option>'+
+    '</select>'+
+    '</div>'+
+    '<div id="spot-list"></div>');
+  loadSpots();
+}
+function loadSpots(){
+  if(!SLUG)return;
+  apiFetch('/spots?slug='+SLUG).then(function(r){return r.json();}).then(function(d){
+    var spots=d.spots||[];
+    var filter=(document.getElementById('sp-filter')||{}).value||'all';
+    var filtered=spots.filter(function(s){
+      if(filter==='available')return spotAvailable(s);
+      if(filter==='cooldown')return !spotAvailable(s)&&s.status!=='blacklist';
+      if(filter==='blacklist')return s.status==='blacklist';
+      return true;
+    });
+    // Dashboard stats
+    var avail=spots.filter(spotAvailable);
+    var dash=document.getElementById('spot-dash');
+    if(dash){
+      var byType={blog:0,forum:0,profile:0,guestbook:0};
+      avail.forEach(function(s){if(byType[s.type]!==undefined)byType[s.type]++;});
+      dash.innerHTML=[
+        {v:spots.length,l:'Total spots',c:'#333'},
+        {v:avail.length,l:'Disponibles',c:'#059669'},
+        {v:spots.filter(function(s){return !spotAvailable(s)&&s.status!=='blacklist';}).length,l:'Cooldown',c:'#f59e0b'},
+        {v:spots.filter(function(s){return s.status==='blacklist';}).length,l:'Blacklist',c:'#ef4444'},
+      ].map(function(x){
+        return '<div style="background:#f8f7f5;border-radius:6px;padding:.6rem .8rem;text-align:center">'+
+          '<div style="font-size:1.1rem;font-weight:700;color:'+x.c+'">'+x.v+'</div>'+
+          '<div style="font-size:.62rem;color:#888;margin-top:.1rem">'+x.l+'</div></div>';
+      }).join('')+
+      '<div style="background:#f8f7f5;border-radius:6px;padding:.6rem .8rem;grid-column:span 4">'+
+      '<div style="font-size:.6rem;font-weight:700;color:#888;margin-bottom:.3rem;letter-spacing:.1em">DISPONIBLES PAR TYPE</div>'+
+      '<div style="display:flex;gap:.4rem">'+
+      ['blog','forum','profile','guestbook'].map(function(t){
+        var tc=SPOT_TYPE_COL[t];
+        return '<span style="font-size:.65rem;padding:.1rem .5rem;border-radius:8px;background:'+tc+';color:#fff">'+t+' '+byType[t]+'</span>';
+      }).join('')+'</div></div>';
+    }
+    // Liste
+    var el=document.getElementById('spot-list');if(!el)return;
+    if(!filtered.length){el.innerHTML='<div style="color:#aaa;font-size:.8rem">Aucun spot'+( filter!=='all'?' ('+filter+')':'')+' enregistré</div>';return;}
+    el.innerHTML='<div style="font-size:.68rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#888;margin-bottom:.6rem">'+filtered.length+' SPOTS</div>'+
+      '<div style="display:flex;flex-direction:column;gap:.4rem">'+filtered.map(function(s){
+        var avail=spotAvailable(s);var left=spotCooldownLeft(s);
+        var statBg=s.status==='blacklist'?'#991b1b':avail?'#166534':'#92400e';
+        var statLbl=s.status==='blacklist'?'BLACKLIST':avail?'DISPO':'CD J+'+left;
+        var tc=SPOT_TYPE_COL[s.type]||'#888';
+        var qual_ok=(!s.dr||s.dr>=25)&&(!s.tf||s.tf>=15)&&(!s.obl||s.obl<50);
+        return '<div style="display:flex;align-items:center;gap:.5rem;padding:.5rem .7rem;background:#f8f7f5;border-radius:4px;flex-wrap:wrap">'+
+          '<span style="font-size:.6rem;font-weight:700;padding:.1rem .4rem;border-radius:8px;background:'+statBg+';color:#fff;white-space:nowrap">'+statLbl+'</span>'+
+          '<span style="font-size:.6rem;padding:.1rem .4rem;border-radius:8px;background:'+tc+';color:#fff">'+s.type+'</span>'+
+          (s.dr?'<span style="font-size:.6rem;color:'+(qual_ok?'#166534':'#ef4444')+'">DR'+s.dr+(s.tf?'/TF'+s.tf:'')+(s.obl?'/OBL'+s.obl:'')+'</span>':'')+
+          '<span style="flex:1;font-size:.73rem;color:#333;min-width:0"><b>'+s.domain+'</b>'+(s.url?' <a href="'+s.url+'" target="_blank" style="color:#0891b2;font-size:.65rem">↗</a>':'')+
+          (s.notes?' <span style="color:#aaa;font-size:.65rem">— '+s.notes+'</span>':'')+
+          ' <span style="color:#ccc;font-size:.62rem">× '+s.uses+'</span></span>'+
+          (avail&&s.status!=='blacklist'?'<button onclick="useSpot(\''+s.id+'\')" class="btn" style="font-size:.62rem;padding:.2rem .5rem;background:#7c3aed;white-space:nowrap">Utiliser →</button>':'')+
+          '<select onchange="updateSpot(\''+s.id+'\',{status:this.value})" style="font-size:.68rem;padding:.1rem .3rem;border:1px solid #ddd;border-radius:3px">'+
+            ['available','cooldown','blacklist'].map(function(x){return '<option '+(x===s.status?'selected':'')+'>'+x+'</option>';}).join('')+
+          '</select>'+
+          '<button onclick="delSpot(\''+s.id+'\')" style="background:none;border:none;cursor:pointer;color:#ccc;font-size:.8rem">✕</button>'+
+          '</div>';
+      }).join('')+'</div>';
+  }).catch(function(){});
+}
+function addSpot(){
+  var dom=document.getElementById('sp-domain').value.trim();
+  var url=document.getElementById('sp-url').value.trim();
+  var type=document.getElementById('sp-type').value;
+  var cooldown=parseInt(document.getElementById('sp-cooldown').value)||30;
+  var dr=parseInt(document.getElementById('sp-dr').value)||0;
+  var tf=parseInt(document.getElementById('sp-tf').value)||0;
+  var obl=parseInt(document.getElementById('sp-obl').value)||0;
+  var notes=document.getElementById('sp-notes').value.trim();
+  if(!dom){toast('Domaine requis',false);return;}
+  apiFetch('/spots',{method:'POST',body:JSON.stringify({slug:SLUG,domain:dom,url,type,cooldown,dr,tf,obl,notes})}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){toast('Spot ajouté ✓',true);loadSpots();}else toast('Erreur: '+(d.error||'?'),false);
+  });
+}
+function useSpot(id){
+  apiFetch('/spots/use',{method:'POST',body:JSON.stringify({slug:SLUG,id})}).then(function(r){return r.json();}).then(function(d){
+    if(d.ok){
+      // Pré-remplir l'URL dans le générateur de commentaires et switcher sur Backlinks
+      var spot=d.spot;
+      showTab('bl');
+      setTimeout(function(){
+        var urlEl=document.getElementById('bl-url');if(urlEl&&spot.url)urlEl.value=spot.url;
+        var domEl=document.getElementById('bl-domain');if(domEl)domEl.value=spot.domain;
+        var typeEl=document.getElementById('bl-type');if(typeEl)typeEl.value=spot.type;
+        toast('Spot chargé dans Backlinks — cooldown démarré ('+spot.cooldown+'j)',true);
+      },100);
+    }else toast('Erreur: '+(d.error||'?'),false);
+  });
+}
+function updateSpot(id,fields){
+  apiFetch('/spots/update',{method:'POST',body:JSON.stringify(Object.assign({slug:SLUG,id},fields))}).then(function(r){return r.json();}).then(function(d){if(d.ok)loadSpots();});
+}
+function delSpot(id){
+  apiFetch('/spots/update',{method:'POST',body:JSON.stringify({slug:SLUG,id,deleted:true})}).then(function(r){return r.json();}).then(function(d){if(d.ok)loadSpots();});
 }
 
 /* ── OPÉRATION ────────────────────────────────────────────── */
@@ -1442,6 +1577,40 @@ OUTPUT : JSON UNIQUEMENT, une seule clé "html" contenant le bloc HTML complet (
       }
       if(!commentHtml)return err('Génération échouée — réessayer');
       return ok({comment_html:commentHtml,word_count,anchor_type,blog_url,boutique_url});
+    }
+    // GET /spots
+    if(request.method==='GET'&&path==='/spots'){const sl=url.searchParams.get('slug');if(!sl)return err('slug requis');const o=await env.R2.get('backlinks/'+sl+'/spots.json').catch(()=>null);const spots=o?JSON.parse(await new Response(o.body).text()):[];return ok({spots});}
+    // POST /spots — ajouter un spot
+    if(path==='/spots'){
+      const{slug,domain,url:surl,type,cooldown,dr,tf,obl,notes}=body;if(!slug||!domain)return err('slug + domain requis');
+      const key='backlinks/'+slug+'/spots.json';
+      const o=await env.R2.get(key).catch(()=>null);
+      const spots=o?JSON.parse(await new Response(o.body).text()):[];
+      spots.push({id:Date.now().toString(36),domain,url:surl||'',type:type||'blog',cooldown:cooldown||30,dr:dr||0,tf:tf||0,obl:obl||0,notes:notes||'',status:'available',uses:0,last_used:null,addedAt:new Date().toISOString().split('T')[0]});
+      await env.R2.put(key,JSON.stringify(spots),{httpMetadata:{contentType:'application/json'}});
+      return ok({slug,added:true,total:spots.length});
+    }
+    // POST /spots/use — marquer un spot comme utilisé (déclenche cooldown)
+    if(path==='/spots/use'){
+      const{slug,id}=body;if(!slug||!id)return err('slug + id requis');
+      const key='backlinks/'+slug+'/spots.json';
+      const o=await env.R2.get(key).catch(()=>null);
+      const spots=o?JSON.parse(await new Response(o.body).text()):[];
+      const s=spots.find(x=>x.id===id);if(!s)return err('Spot introuvable',404);
+      s.last_used=new Date().toISOString().split('T')[0];s.uses=(s.uses||0)+1;
+      await env.R2.put(key,JSON.stringify(spots),{httpMetadata:{contentType:'application/json'}});
+      return ok({ok:true,spot:s});
+    }
+    // POST /spots/update — changer statut ou supprimer
+    if(path==='/spots/update'){
+      const{slug,id,status,deleted}=body;if(!slug||!id)return err('slug + id requis');
+      const key='backlinks/'+slug+'/spots.json';
+      const o=await env.R2.get(key).catch(()=>null);
+      let spots=o?JSON.parse(await new Response(o.body).text()):[];
+      if(deleted)spots=spots.filter(x=>x.id!==id);
+      else{const s=spots.find(x=>x.id===id);if(s&&status)s.status=status;}
+      await env.R2.put(key,JSON.stringify(spots),{httpMetadata:{contentType:'application/json'}});
+      return ok({ok:true});
     }
     // POST /backlinks/ping — ping Google/Bing pour indexation
     if(path==='/backlinks/ping'){
