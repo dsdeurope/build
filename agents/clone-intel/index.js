@@ -297,6 +297,12 @@ function generateBrief(domain, cms, productData, seoData, designData, stackData)
 }
 
 // ── ROUTER ────────────────────────────────────────────────────────────────────
+function authOk(req, env) {
+  const h = req.headers.get('Authorization') || '';
+  const t = new URL(req.url).searchParams.get('token') || '';
+  return !env.API_TOKEN || h === 'Bearer ' + env.API_TOKEN || t === env.API_TOKEN;
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
@@ -307,6 +313,7 @@ export default {
     const domain = (body.domain || url.searchParams.get('domain') || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').toLowerCase();
 
     if (path === '/health') return J({ worker: 'v35-clone-intel', status: 'up' });
+    if (!authOk(request, env)) return E('Unauthorized', 401);
 
     if (path === '/products') {
       if (!domain) return E('domain required');

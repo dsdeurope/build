@@ -6,3 +6,6 @@ account_id = "fe4415f3f3f3b64f651166d1a7ffe1a0"
 [[kv_namespaces]]
 binding = "KV"
 id = "e2eca9fb88584dbca9c59626f28714b6"
+
+# Secrets: wrangler secret put API_TOKEN --name v35-fulfillment
+# Secrets: wrangler secret put SHOPIFY_WEBHOOK_SECRET --name v35-fulfillment

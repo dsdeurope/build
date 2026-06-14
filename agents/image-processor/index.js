@@ -181,13 +181,19 @@ async function processOne(body, env) {
 }
 
 // ── ROUTER ────────────────────────────────────────────────────────────────────
+function authOk(req, env) {
+  const h = req.headers.get('Authorization') || '';
+  const t = new URL(req.url).searchParams.get('token') || '';
+  return !env.API_TOKEN || h === 'Bearer ' + env.API_TOKEN || t === env.API_TOKEN;
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
     const url  = new URL(request.url);
     const path = url.pathname.replace(/\/$/, '');
 
-    // ── Serve images from R2
+    // ── Serve images from R2 — public (CDN-like)
     if (path.startsWith('/images/')) {
       const key = decodeURIComponent(path.slice(8));
       if (!env.R2) return new Response('R2 not configured', { status: 503 });
@@ -207,6 +213,7 @@ export default {
     }
 
     if (path === '/health') return J({ worker: 'v35-image-processor', r2: !!env.R2, cdn: env.CDN_DOMAIN || 'worker-url' });
+    if (!authOk(request, env)) return E('Unauthorized', 401);
 
     if (request.method !== 'POST') return E('Method not allowed', 405);
     let body = {};

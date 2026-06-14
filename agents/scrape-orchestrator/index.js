@@ -113,7 +113,8 @@ async function runJob(jobId, env, ctx) {
     job.status='running'; job.started_at=new Date().toISOString(); await saveJob(kv, job);
     await log(kv, jobId, `Démarrage scraping de ${domain}`);
 
-    const H = { 'Content-Type':'application/json' };
+    const tok = env.AUTH_SECRET || env.API_TOKEN || '';
+    const H = { 'Content-Type':'application/json', ...(tok?{'Authorization':'Bearer '+tok}:{}) };
     const post = (path, body) => fetch(`${CLONE_INTEL}${path}`, { method:'POST', headers:H, body:JSON.stringify(body), signal:AbortSignal.timeout(60000) }).then(r=>r.json()).catch(e=>({ ok:false, error:e.message }));
 
     // ── Step 1: CMS
@@ -231,6 +232,13 @@ async function releaseAndStartNext(kv, env, ctx) {
 }
 
 // ── ROUTER ────────────────────────────────────────────────────────────────────
+function authOk(req, env) {
+  const h = req.headers.get('Authorization') || '';
+  const t = new URL(req.url).searchParams.get('token') || '';
+  const tok = env.AUTH_SECRET || env.API_TOKEN;
+  return !tok || h === 'Bearer ' + tok || t === tok;
+}
+
 export default {
   async fetch(request, env, ctx) {
     if (request.method==='OPTIONS') return new Response(null, { headers: CORS });
@@ -242,6 +250,7 @@ export default {
     if (request.method==='POST') { try{body=await request.json();}catch{} }
 
     if (url.pathname==='/health') return J({ worker:'v35-scrape-orchestrator', max_concurrent:MAX, r2:!!env.R2 });
+    if (!authOk(request, env)) return E('Unauthorized', 401);
 
     // GET /stats
     if (url.pathname==='/stats') {

@@ -132,6 +132,12 @@ async function buildOrder(shopifyOrder, shop) {
 }
 
 // ── FETCH HANDLER ─────────────────────────────────────────────────────────────
+function authOk(req, env) {
+  const h = req.headers.get('Authorization') || '';
+  const t = new URL(req.url).searchParams.get('token') || '';
+  return !env.API_TOKEN || h === 'Bearer ' + env.API_TOKEN || t === env.API_TOKEN;
+}
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
@@ -140,11 +146,14 @@ export default {
     const path = url.pathname.replace(/\/$/, '');
     const segs = path.split('/').filter(Boolean);
 
-    // GET /health
+    // GET /health — public
     if (path === '/health') {
       const index = await getIndex(env.KV);
       return ok({ service: 'v35-fulfillment', orders: index.length });
     }
+
+    // /webhook/orders — auth via Shopify HMAC (handled inside)
+    if (path !== '/webhook/orders' && !authOk(request, env)) return fail('Unauthorized', 401);
 
     // GET /stats
     if (path === '/stats') {

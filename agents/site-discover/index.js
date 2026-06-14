@@ -516,6 +516,14 @@ async function discover(niches_req, limit, ali_min_pct, auto_save, api_token, en
 }
 
 // ── Handler ──────────────────────────────────────────────────────────────────
+function authOk(req, env) {
+  const h = req.headers.get('Authorization') || '';
+  const t = new URL(req.url).searchParams.get('token') || '';
+  return !env.API_TOKEN || h === 'Bearer ' + env.API_TOKEN || t === env.API_TOKEN;
+}
+const ok  = d       => Response.json({ ok: true,  ...d },            { headers: CORS });
+const fail = (m, s=400) => Response.json({ ok: false, error: m }, { status: s, headers: CORS });
+
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
@@ -537,6 +545,7 @@ export default {
     }
 
     if (action === 'discover' && request.method === 'POST') {
+      if (!authOk(request, env)) return fail('Unauthorized', 401);
       let body = {};
       try { body = await request.json(); } catch {}
 
