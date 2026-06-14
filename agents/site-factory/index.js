@@ -381,8 +381,11 @@ function exitIntent(lang,p){
   return `<div id="ei-modal" style="position:fixed;inset:0;z-index:1000;background:rgba(0,0,0,.58);display:none;align-items:center;justify-content:center" role="dialog" aria-label="Special offer"><div style="background:#fff;max-width:440px;width:92%;text-align:center;padding:3rem 2.2rem 2.5rem;position:relative"><button onclick="_closeEI()" style="position:absolute;top:.9rem;right:1.1rem;background:none;border:none;font-size:1.4rem;cursor:pointer;color:#bbb;line-height:1" aria-label="Close">✕</button><p style="font-size:.6rem;letter-spacing:.35em;text-transform:uppercase;color:${p};margin-bottom:.7rem">${e?'EXCLUSIVE OFFER':'OFFRE EXCLUSIVE'}</p><h2 style="font:normal 1.6rem/1.2 Georgia,serif;color:#111;margin-bottom:.75rem">${e?'Before you go…':'Avant de partir…'}</h2><p style="color:#888;font-size:.87rem;margin-bottom:1.3rem">${e?'Get <strong style="color:#111">10% off</strong> your first order:':'Obtenez <strong style="color:#111">-10%</strong> sur votre première commande :'}</p><div style="background:#f5f0ea;border:2px dashed ${p};padding:.8rem 1.4rem;font-family:monospace;font-size:1.15rem;font-weight:700;color:#111;letter-spacing:.25em;margin-bottom:1.3rem">WELCOME10</div><button onclick="location.href='/checkout/'" style="display:block;width:100%;padding:.92rem;background:${p};color:#fff;border:none;font-size:.71rem;letter-spacing:.18em;text-transform:uppercase;font-weight:700;cursor:pointer;margin-bottom:.65rem;font-family:inherit">${e?'Claim 10% off — Shop now':'Obtenir -10% — Commander'}</button><button onclick="_closeEI()" style="font-size:.72rem;color:#ccc;background:none;border:none;cursor:pointer;font-family:inherit">${e?'No thanks, I\'ll pay full price':'Non merci, je préfère payer plein tarif'}</button></div></div>`;
 }
 
-const layout=(title,desc,url,ld,body,p,pd,ac,lang='fr',tpl=1)=>
-  `<!DOCTYPE html><html lang="${lang}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><meta name="theme-color" content="${p}"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}"><meta property="og:type" content="website"><link rel="canonical" href="${url}"><link rel="manifest" href="/manifest.json"><link rel="preconnect" href="https://v35-admin.ernestpedanou.workers.dev"><script type="application/ld+json">${ld}</script><style>${css(p,pd,ac,tpl)}</style></head><body>${body}<button class="btt" id="btt" onclick="scrollTop()">↑</button>${cookieConsent(lang,p)}${exitIntent(lang,p)}${pageJS()}</body></html>`;
+const layout=(title,desc,url,ld,body,p,pd,ac,lang='fr',tpl=1,ogType='website')=>{
+  const origin=url.replace(/^(https?:\/\/[^/]+).*/,'$1');
+  const ogImg=origin+'/og.svg';
+  return `<!DOCTYPE html><html lang="${lang}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><meta name="description" content="${esc(desc)}"><meta name="theme-color" content="${p}"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(desc)}"><meta property="og:type" content="${ogType}"><meta property="og:url" content="${url}"><meta property="og:image" content="${ogImg}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(title)}"><meta name="twitter:description" content="${esc(desc)}"><meta name="twitter:image" content="${ogImg}"><link rel="canonical" href="${url}"><link rel="manifest" href="/manifest.json"><link rel="preconnect" href="https://v35-admin.ernestpedanou.workers.dev"><script type="application/ld+json">${ld}</script><style>${css(p,pd,ac,tpl)}</style></head><body>${body}<button class="btt" id="btt" onclick="scrollTop()">↑</button>${cookieConsent(lang,p)}${exitIntent(lang,p)}${pageJS()}</body></html>`;
+};
 
 const SVG_HEART=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
 const SVG_BAG=`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>`;
@@ -567,8 +570,9 @@ function genBlogPost(topic,niche,domain,lang){
   const body_html=e?topic.enBody:topic.frBody;
   const faqs=(e?topic.faq?.en:topic.faq?.fr)||[];
   const faqHtml=faqs.length?`<div class="art-faq"><h2>${e?'Frequently Asked Questions':'Questions fréquentes'}</h2>${faqs.map(f=>`<div class="faq-item"><p class="faq-q">${esc(f.q)}</p><p class="faq-a">${esc(f.a)}</p></div>`).join('')}</div>`:'';
-  const date=new Date().toLocaleDateString(e?'en-GB':'fr-FR',{day:'numeric',month:'long',year:'numeric'});
-  const ld=`{"@context":"https://schema.org","@type":"Article","headline":${JSON.stringify(title)},"author":{"@type":"Organization","name":${JSON.stringify(b)}},"datePublished":"${new Date().toISOString().slice(0,10)}","publisher":{"@type":"Organization","name":${JSON.stringify(b)}},"url":"https://${domain}/blog/${topic.slug}/"}`;
+  const pubDate=topic.publishedAt||new Date().toISOString().slice(0,10);
+  const date=new Date(pubDate).toLocaleDateString(e?'en-GB':'fr-FR',{day:'numeric',month:'long',year:'numeric'});
+  const ld=`{"@context":"https://schema.org","@type":"Article","headline":${JSON.stringify(title)},"author":{"@type":"Organization","name":${JSON.stringify(b)}},"datePublished":"${pubDate}","dateModified":"${pubDate}","publisher":{"@type":"Organization","name":${JSON.stringify(b)}},"url":"https://${domain}/blog/${topic.slug}/"}`;
   const art=`${promoBar(niche,lang)}${navBar(b,lang)}<div class="bc"><div class="bc-i"><a href="/">${e?'Home':'Accueil'}</a> › <a href="/blog/">${e?'Journal':'Blog'}</a> › ${esc(title)}</div></div><div class="art-w"><div class="art-hd"><span class="art-tag">${niche}</span><h1>${esc(title)}</h1><div class="art-mt"><span>${date}</span><span>·</span><span>${topic.read} ${e?'min read':'min de lecture'}</span><span>·</span><a href="/blog/" style="color:var(--p)">${e?'← All articles':'← Tous les articles'}</a></div></div><div class="art">${body_html}${faqHtml}</div></div>${trustSection(lang)}${footerSection(b,domain,lang)}`;
   return layout(`${title} | ${b}`,e?topic.enExc:topic.frExc,`https://${domain}/blog/${topic.slug}/`,ld,art,p,pd,ac,lang,tplFor(niche));
 }
@@ -895,13 +899,13 @@ function genProduct(prod,col,niche,domain,lang){
   const js=`<script>document.querySelectorAll('.tab-btn').forEach(function(b){b.addEventListener('click',function(){document.querySelectorAll('.tab-btn,.tab-content').forEach(function(x){x.classList.remove('act')});this.classList.add('act');document.getElementById(this.dataset.tab).classList.add('act')})});document.querySelectorAll('.pdp-thumb').forEach(function(t){t.addEventListener('click',function(){document.querySelectorAll('.pdp-thumb').forEach(function(x){x.classList.remove('act')});this.classList.add('act');document.querySelector('.pdp-main-img').style.background=this.dataset.grad})});var q=1;function updCart(){document.getElementById('addCart').textContent='${e?'Add to Cart':'Ajouter'} — '+(${price}*q).toFixed(2)+'€'}document.getElementById('qp').addEventListener('click',function(){if(q<10){q++;document.getElementById('qv').textContent=q;updCart()}});document.getElementById('qm').addEventListener('click',function(){if(q>1){q--;document.getElementById('qv').textContent=q;updCart()}});</script>`;
   const stockCount=3+((title.length*3+title.charCodeAt(0))%6);
   const viewerCount=8+((title.length*5+title.charCodeAt(0)*2)%15);
-  const ld=`{"@context":"https://schema.org","@type":"Product","name":${JSON.stringify(title)},"description":${JSON.stringify(e?`${title} — ${b}. Free delivery from 39€. 30-day returns.`:`${title} — ${b}. Livraison offerte dès 39€. Retours 30 jours.`)},"url":${JSON.stringify(url)},"brand":{"@type":"Brand","name":${JSON.stringify(b)}},"offers":{"@type":"Offer","priceCurrency":"EUR","price":"${price}","priceValidUntil":"${new Date(Date.now()+86400000*60).toISOString().slice(0,10)}","availability":"https://schema.org/InStock","url":${JSON.stringify(url)},"seller":{"@type":"Organization","name":${JSON.stringify(b)}}},"aggregateRating":{"@type":"AggregateRating","ratingValue":"4.8","reviewCount":"47","bestRating":"5"},"review":[{"@type":"Review","reviewRating":{"@type":"Rating","ratingValue":"5","bestRating":"5"},"author":{"@type":"Person","name":${JSON.stringify(e?'Sarah M.':'Sophie M.')}},"reviewBody":${JSON.stringify(e?'Absolutely perfect quality, arrived beautifully packaged.':'Qualité exceptionnelle, arrivé magnifiquement emballé.')}}]}`;
+  const ld=`{"@context":"https://schema.org","@type":"Product","name":${JSON.stringify(title)},"description":${JSON.stringify(e?`${title} — ${b}. Free delivery from 39€. 30-day returns.`:`${title} — ${b}. Livraison offerte dès 39€. Retours 30 jours.`)},"url":${JSON.stringify(url)},"brand":{"@type":"Brand","name":${JSON.stringify(b)}},"offers":{"@type":"Offer","priceCurrency":"EUR","price":"${price}","priceValidUntil":"${new Date(Date.now()+86400000*365).toISOString().slice(0,10)}","availability":"https://schema.org/InStock","url":${JSON.stringify(url)},"seller":{"@type":"Organization","name":${JSON.stringify(b)}}},"aggregateRating":{"@type":"AggregateRating","ratingValue":"4.8","reviewCount":"47","bestRating":"5"},"review":[{"@type":"Review","reviewRating":{"@type":"Rating","ratingValue":"5","bestRating":"5"},"author":{"@type":"Person","name":${JSON.stringify(e?'Sarah M.':'Sophie M.')}},"reviewBody":${JSON.stringify(e?'Absolutely perfect quality, arrived beautifully packaged.':'Qualité exceptionnelle, arrivé magnifiquement emballé.')}}]}`;
   const desc=e?`Buy ${title} — ${b}. Free delivery from 39€. 30-day returns.`:`Acheter ${title} — ${b}. Livraison offerte dès 39€. Retours 30 jours.`;
   const inStock=`<span class="pdp-stock"><span class="pdp-stock-dot"></span>${e?'In stock — ships today':'En stock — expédié aujourd\'hui'}</span><span class="pdp-scarcity">⚠ ${e?`Only ${stockCount} left`:`Plus que ${stockCount} en stock`}</span><span class="pdp-viewers">👁 ${e?`${viewerCount} viewing now`:`${viewerCount} personnes regardent`}</span>`;
   const social=`<p class="pdp-social-proof">${e?`🔥 ${viewerCount+5} people bought this in the last 24h`:`🔥 ${viewerCount+5} personnes ont acheté ça ces dernières 24h`}</p>`;
   const mobCart=`<div id="mob-cart-bar" class="mob-cart-bar"><div class="mob-cart-info"><span class="mob-cart-name">${esc(title)}</span><span class="mob-cart-price">${price}€</span></div><button class="mob-cart-btn" onclick="location.href='/checkout/'">${e?'Buy Now':'Acheter'}</button></div>`;
   const body=`${promoBar(niche,lang)}${navBar(b,lang)}<div class="bc"><div class="bc-i"><a href="/">${e?'Home':'Accueil'}</a> › <a href="/collections/">${e?'Collections':'Collections'}</a> › <a href="${col.path}/">${esc(col.title)}</a> › ${esc(title)}</div></div><div class="pdp-wrap"><div class="pdp-grid"><div class="pdp-gallery">${mainImg}<div class="pdp-thumbs">${thumbs}</div></div><div class="pdp-info">${inStock}<p class="pdp-eye">${esc(col.title)}</p><h1>${esc(title)}</h1><div class="pdp-rating"><span class="pdp-stars">★★★★★</span><span class="pdp-rating-cnt">4.8</span><a href="#t3" class="pdp-rating-link">(47 ${e?'reviews':'avis'})</a></div><div class="pdp-price-row"><span class="pdp-price-now">${price}€</span>${orig?`<span class="pdp-price-orig">${orig}€</span><span class="pdp-price-save">${e?'−':'−'}${saveAmt}€</span>`:''}</div>${social}${bulletsHTML}${varHTML}<div class="pdp-qty"><button id="qm">−</button><span id="qv">1</span><button id="qp">+</button></div><button class="btn-cart" id="addCart" onclick="location.href='/checkout/'">${e?`Add to Cart — ${price}€`:`Ajouter au panier — ${price}€`}</button><button class="btn-wish">${SVG_HEART} ${e?'Add to Wishlist':'Ajouter à ma liste'}</button>${trustRow}<div class="pdp-dlv">${SVG_TRUCK} ${dlv}</div></div></div></div>${tabs}${related}${footerSection(b,domain,lang)}${mobCart}${js}`;
-  return layout(`${esc(title)} | ${b}`,desc,url,ld,body,p,pd,ac,lang,tplFor(niche));
+  return layout(`${esc(title)} | ${b}`,desc,url,ld,body,p,pd,ac,lang,tplFor(niche),'product');
 }
 
 function genSuivi(domain,lang){
@@ -929,8 +933,17 @@ function genWishlist(domain,lang){
 
 async function buildAndStore(bp,niche,domain,lang,env){
   const sl=slug(domain),pre=`site:${sl}:`;
-  const [p,pd,ac]=NS[niche]||['#2563eb','#1d4ed8','#eff6ff'];
+  const [p,pd,ac,em]=NS[niche]||['#2563eb','#1d4ed8','#eff6ff','🛍'];
   const cols=bp.allCollections||bp.mvpSelection||[];
+
+  // Charger dates de publication blog (persistance inter-runs)
+  const datesObj=await env.R2.get(sl+'/blog-dates.json').catch(()=>null);
+  const blogDates=datesObj?JSON.parse(await new Response(datesObj.body).text()):{};
+  const today=new Date().toISOString().slice(0,10);
+
+  // OG image brandée (1200×630 SVG stocké en R2)
+  const b=brand(domain);
+  const ogSvg=`<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630"><defs><linearGradient id="g" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:${p}"/><stop offset="100%" style="stop-color:${pd}"/></linearGradient></defs><rect width="1200" height="630" fill="url(#g)"/><rect x="60" y="60" width="1080" height="510" rx="16" fill="rgba(255,255,255,0.08)"/><text x="600" y="240" font-family="Georgia,serif" font-size="120" text-anchor="middle" fill="rgba(255,255,255,0.9)">${em}</text><text x="600" y="360" font-family="Georgia,serif" font-size="68" font-weight="normal" text-anchor="middle" fill="#ffffff" letter-spacing="4">${esc(b)}</text><text x="600" y="430" font-family="Arial,sans-serif" font-size="28" text-anchor="middle" fill="rgba(255,255,255,0.7)" letter-spacing="8">${niche.toUpperCase()}</text></svg>`;
   const files={
     '/':                  genHome(bp,niche,domain,lang),
     '/collections/':      genCollIndex(bp,niche,domain,lang),
@@ -946,7 +959,10 @@ async function buildAndStore(bp,niche,domain,lang,env){
     '/manifest.json':     JSON.stringify({name:brand(domain),short_name:brand(domain).split(' ')[0],start_url:'/',display:'standalone',background_color:'#ffffff',theme_color:(NS[niche]||['#111'])[0],description:`${brand(domain)} — ${(NS[niche]||['','','','','','','Boutique'])[4]}`,icons:[{src:'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect width="100" height="100" fill="%23'+((NS[niche]||['#b45309'])[0]).replace('#','')+'"/><text y=".9em" font-size="85">'+((NS[niche]||['','','','💍'])[3])+'</text></svg>',sizes:'any',type:'image/svg+xml'}]}),
   };
   const topics=BLOG_TOPICS[niche]||BLOG_TOPICS['default'];
-  for(const t of topics) files[`/blog/${t.slug}/`]=genBlogPost(t,niche,domain,lang);
+  for(const t of topics){
+    if(!blogDates[t.slug]) blogDates[t.slug]=today; // date figée à la 1ère génération
+    files[`/blog/${t.slug}/`]=genBlogPost({...t,publishedAt:blogDates[t.slug]},niche,domain,lang);
+  }
   for(const c of cols){
     files[c.path+'/']=genColl(c,bp,niche,domain,lang);
     const base=c.title.split(/[\s&]/)[0];
@@ -964,6 +980,8 @@ async function buildAndStore(bp,niche,domain,lang,env){
   await Promise.all([
     ...Object.entries(files).map(([path,html])=>env.R2.put(`${sl}${path}`,html,{httpMetadata:{contentType:ct(path)}})),
     env.R2.put(`${sl}/__meta.json`,meta,{httpMetadata:{contentType:'application/json'}}),
+    env.R2.put(`${sl}/og.svg`,ogSvg,{httpMetadata:{contentType:'image/svg+xml','Cache-Control':'public,max-age=2592000'}}),
+    env.R2.put(`${sl}/blog-dates.json`,JSON.stringify(blogDates),{httpMetadata:{contentType:'application/json'}}),
   ]);
   // KV meta + blueprint (best-effort)
   await env.KV.put(pre+'__meta',meta,{expirationTtl:86400*365}).catch(()=>{});
