@@ -102,13 +102,26 @@ function applySecHeaders(response, isHtml=true) {
 }
 
 // ── Anti-clone watermark ──────────────────────────────────────────────────
-// Injects an invisible, unique per-slug HTML comment as a copyright marker
-// Also blocks Referer-less image hotlinking
 function addWatermark(html, slug) {
   const hash = slug.split('').reduce((h,c)=>((h<<5)-h)+c.charCodeAt(0)|0,0).toString(36);
   const ts = Date.now().toString(36);
   const wm = `<!-- site:${hash} build:${ts} -->`;
   return html.replace('</head>', `${wm}</head>`);
+}
+
+// ── Rewrite absolute links to include slug prefix (workers.dev test mode) ──
+// In production (custom domain), links like /checkout/ resolve correctly.
+// In test mode (*.workers.dev/slug/...) they need to become /slug/checkout/
+function rewriteLinks(html, sl) {
+  // href="/..." → href="/{sl}/..."  (skip href="//..." protocol-relative and href="#")
+  html = html.replace(/href="\/(?!\/)/g, 'href="/' + sl + '/');
+  // action="/..." forms
+  html = html.replace(/action="\/(?!\/)/g, 'action="/' + sl + '/');
+  // JS: location.href='/...' in onclick and scripts
+  html = html.replace(/location\.href='\/([^']*)'/g, "location.href='/" + sl + "/$1'");
+  // JS: location.href="/..."
+  html = html.replace(/location\.href="\/([^"]*)"/g, 'location.href="/' + sl + '/$1"');
+  return html;
 }
 
 // ── 404 ───────────────────────────────────────────────────────────────────
@@ -171,18 +184,20 @@ export default {
       // No X-Site, no X-Powered-By — no fingerprints
     };
 
+    // workers.dev = test mode → rewrite absolute links to include slug prefix
+    const testMode = url.hostname.endsWith('.workers.dev');
+
     // ── 9. Serve from R2 ──────────────────────────────────────────────────
     if (env.R2) {
       const obj = await env.R2.get(`${sl}${normalPath}`);
       if (obj) {
-        let body = obj.body;
         if (isHtml) {
-          // Read body to add watermark
-          const text = await new Response(obj.body).text();
-          const watermarked = addWatermark(text, sl);
-          return applySecHeaders(new Response(watermarked, {headers: baseHeaders}), true);
+          let text = await new Response(obj.body).text();
+          text = addWatermark(text, sl);
+          if (testMode) text = rewriteLinks(text, sl);
+          return applySecHeaders(new Response(text, {headers: baseHeaders}), true);
         }
-        return applySecHeaders(new Response(body, {headers: baseHeaders}), false);
+        return applySecHeaders(new Response(obj.body, {headers: baseHeaders}), false);
       }
     }
 
@@ -193,8 +208,9 @@ export default {
     if (!content) return notFound(sl);
 
     if (isHtml) {
-      const watermarked = addWatermark(content, sl);
-      return applySecHeaders(new Response(watermarked, {headers: baseHeaders}), true);
+      let text = addWatermark(content, sl);
+      if (testMode) text = rewriteLinks(text, sl);
+      return applySecHeaders(new Response(text, {headers: baseHeaders}), true);
     }
     return applySecHeaders(new Response(content, {headers: baseHeaders}), false);
   }
