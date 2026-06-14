@@ -3,7 +3,13 @@
  * Surveillance sécurité — détection fuite IP, ban, anomalies.
  */
 
-import { getRecentErrors, logInfo } from '../../lib/logger.js';
+// Inlined logger helpers (lib/logger.js absent — self-contained)
+async function getRecentErrors(env, worker, limit=50){
+  try{const raw=await env.LOGS.get('errors:'+worker);return raw?JSON.parse(raw).slice(-limit):[];}catch{return [];}
+}
+async function logInfo(env, worker, event, data){
+  try{await env.LOGS.put('info:'+worker+':'+Date.now(),JSON.stringify({worker,event,data,ts:new Date().toISOString()}),{expirationTtl:86400*7});}catch{}
+}
 
 const THREAT_THRESHOLDS = {
   errorSpike: 10,       // erreurs/heure avant alerte

@@ -186,7 +186,9 @@ export default {
     const isHtml = ct.startsWith('text/html');
     const baseHeaders = {
       'Content-Type': ct,
-      'Cache-Control': isHtml ? 'public,max-age=3600' : 'public,max-age=86400',
+      'Cache-Control': isHtml
+        ? 'public,max-age=3600,stale-while-revalidate=86400'
+        : 'public,max-age=86400,stale-while-revalidate=604800',
     };
 
     // ── 9. Serve from R2 ──────────────────────────────────────────────────

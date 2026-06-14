@@ -2,7 +2,8 @@
 // 6 étapes : factory_fr → seo_assets → dns_setup → factory_langs → ping_index → complete
 // Retry ×3 par étape · État persisté en R2 · Idempotent
 
-const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'POST,GET,OPTIONS','Access-Control-Allow-Headers':'Content-Type,Authorization'};
+// CORS: orchestrator — internal use only, no browser access expected
+const CORS={'Access-Control-Allow-Origin':'same-origin','Access-Control-Allow-Methods':'POST,GET,OPTIONS','Access-Control-Allow-Headers':'Content-Type,Authorization','X-Robots-Tag':'noindex, nofollow'};
 const ok=(d,s=200)=>new Response(JSON.stringify(d),{status:s,headers:{'Content-Type':'application/json',...CORS}});
 const err=(m,s=400)=>ok({error:m},s);
 
@@ -14,7 +15,8 @@ const STEPS=['factory_fr','seo_assets','dns_setup','factory_langs','ping_index',
 function auth(req,env){
   const h=req.headers.get('Authorization')||'';
   const t=new URL(req.url).searchParams.get('token')||'';
-  const tok=env.API_TOKEN||'dde0d1b0dfdc9546c0e3464e9939fa4c0fc138e8d5f43df3';
+  const tok=env.API_TOKEN;
+  if(!tok)return false;
   return h==='Bearer '+tok||t===tok;
 }
 const genId=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);

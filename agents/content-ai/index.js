@@ -600,6 +600,10 @@ function seoScore(html, keyword) {
 export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { headers:CORS });
+    // Auth gate — internal bindings have no Authorization header so only check when header present
+    const authH = request.headers.get('Authorization') || '';
+    if (env.API_TOKEN && authH && authH !== 'Bearer ' + env.API_TOKEN)
+      return err('Unauthorized', 401);
 
     // Setup key rotator — OpenAI first, OpenRouter second, Gemini fallback
     const oaiKeys = (env.OPENAI_KEY || env.OPENAI_KEYS || '').split(',').map(k => k.trim()).filter(Boolean);

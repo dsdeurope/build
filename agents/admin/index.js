@@ -12,14 +12,16 @@
 // POST /restore       → restaurer une sauvegarde
 // GET  /export        → exporter JSON local
 
-const CORS={'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'Content-Type,Authorization'};
+// CORS: admin panel — restrict to same-origin only (no external CORS needed)
+const CORS={'Access-Control-Allow-Origin':'same-origin','Access-Control-Allow-Methods':'GET,POST,OPTIONS','Access-Control-Allow-Headers':'Content-Type,Authorization','X-Robots-Tag':'noindex, nofollow'};
 const ok=(d,s=200)=>new Response(JSON.stringify({ok:true,...d}),{status:s,headers:{'Content-Type':'application/json',...CORS}});
 const err=(m,s=400)=>new Response(JSON.stringify({ok:false,error:m}),{status:s,headers:{'Content-Type':'application/json',...CORS}});
 
 function auth(request,env){
   const h=request.headers.get('Authorization')||'';
   const t=new URL(request.url).searchParams.get('token')||'';
-  const token=env.API_TOKEN||'dde0d1b0dfdc9546c0e3464e9939fa4c0fc138e8d5f43df3';
+  const token=env.API_TOKEN;
+  if(!token)return false;
   return h==='Bearer '+token||t===token;
 }
 
@@ -1354,11 +1356,18 @@ export default{
 
     const url=new URL(request.url);
     const path=url.pathname.replace(/\/+$/,'')||'/';
-    const token=env.API_TOKEN||'dde0d1b0dfdc9546c0e3464e9939fa4c0fc138e8d5f43df3';
+    const token=env.API_TOKEN||'';
 
-    // Serve admin UI (no auth for UI itself — token embedded in page)
+    // Serve admin UI — protected by HTTP Basic Auth before token is embedded
     if(request.method==='GET'&&path==='/'){
-      return new Response(adminHTML(token),{headers:{'Content-Type':'text/html;charset=UTF-8','Cache-Control':'no-store'}});
+      if(!token)return new Response('API_TOKEN not configured',{status:500});
+      // HTTP Basic Auth gate: credentials = admin / <API_TOKEN>
+      const basicRaw=request.headers.get('Authorization')||'';
+      const validBasic='Basic '+btoa('admin:'+token);
+      if(basicRaw!==validBasic){
+        return new Response('Unauthorized',{status:401,headers:{'WWW-Authenticate':'Basic realm="V35 Admin"','Cache-Control':'no-store'}});
+      }
+      return new Response(adminHTML(token),{headers:{'Content-Type':'text/html;charset=UTF-8','Cache-Control':'no-store','X-Robots-Tag':'noindex, nofollow'}});
     }
 
     // Public endpoint — checkout calls this from browser
@@ -1446,8 +1455,8 @@ export default{
     if(request.method==='GET'&&path==='/operation/content'){const sl=url.searchParams.get('slug');if(!sl)return err('slug required');const obj=await env.R2.get('op/content-'+sl+'.json').catch(()=>null);const c=obj?JSON.parse(await new Response(obj.body).text()):null;return ok({content:c||{}});}
     if(request.method==='GET'&&path==='/operation/domain-suggest'){const niche=url.searchParams.get('niche')||'';const sg={'Jewellery':['bijoupure.fr','orfevra.fr','eclat-bijoux.fr','dorure-fine.fr','cristale.fr'],'Bijoux':['bijoushine.fr','auroria.fr','lapure.fr','diamantine.fr','parure-fine.fr'],'Luminaires':['luminova.fr','lux-deco.fr','eclairia.fr','luminia.fr','lighterra.fr'],'Décoration':['maison-arte.fr','decostore.fr','homestyle.fr','belle-maison.fr','decoria.fr'],'Mode Femme':['modelia.fr','femmestyle.fr','tendance-mode.fr','ellefashion.fr','ellegance.fr'],'Mode Homme':['monsieur-mode.fr','manstore.fr','styleman.fr','hommechic.fr','gentstore.fr'],'Beauté':['beautystore.fr','glowshop.fr','cosmetica.fr','mabeaute.fr','beautylab.fr'],'Bien-être':['zenstore.fr','natureza.fr','serenia.fr','zenlab.fr','bienetre.fr'],'Sport':['sportzone.fr','fitshop.fr','activa.fr','fitgear.fr','sportlab.fr'],'Maroquinerie':['sacmode.fr','cuiromania.fr','leatherco.fr','maroquin.fr','sacpremium.fr'],'High-Tech':['techstore.fr','gadgetzone.fr','hitech.fr','techshop.fr','gadgetlab.fr'],'Animaux':['animalstore.fr','petshopfr.fr','monpet.fr','animalia.fr','petzone.fr']};return ok({niche,suggestions:sg[niche]||['topshop.fr','boutique-premium.fr','monstore.fr','eshop-france.fr']});}
     // GET /orchestrator/* — proxy vers v35-orchestrator
-    if(request.method==='GET'&&path==='/orchestrator/runs'){const orRes=await env.ORCHESTRATOR.fetch(new Request('https://orchestrator/runs',{headers:{'Authorization':'Bearer '+(env.API_TOKEN||'dde0d1b0dfdc9546c0e3464e9939fa4c0fc138e8d5f43df3')}}));const orD=await orRes.json().catch(()=>({runs:[]}));return ok(orD);}
-    if(request.method==='GET'&&path.startsWith('/orchestrator/run/')){const runId=path.slice('/orchestrator/run/'.length);const orRes=await env.ORCHESTRATOR.fetch(new Request('https://orchestrator/run/'+runId,{headers:{'Authorization':'Bearer '+(env.API_TOKEN||'dde0d1b0dfdc9546c0e3464e9939fa4c0fc138e8d5f43df3')}}));const orD=await orRes.json().catch(()=>({}));return ok(orD);}
+    if(request.method==='GET'&&path==='/orchestrator/runs'){const orRes=await env.ORCHESTRATOR.fetch(new Request('https://orchestrator/runs',{headers:{'Authorization':'Bearer '+(env.API_TOKEN||'')}}));const orD=await orRes.json().catch(()=>({runs:[]}));return ok(orD);}
+    if(request.method==='GET'&&path.startsWith('/orchestrator/run/')){const runId=path.slice('/orchestrator/run/'.length);const orRes=await env.ORCHESTRATOR.fetch(new Request('https://orchestrator/run/'+runId,{headers:{'Authorization':'Bearer '+(env.API_TOKEN||'')}}));const orD=await orRes.json().catch(()=>({}));return ok(orD);}
     // GET /backlinks
     if(request.method==='GET'&&path==='/backlinks'){const sl=url.searchParams.get('slug');if(!sl)return err('slug requis');const o=await env.R2.get('backlinks/'+sl+'/links.json').catch(()=>null);const links=o?JSON.parse(await new Response(o.body).text()):[];return ok({links});}
     if(request.method==='GET'&&path==='/operation/blueprint'){const sl=url.searchParams.get('slug');if(!sl)return err('slug required');const obj=await env.R2.get('op/blueprint-'+sl+'.json').catch(()=>null);const bp=obj?JSON.parse(await new Response(obj.body).text()):null;return ok({blueprint:bp});}
@@ -1622,7 +1631,7 @@ export default{
       const{slug,lang,langCode,domain,niche,blueprint}=body;
       if(!blueprint||!domain||!niche)return err('blueprint, domain, niche required');
       const factRes=await fetch('https://v35-site-factory.ernestpedanou.workers.dev/',{
-        method:'POST',headers:{'Content-Type':'application/json','X-API-Token':env.API_TOKEN||'dde0d1b0dfdc9546c0e3464e9939fa4c0fc138e8d5f43df3'},
+        method:'POST',headers:{'Content-Type':'application/json','X-API-Token':env.API_TOKEN||''},
         body:JSON.stringify({domain,niche,lang:lang||'fr',blueprint})
       });
       const fData=await factRes.json().catch(()=>({success:false,error:'Parse error'}));
@@ -1645,7 +1654,7 @@ export default{
       if(content.tagline)bp.sloganOverride=content.tagline;
       bp.contentOverride=content;
       const factRes=await fetch('https://v35-site-factory.ernestpedanou.workers.dev/',{
-        method:'POST',headers:{'Content-Type':'application/json','X-API-Token':env.API_TOKEN||'dde0d1b0dfdc9546c0e3464e9939fa4c0fc138e8d5f43df3'},
+        method:'POST',headers:{'Content-Type':'application/json','X-API-Token':env.API_TOKEN||''},
         body:JSON.stringify({domain:cfg.domain||slug+'.fr',niche:cfg.niche||'Mode Femme',lang:'fr',blueprint:bp})
       });
       const fData=await factRes.json().catch(()=>({success:false,error:'Parse error'}));
@@ -1658,14 +1667,14 @@ export default{
       const bpObj=await env.R2.get('op/blueprint-'+slug+'.json').catch(()=>null);
       const bp=bpObj?JSON.parse(await new Response(bpObj.body).text()):null;
       if(!bp?.allCollections?.length)return err('Blueprint introuvable — régénérez le site d\'abord via Opération');
-      const orRes=await env.ORCHESTRATOR.fetch(new Request('https://orchestrator/run',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(env.API_TOKEN||'dde0d1b0dfdc9546c0e3464e9939fa4c0fc138e8d5f43df3')},body:JSON.stringify({slug,niche:niche||'Mode Femme',domain:domain||slug+'.fr',blueprint:bp,zone_id:zone_id||null})}));
+      const orRes=await env.ORCHESTRATOR.fetch(new Request('https://orchestrator/run',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(env.API_TOKEN||'')},body:JSON.stringify({slug,niche:niche||'Mode Femme',domain:domain||slug+'.fr',blueprint:bp,zone_id:zone_id||null})}));
       const orD=await orRes.json().catch(()=>({error:'Orchestrateur indisponible'}));
       return ok(orD);
     }
     // POST /orchestrator/next — avancer d'une étape
     if(path==='/orchestrator/next'){
       const{runId}=body;if(!runId)return err('runId requis');
-      const orRes=await env.ORCHESTRATOR.fetch(new Request('https://orchestrator/run/next',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(env.API_TOKEN||'dde0d1b0dfdc9546c0e3464e9939fa4c0fc138e8d5f43df3')},body:JSON.stringify({runId})}));
+      const orRes=await env.ORCHESTRATOR.fetch(new Request('https://orchestrator/run/next',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(env.API_TOKEN||'')},body:JSON.stringify({runId})}));
       const orD=await orRes.json().catch(()=>({error:'parse'}));
       return ok(orD);
     }

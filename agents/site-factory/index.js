@@ -974,6 +974,9 @@ async function buildAndStore(bp,niche,domain,lang,env){
 export default{
   async fetch(request,env){
     if(request.method==='OPTIONS') return new Response(null,{status:204,headers:CORS});
+    // Auth check — allow internal service bindings (no Authorization header set) OR valid token
+    const authH=request.headers.get('Authorization')||'';
+    if(env.API_TOKEN&&authH&&authH!=='Bearer '+env.API_TOKEN)return err('Unauthorized',401);
     if(request.method!=='POST') return err('POST only',405);
     let body={};
     try{body=await request.json();}catch{return err('Invalid JSON');}

@@ -1,5 +1,20 @@
-import { buildSiloStructure } from '../../lib/seo.js';
-import { logInfo } from '../../lib/logger.js';
+// Inlined helpers (lib/seo.js + lib/logger.js absent)
+function buildSiloStructure(links){
+  const silos={ecommerce:[],marketing:[],tech:[],local:[],other:[]};
+  for(const u of links){
+    try{const h=new URL(u).hostname;
+      if(/shop|store|boutique|bijou|mode|deco|maison/.test(h))silos.ecommerce.push(u);
+      else if(/blog|news|media|press|seo/.test(h))silos.marketing.push(u);
+      else if(/tech|dev|api|code/.test(h))silos.tech.push(u);
+      else if(/\.fr$|\.de$|\.es$|\.it$/.test(h))silos.local.push(u);
+      else silos.other.push(u);
+    }catch{}
+  }
+  return silos;
+}
+async function logInfo(env,worker,event,data){
+  try{await env.KV.put('log:'+worker+':'+Date.now(),JSON.stringify({worker,event,data,ts:new Date().toISOString()}),{expirationTtl:86400*7});}catch{}
+}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
