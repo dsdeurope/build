@@ -18,3 +18,7 @@ service = "v35-site-factory"
 [[services]]
 binding = "CONTENT_AI"
 service = "v35-content-ai"
+
+[[services]]
+binding = "BACKUP"
+service = "v35-backup"

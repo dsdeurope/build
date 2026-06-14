@@ -1,12 +1,12 @@
 // Orchestrateur V35 — pilote le pipeline complet de clonage/déploiement de sites
 // Pipeline: validate → scrape → images → aged-domain → content-jobs → skeleton
 
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'POST,GET,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
-  'Content-Type': 'application/json',
-};
+const ALLOWED_ORIGINS=/^(https?:\/\/[^.]+\.workers\.dev|https?:\/\/[^.]+\.ernestpedanou\.workers\.dev)$/;
+function getCORS(req){
+  const o=(req&&req.headers.get('Origin'))||'';
+  return{'Access-Control-Allow-Origin':(!o||ALLOWED_ORIGINS.test(o))?o||'same-origin':'same-origin','Access-Control-Allow-Methods':'POST,GET,OPTIONS','Access-Control-Allow-Headers':'Content-Type','Vary':'Origin'};
+}
+const CORS_STATIC={'Access-Control-Allow-Origin':'same-origin','Access-Control-Allow-Methods':'POST,GET,OPTIONS','Access-Control-Allow-Headers':'Content-Type'};
 
 const WORKERS = {
   SEQ:      'https://v35-sequenceur.ernestpedanou.workers.dev',
@@ -254,7 +254,7 @@ async function runStep(jobId, stepName, fn, env) {
 
 export default {
   async fetch(request, env) {
-    if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
+    if (request.method === 'OPTIONS') return new Response(null, {status:204, headers: getCORS(request) });
 
     const url = new URL(request.url);
     const path = url.pathname.replace(/^\//, '');
@@ -264,13 +264,13 @@ export default {
       const jobId = path.slice(7);
       const raw = await env.KV.get(`orch:${jobId}`);
       if (!raw) return Response.json({ error: 'Job not found' }, { status: 404, headers: CORS });
-      return Response.json(JSON.parse(raw), { headers: CORS });
+      return Response.json(JSON.parse(raw), { headers: CORS_STATIC });
     }
 
     // GET /jobs — list recent jobs
     if (request.method === 'GET' && path === 'jobs') {
       const list = await env.KV.get('orch:__index');
-      return Response.json(list ? JSON.parse(list) : [], { headers: CORS });
+      return Response.json(list ? JSON.parse(list) : [], { headers: CORS_STATIC });
     }
 
     if (request.method !== 'POST') return new Response('POST /orchestrate', { status: 405, headers: CORS });
@@ -490,6 +490,6 @@ export default {
     };
     await env.KV.put(jobKey, JSON.stringify(finalJob), { expirationTtl: 86400 });
 
-    return Response.json({ jobId, status: finalJob.status, summary: finalJob.summary, poll: `/status/${jobId}` }, { headers: CORS });
+    return Response.json({ jobId, status: finalJob.status, summary: finalJob.summary, poll: `/status/${jobId}` }, { headers: CORS_STATIC });
   }
 };

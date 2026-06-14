@@ -136,7 +136,15 @@ async function advance(state,env){
   const idx=state.currentStep;
   if(idx>=state.steps.length){state.status='complete';state.completedAt=new Date().toISOString();return;}
   const step=state.steps[idx];
-  if(step.name==='complete'){step.status='done';step.completedAt=new Date().toISOString();state.status='complete';state.completedAt=new Date().toISOString();return;}
+  if(step.name==='complete'){
+    step.status='done';step.completedAt=new Date().toISOString();
+    state.status='complete';state.completedAt=new Date().toISOString();
+    // Backup automatique après pipeline complet
+    if(env.BACKUP){
+      env.BACKUP.fetch(new Request('https://backup/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:state.slug})})).catch(()=>{});
+    }
+    return;
+  }
   step.status='running';step.startedAt=new Date().toISOString();
   await rput(env,'orch/run-'+state.runId+'.json',state);
   try{
