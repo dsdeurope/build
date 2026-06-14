@@ -178,6 +178,17 @@ export default {
       return maintenancePage(sl, sandboxState.reason);
     }
 
+    // POST /api/order — proxy vers fulfillment (order création sans exposer token)
+    if (normalPath === '/api/order/' && request.method === 'POST') {
+      if (!env.FULFILLMENT) return new Response(JSON.stringify({ok:false,error:'fulfillment unavailable'}),{status:503,headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+      let body; try { body = await request.json(); } catch { return new Response(JSON.stringify({ok:false,error:'invalid json'}),{status:400,headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}}); }
+      body.shop = body.shop || url.hostname;
+      const fReq = new Request('https://fulfillment/orders', {method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+(env.API_TOKEN||'')},body:JSON.stringify(body)});
+      const fRes = await env.FULFILLMENT.fetch(fReq).catch(()=>null);
+      const fJson = fRes ? await fRes.json().catch(()=>({ok:false})) : {ok:false,error:'timeout'};
+      return new Response(JSON.stringify(fJson),{status:fRes?.status||500,headers:{'Content-Type':'application/json','Access-Control-Allow-Origin':'*'}});
+    }
+
     // Block access to internal/sensitive paths
     if (/^\/(api|admin|_|\.env|config|\.git)/i.test(normalPath)) return forbidden();
 

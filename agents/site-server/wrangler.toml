@@ -10,3 +10,7 @@ id = "e2eca9fb88584dbca9c59626f28714b6"
 [[r2_buckets]]
 binding = "R2"
 bucket_name = "v35-sites"
+
+[[services]]
+binding = "FULFILLMENT"
+service = "v35-fulfillment"
