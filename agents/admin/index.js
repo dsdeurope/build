@@ -115,6 +115,7 @@ a.back:hover{color:#111}
     <li><a onclick="showTab('pages')" id="n-pages">📄 Toutes les pages</a></li>
     <li><a onclick="showTab('media')" id="n-media">🖼 Médias</a></li>
     <li><a onclick="showTab('promos')" id="n-promos">🏷 Codes promo</a></li>
+    <li><a onclick="showTab('stats')" id="n-stats">📊 Analytics</a></li>
     <li><a onclick="showTab('bk')" id="n-bk">💾 Sauvegardes</a></li>
   </ul>
   <div class="sb-sep" id="sb-sep" style="display:none"></div>
@@ -148,7 +149,7 @@ function loadSite(){
 }
 
 function showTab(tab){
-  ['home','cols','pages','media','promos','bk'].forEach(function(t){
+  ['home','cols','pages','media','promos','stats','bk'].forEach(function(t){
     var el=document.getElementById('n-'+t);
     if(el)el.classList.toggle('act',t===tab);
   });
@@ -157,6 +158,7 @@ function showTab(tab){
   else if(tab==='pages')renderPages();
   else if(tab==='media')renderMedia();
   else if(tab==='promos')renderPromos();
+  else if(tab==='stats')renderStats();
   else if(tab==='bk')renderBk();
 }
 
@@ -447,6 +449,38 @@ function createPromo(){
   });
 }
 
+/* ── ANALYTICS ───────────────────────────────────────────── */
+function renderStats(){
+  set('<div class="hd"><h1>Analytics</h1><span class="slug-tag">'+SLUG+'</span></div>'+
+  '<div class="card"><div class="card-hd">Visites par jour (30 derniers jours)</div><div id="stats-l"><span class="spin"></span></div></div>'+
+  '<div class="card"><div class="card-hd">Informations site</div><div id="stats-meta"><span class="spin"></span></div></div>');
+  apiFetch('/analytics?slug='+SLUG).then(function(r){return r.json();}).then(function(d){
+    var rows=d.days||[];
+    if(!rows.length){document.getElementById('stats-l').innerHTML='<p class="empty">Aucune donnée disponible (les visites s\'accumulent progressivement).</p>';}
+    else{
+      var total=rows.reduce(function(s,r){return s+r.views},0);
+      var h='<div style="margin-bottom:.8rem;font-size:.78rem;color:#888">Total: <strong style="color:#111">'+total+' visites</strong></div>';
+      h+='<table style="width:100%;border-collapse:collapse;font-size:.8rem">';
+      rows.forEach(function(r){
+        var pct=Math.round((r.views/Math.max(...rows.map(function(x){return x.views})))*100);
+        h+='<tr style="border-bottom:1px solid #f5f5f3"><td style="padding:.4rem .6rem;font-family:monospace;color:#555;width:110px">'+r.date+'</td>'+
+           '<td style="padding:.4rem .6rem"><div style="background:var(--p,#b45309);height:10px;width:'+pct+'%;min-width:4px;border-radius:2px;opacity:.7"></div></td>'+
+           '<td style="padding:.4rem .6rem;text-align:right;font-weight:600;color:#111;width:60px">'+r.views+'</td></tr>';
+      });
+      h+='</table>';
+      document.getElementById('stats-l').innerHTML=h;
+    }
+    var m=d.meta||{};
+    document.getElementById('stats-meta').innerHTML=
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;font-size:.82rem">'+
+      '<div style="padding:.6rem;background:#fafaf8;border-radius:3px"><div style="color:#aaa;font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.25rem">Pages</div><strong>'+( m.pages||'—')+'</strong></div>'+
+      '<div style="padding:.6rem;background:#fafaf8;border-radius:3px"><div style="color:#aaa;font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.25rem">Niche</div><strong>'+(m.niche||'—')+'</strong></div>'+
+      '<div style="padding:.6rem;background:#fafaf8;border-radius:3px"><div style="color:#aaa;font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.25rem">Langue</div><strong>'+(m.lang||'—')+'</strong></div>'+
+      '<div style="padding:.6rem;background:#fafaf8;border-radius:3px"><div style="color:#aaa;font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.25rem">Déployé le</div><strong style="font-size:.75rem">'+(m.deployedAt?m.deployedAt.slice(0,10):'—')+'</strong></div>'+
+      '</div>';
+  }).catch(function(){document.getElementById('stats-l').innerHTML='<p style="color:red">Erreur</p>';});
+}
+
 function deletePromo(code){
   if(!confirm('Supprimer le code '+code+' ?'))return;
   apiFetch('/promo/delete',{method:'POST',body:JSON.stringify({slug:SLUG,code})})
@@ -636,6 +670,23 @@ export default{
       const r=await fetch(ENH_URL+'/cro-ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug,path:pg,lang:'en'})});
       const d=await r.json();
       return ok(d);
+    }
+
+    // GET /analytics
+    if(request.method==='GET'&&path==='/analytics'){
+      const sl=url.searchParams.get('slug');if(!sl)return err('slug required');
+      const days=[];
+      const now=new Date();
+      for(let i=0;i<30;i++){
+        const d=new Date(now-i*86400000).toISOString().slice(0,10);
+        const v=await env.KV.get('analytics:'+sl+':'+d).catch(()=>null);
+        if(v)days.push({date:d,views:parseInt(v)});
+      }
+      days.reverse();
+      const metaRaw=await env.R2.get(sl+'/__meta.json').catch(()=>null);
+      let meta={};
+      if(metaRaw){try{meta=JSON.parse(await new Response(metaRaw.body).text());}catch{}}
+      return ok({slug:sl,days,meta});
     }
 
     // Promo endpoints (auth required)

@@ -132,7 +132,7 @@ function notFound(sl) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const ip = request.headers.get('cf-connecting-ip') || request.headers.get('x-forwarded-for') || 'unknown';
     const ua = request.headers.get('user-agent') || '';
     const url = new URL(request.url);
@@ -198,7 +198,12 @@ export default {
           text = addWatermark(text, sl);
           text = text.replace('<body', `<body data-geo="${geoCountry}"`);
           if (testMode) text = rewriteLinks(text, sl);
-          return applySecHeaders(new Response(text, {headers: baseHeaders}), true);
+          const res = applySecHeaders(new Response(text, {headers: baseHeaders}), true);
+          if (env.KV && ctx) {
+            const today = new Date().toISOString().slice(0,10);
+            ctx.waitUntil(env.KV.get(`analytics:${sl}:${today}`).then(v=>env.KV.put(`analytics:${sl}:${today}`,String(parseInt(v||'0')+1),{expirationTtl:86400*30})).catch(()=>{}));
+          }
+          return res;
         }
         return applySecHeaders(new Response(obj.body, {headers: baseHeaders}), false);
       }
