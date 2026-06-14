@@ -80,58 +80,70 @@ function extractPrice(html) {
   return null;
 }
 
-// Scrape first AliExpress search result price via DDG
-async function getAliPrice(productTitle) {
+// AliExpress product search via RapidAPI Datahub
+async function getAliPrice(productTitle, rapidApiKey) {
+  const fallbackUrl = `https://fr.aliexpress.com/wholesale?SearchText=${encodeURIComponent(productTitle)}&SortType=price_asc`;
+  if (!rapidApiKey) return { price: null, url: fallbackUrl, note: 'RAPIDAPI_KEY manquant' };
+
   try {
-    const q = `site:aliexpress.com ${productTitle}`;
-    const r = await get(`https://lite.duckduckgo.com/lite/?q=${encodeURIComponent(q)}`);
-    const html = r.text;
+    const r = await fetch(`https://aliexpress-datahub.p.rapidapi.com/item_search_2?q=${encodeURIComponent(productTitle)}&page=1`, {
+      headers: {
+        'X-RapidAPI-Key': rapidApiKey,
+        'X-RapidAPI-Host': 'aliexpress-datahub.p.rapidapi.com',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+    const d = await r.json();
+    const items = d?.result?.resultList || d?.result?.items || d?.data?.products || [];
+    if (!items.length) return { price: null, url: fallbackUrl, note: 'Aucun résultat AliExpress' };
 
-    // Extract AliExpress product URLs from DDG results
-    const urlRe = /https?:\/\/(?:fr\.)?aliexpress\.com\/item\/[\d]+\.html/gi;
-    const urls = [...new Set(html.match(urlRe) || [])].slice(0, 3);
-    if (!urls.length) return { price: null, url: null };
+    // Skip ads, take first real product with a price
+    const item = items.find(i => i.item?.sku?.def?.promotionPrice || i.item?.sku?.def?.price) || items[0];
+    const raw = item?.item;
+    const price = parseFloat(raw?.sku?.def?.promotionPrice || raw?.sku?.def?.price || 0) || null;
+    const itemId = raw?.itemId;
+    const url = itemId ? `https://fr.aliexpress.com/item/${itemId}.html` : fallbackUrl;
+    const image = raw?.image ? `https:${raw.image}` : null;
 
-    // Scrape first product page for price
-    for (const url of urls) {
-      try {
-        const page = await get(url, { 'Accept': 'text/html' });
-        // AliExpress price in JSON
-        const priceMatch = page.text.match(/"discountPrice"\s*:\s*\{[^}]*"value"\s*:\s*"?([\d.]+)"?/);
-        if (priceMatch) return { price: parseFloat(priceMatch[1]), url, currency: 'EUR' };
-        // Fallback: any price pattern
-        const simple = page.text.match(/class="[^"]*snow-price[^"]*"[^>]*>([\d.]+)/);
-        if (simple) return { price: parseFloat(simple[1]), url, currency: 'EUR' };
-      } catch {}
-    }
-
-    // Last fallback: search URL (user navigates manually)
-    return {
-      price: null,
-      url: `https://fr.aliexpress.com/wholesale?SearchText=${encodeURIComponent(productTitle)}`,
-      note: 'Prix non extrait — ouvrir le lien pour vérifier',
-    };
-  } catch {
-    return { price: null, url: null };
+    return { price, url, title: raw?.title || '', image, currency: 'USD', note: price ? null : 'Prix non disponible — ouvrir le lien' };
+  } catch (e) {
+    return { price: null, url: fallbackUrl, note: e.message };
   }
 }
 
-async function calcMargin(domain, productTitle, providedAliUrl) {
+async function calcMargin(domain, productTitle, providedAliUrl, rapidApiKey) {
   // 1. Scrape competitor product price
   let competitorPrice = null;
   let competitorUrl = null;
   try {
-    // Try to find a product URL via search on the site
-    const search = await get(`https://${domain}/search?q=${encodeURIComponent(productTitle)}`);
-    // Extract first product link
-    const prodRe = new RegExp(`https?://${domain.replace('.', '\\.')}(?:/[a-z]{2})?/products?/[^"'\\s<>]+`, 'i');
-    const prodMatch = search.text.match(prodRe);
-    if (prodMatch) {
-      competitorUrl = prodMatch[0];
-      const page = await get(competitorUrl);
-      competitorPrice = extractPrice(page.text);
+    const escapedDomain = domain.replace(/\./g, '\\.');
+    // Try multiple search endpoints (Shopify, PrestaShop, WooCommerce)
+    const searchUrls = [
+      `https://${domain}/search?q=${encodeURIComponent(productTitle)}`,
+      `https://${domain}/index.php?controller=search&s=${encodeURIComponent(productTitle)}`,
+      `https://${domain}/?s=${encodeURIComponent(productTitle)}&post_type=product`,
+    ];
+    for (const searchUrl of searchUrls) {
+      try {
+        const search = await get(searchUrl);
+        if (!search.ok) continue;
+        // Shopify: /products/slug, PrestaShop: /slug.html, WooCommerce: /product/slug
+        const prodRe = new RegExp(
+          `(?:https?://${escapedDomain})?(/(?:[a-z]{2}/)?(?:products?|product)/[^"'\\s<>]+|/[a-z0-9-]+-[0-9]+\\.html)`,
+          'gi'
+        );
+        const matches = [...search.text.matchAll(prodRe)].map(m =>
+          m[1].startsWith('http') ? m[1] : `https://${domain}${m[1]}`
+        ).filter((u, i, a) => a.indexOf(u) === i).slice(0, 3);
+        for (const url of matches) {
+          const page = await get(url);
+          const price = extractPrice(page.text);
+          if (price) { competitorPrice = price; competitorUrl = url; break; }
+        }
+        if (competitorPrice) break;
+      } catch {}
     }
-    // Fallback: try homepage / collections first product
+    // Fallback: homepage
     if (!competitorPrice) {
       const home = await get(`https://${domain}`);
       competitorPrice = extractPrice(home.text);
@@ -141,7 +153,7 @@ async function calcMargin(domain, productTitle, providedAliUrl) {
   // 2. AliExpress price
   const ali = providedAliUrl
     ? { price: null, url: providedAliUrl, note: 'URL fournie — prix à vérifier manuellement' }
-    : await getAliPrice(productTitle);
+    : await getAliPrice(productTitle, rapidApiKey);
 
   // 3. Margin calculation
   let margin = null, marginPct = null, verdict = 'inconnu';
@@ -332,7 +344,7 @@ async function fullValidation(domain, keywords) {
 
 // ── FETCH HANDLER ─────────────────────────────────────────────────────────────
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { headers: CORS });
 
     const url  = new URL(request.url);
@@ -344,7 +356,7 @@ export default {
     if (path === '/margin' && request.method === 'POST') {
       const { domain, product_title, ali_url } = body;
       if (!domain || !product_title) return fail('domain + product_title requis');
-      const result = await calcMargin(domain.replace(/^https?:\/\//, ''), product_title, ali_url);
+      const result = await calcMargin(domain.replace(/^https?:\/\//, ''), product_title, ali_url, env.RAPIDAPI_KEY);
       return ok(result);
     }
 
