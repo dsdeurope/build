@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>V35 Build — Market Intel</title>
+<link rel="stylesheet" href="/assets/platform.css">
+</head>
+<body>
+<div id="toasts"></div>
+<div class="layout">
+  <aside id="sidebar"></aside>
+  <div class="main">
+    <header class="topbar">
+      <span id="topbar-title">Market Intelligence</span>
+      <div class="topbar-right">
+        <span class="badge badge-info">margin · trends · ad-spy</span>
+      </div>
+    </header>
+    <div class="content">
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:0">
+        <button class="tab-btn active" onclick="switchTab('margin')">💰 Margin Calculator</button>
+        <button class="tab-btn" onclick="switchTab('trends')">📈 Google Trends</button>
+        <button class="tab-btn" onclick="switchTab('adspy')">🔍 Ad Spy</button>
+        <button class="tab-btn" onclick="switchTab('validate')">✅ Validation complète</button>
+      </div>
+
+      <!-- MARGIN CALCULATOR -->
+      <div id="tab-margin" class="tab-panel">
+        <div class="panel">
+          <div class="panel-header">💰 Margin Calculator — Competitor vs AliExpress</div>
+          <div style="padding:16px">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Domaine concurrent</label>
+                <input id="m-domain" class="form-input" placeholder="ex: shop-concurrent.fr" oninput="clearResult('margin-result')">
+              </div>
+              <div class="form-group">
+                <label>Produit / titre</label>
+                <input id="m-title" class="form-input" placeholder="ex: robe fleurie boho été" oninput="clearResult('margin-result')">
+              </div>
+              <div class="form-group">
+                <label>URL AliExpress (optionnel)</label>
+                <input id="m-ali" class="form-input" placeholder="https://fr.aliexpress.com/item/...">
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="calcMargin()" id="btn-margin">Calculer la marge</button>
+          </div>
+        </div>
+
+        <div id="margin-result" class="result-panel" style="display:none"></div>
+
+        <div class="panel" style="margin-top:16px">
+          <div class="panel-header">📚 Règles de marge dropshipping</div>
+          <div style="padding:16px">
+            <table class="data-table">
+              <thead><tr><th>Verdict</th><th>Marge</th><th>Règle</th></tr></thead>
+              <tbody>
+                <tr><td>🟢 Excellente</td><td>≥ 60%</td><td>Prix vente ≥ 2.5× coût AliExpress</td></tr>
+                <tr><td>🟡 Correcte</td><td>40–59%</td><td>Prix vente ≥ 1.7× coût</td></tr>
+                <tr><td>🟠 Faible</td><td>20–39%</td><td>Surveiller frais pub</td></tr>
+                <tr><td>🔴 Insuffisante</td><td>&lt; 20%</td><td>À éviter sauf volume élevé</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- GOOGLE TRENDS -->
+      <div id="tab-trends" class="tab-panel" style="display:none">
+        <div class="panel">
+          <div class="panel-header">📈 Google Trends — Intérêt par niche / mot-clé</div>
+          <div style="padding:16px">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Mot-clé ou niche</label>
+                <input id="t-keyword" class="form-input" placeholder="ex: robe été, bijoux femme, décoration maison" oninput="clearResult('trends-result')">
+              </div>
+              <div class="form-group">
+                <label>Pays</label>
+                <select id="t-geo" class="form-input">
+                  <option value="FR">🇫🇷 France</option>
+                  <option value="BE">🇧🇪 Belgique</option>
+                  <option value="CH">🇨🇭 Suisse</option>
+                  <option value="">🌍 Monde</option>
+                  <option value="DE">🇩🇪 Allemagne</option>
+                  <option value="ES">🇪🇸 Espagne</option>
+                  <option value="IT">🇮🇹 Italie</option>
+                  <option value="GB">🇬🇧 UK</option>
+                  <option value="US">🇺🇸 USA</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Période</label>
+                <select id="t-period" class="form-input">
+                  <option value="today 12-m">12 derniers mois</option>
+                  <option value="today 3-m">3 derniers mois</option>
+                  <option value="today 5-y">5 ans</option>
+                </select>
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="getTrends()" id="btn-trends">Analyser la tendance</button>
+          </div>
+        </div>
+
+        <div id="trends-result" class="result-panel" style="display:none"></div>
+
+        <div class="panel" style="margin-top:16px">
+          <div class="panel-header">💡 Niches populaires à analyser</div>
+          <div style="padding:12px;display:flex;flex-wrap:wrap;gap:8px">
+            ${['robe été','bijoux femme','décoration maison','soin visage','lingerie','bague argent','vêtements enfant','sport femme','accessoires cheveux','montre femme','sac à main','luminaire salon'].map(k =>
+              `<button class="btn btn-sm" onclick="document.getElementById('t-keyword').value='${k}';getTrends()">${k}</button>`
+            ).join('')}
+          </div>
+        </div>
+      </div>
+
+      <!-- AD SPY -->
+      <div id="tab-adspy" class="tab-panel" style="display:none">
+        <div class="panel">
+          <div class="panel-header">🔍 Ad Spy — Détection publicités Meta & TikTok</div>
+          <div style="padding:16px">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Domaine à analyser</label>
+                <input id="s-domain" class="form-input" placeholder="ex: shop-concurrent.fr" oninput="clearResult('adspy-result')">
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="spyAds()" id="btn-adspy">Détecter les pubs</button>
+          </div>
+        </div>
+
+        <div id="adspy-result" class="result-panel" style="display:none"></div>
+
+        <div class="panel" style="margin-top:16px">
+          <div class="panel-header">📖 Comment interpréter</div>
+          <div style="padding:16px;font-size:13px;color:var(--muted);line-height:1.7">
+            <p>🔥 <b>Actif Meta + TikTok</b> → shop rentable, budget pub élevé → niche validée</p>
+            <p>📘 <b>Meta seulement</b> → shoppers 25-45 ans, bonne preuve de rentabilité</p>
+            <p>🎵 <b>TikTok seulement</b> → audience jeune 18-30, potentiel viral</p>
+            <p>💤 <b>Aucune pub</b> → SEO only ou budget faible → risque plus élevé</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- VALIDATION COMPLÈTE -->
+      <div id="tab-validate" class="tab-panel" style="display:none">
+        <div class="panel">
+          <div class="panel-header">✅ Validation complète — Ads + Trends</div>
+          <div style="padding:16px">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Domaine concurrent</label>
+                <input id="v-domain" class="form-input" placeholder="ex: shop-concurrent.fr" oninput="clearResult('validate-result')">
+              </div>
+              <div class="form-group" style="grid-column:1/-1">
+                <label>Mots-clés niche (séparés par virgules, max 3)</label>
+                <input id="v-keywords" class="form-input" placeholder="ex: robe été, robe fleurie, mode femme été">
+              </div>
+            </div>
+            <button class="btn btn-primary" onclick="doValidation()" id="btn-validate">Lancer la validation</button>
+          </div>
+        </div>
+
+        <div id="validate-result" class="result-panel" style="display:none"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<style>
+.tab-btn{padding:8px 16px;border:none;background:none;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;font-size:13px;font-weight:500;transition:.15s;margin-bottom:-1px}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:#6366f1;border-bottom-color:#6366f1}
+.tab-panel{animation:fadeIn .15s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:14px}
+.form-group label{display:block;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:.4px}
+.result-panel{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-top:16px}
+.margin-card{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:16px}
+.margin-kpi{background:var(--surface2);border-radius:8px;padding:14px;text-align:center}
+.margin-kpi .val{font-size:24px;font-weight:700;margin-bottom:4px}
+.margin-kpi .lbl{font-size:11px;color:var(--muted);text-transform:uppercase}
+.trend-bar{display:flex;align-items:center;gap:8px;margin:3px 0}
+.trend-bar .bar{height:8px;border-radius:4px;background:#6366f1;min-width:2px}
+.trend-bar .val{font-size:11px;color:var(--muted);min-width:28px}
+.trend-bar .date{font-size:10px;color:var(--muted);min-width:70px}
+.chip{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;background:var(--surface2);margin:2px;color:var(--text)}
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th,.data-table td{padding:8px 12px;border-bottom:1px solid var(--border);text-align:left}
+.data-table th{font-size:11px;text-transform:uppercase;color:var(--muted);font-weight:600}
+</style>
+
+<script type="module">
+import { checkAuth, buildNav, toast } from '/assets/platform.js';
+checkAuth(); buildNav();
+
+const INTEL = 'https://v35-market-intel.ernestpedanou.workers.dev';
+
+window.switchTab = function(tab) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-'+tab).style.display = '';
+  event.target.classList.add('active');
+};
+
+window.clearResult = function(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
+};
+
+function showResult(id, html) {
+  const el = document.getElementById(id);
+  el.innerHTML = html;
+  el.style.display = '';
+}
+
+function setLoading(btnId, loading) {
+  const btn = document.getElementById(btnId);
+  btn.disabled = loading;
+  btn.textContent = loading ? '⏳ Analyse en cours…' : btn.dataset.orig || btn.textContent;
+  if (!loading) btn.textContent = btn.dataset.orig;
+}
+
+// ── MARGIN ────────────────────────────────────────────────────────────────────
+window.calcMargin = async function() {
+  const domain = document.getElementById('m-domain').value.trim();
+  const title  = document.getElementById('m-title').value.trim();
+  const aliUrl = document.getElementById('m-ali').value.trim();
+  if (!domain || !title) return toast('Domaine + titre requis', 'error');
+
+  const btn = document.getElementById('btn-margin');
+  btn.dataset.orig = '💰 Calculer la marge';
+  btn.disabled = true; btn.textContent = '⏳ Analyse en cours…';
+
+  try {
+    const r = await fetch(INTEL+'/margin', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ domain, product_title: title, ali_url: aliUrl || undefined }),
+    });
+    const d = await r.json();
+
+    const verdictColor = d.margin_pct >= 60 ? '#22c55e' : d.margin_pct >= 40 ? '#eab308' : d.margin_pct >= 20 ? '#f97316' : '#ef4444';
+
+    showResult('margin-result', `
+      <h3 style="margin:0 0 12px">Résultats — <span style="color:var(--muted)">${d.product_title}</span></h3>
+      <div class="margin-card">
+        <div class="margin-kpi">
+          <div class="val">${d.competitor_price ? d.competitor_price.toFixed(2)+'€' : '—'}</div>
+          <div class="lbl">Prix concurrent</div>
+        </div>
+        <div class="margin-kpi">
+          <div class="val">${d.ali_price ? d.ali_price.toFixed(2)+'€' : '—'}</div>
+          <div class="lbl">Prix AliExpress</div>
+        </div>
+        <div class="margin-kpi">
+          <div class="val" style="color:${verdictColor}">${d.margin_pct !== null ? d.margin_pct+'%' : '—'}</div>
+          <div class="lbl">Marge</div>
+        </div>
+        <div class="margin-kpi">
+          <div class="val">${d.x3_price ? d.x3_price.toFixed(2)+'€' : '—'}</div>
+          <div class="lbl">Prix cible ×3</div>
+        </div>
+      </div>
+      <div style="font-size:20px;margin-bottom:12px">${d.verdict}</div>
+      ${d.competitor_url ? `<p style="font-size:12px;color:var(--muted)">Page produit : <a href="${d.competitor_url}" target="_blank" style="color:#6366f1">${d.competitor_url}</a></p>` : ''}
+      ${d.ali_url ? `<p style="font-size:12px;color:var(--muted)">AliExpress : <a href="${d.ali_url}" target="_blank" style="color:#6366f1">${d.ali_url}</a></p>` : ''}
+      ${d.note ? `<p style="font-size:12px;color:var(--muted);font-style:italic">${d.note}</p>` : ''}
+    `);
+  } catch(e) {
+    showResult('margin-result', `<p style="color:#ef4444">Erreur: ${e.message}</p>`);
+  } finally {
+    btn.disabled = false; btn.textContent = btn.dataset.orig;
+  }
+};
+
+// ── TRENDS ────────────────────────────────────────────────────────────────────
+window.getTrends = async function() {
+  const keyword = document.getElementById('t-keyword').value.trim();
+  const geo     = document.getElementById('t-geo').value;
+  const period  = document.getElementById('t-period').value;
+  if (!keyword) return toast('Mot-clé requis', 'error');
+
+  const btn = document.getElementById('btn-trends');
+  btn.dataset.orig = '📈 Analyser la tendance';
+  btn.disabled = true; btn.textContent = '⏳ Analyse en cours…';
+
+  try {
+    const r = await fetch(INTEL+'/trends', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ keyword, geo, period }),
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error);
+
+    const maxVal = Math.max(...(d.points||[]).map(p => p.value), 1);
+    const barsHtml = (d.points||[]).map(p =>
+      `<div class="trend-bar">
+        <div class="date">${p.date}</div>
+        <div class="bar" style="width:${Math.round((p.value/maxVal)*200)}px"></div>
+        <div class="val">${p.value}</div>
+      </div>`
+    ).join('');
+
+    const risingHtml = (d.rising||[]).map(k => `<span class="chip">🚀 ${k.query}</span>`).join('');
+    const topHtml    = (d.top||[]).map(k => `<span class="chip">${k.query}</span>`).join('');
+
+    showResult('trends-result', `
+      <div style="display:flex;align-items:center;gap:20px;margin-bottom:16px;flex-wrap:wrap">
+        <div><span style="font-size:28px">${d.trend||'—'}</span></div>
+        <div>
+          <div style="font-size:22px;font-weight:700">${d.avg_interest||'—'}<span style="font-size:13px;font-weight:400;color:var(--muted)">/100</span></div>
+          <div style="font-size:12px;color:var(--muted)">Intérêt moyen</div>
+        </div>
+        <div>
+          <div style="font-size:22px;font-weight:700;color:${(d.delta_pct||0)>0?'#22c55e':'#ef4444'}">${(d.delta_pct||0)>0?'+':''}${d.delta_pct||0}%</div>
+          <div style="font-size:12px;color:var(--muted)">vs mois précédents</div>
+        </div>
+      </div>
+      <div style="margin-bottom:16px">${barsHtml}</div>
+      ${risingHtml ? `<div style="margin-bottom:8px"><b style="font-size:12px;text-transform:uppercase;color:var(--muted)">En hausse 🚀</b><br>${risingHtml}</div>` : ''}
+      ${topHtml    ? `<div><b style="font-size:12px;text-transform:uppercase;color:var(--muted)">Top requêtes</b><br>${topHtml}</div>` : ''}
+    `);
+  } catch(e) {
+    showResult('trends-result', `<p style="color:#ef4444">Erreur: ${e.message}</p>`);
+  } finally {
+    btn.disabled = false; btn.textContent = btn.dataset.orig;
+  }
+};
+
+// ── AD SPY ────────────────────────────────────────────────────────────────────
+window.spyAds = async function() {
+  const domain = document.getElementById('s-domain').value.trim();
+  if (!domain) return toast('Domaine requis', 'error');
+
+  const btn = document.getElementById('btn-adspy');
+  btn.dataset.orig = '🔍 Détecter les pubs';
+  btn.disabled = true; btn.textContent = '⏳ Analyse en cours…';
+
+  try {
+    const r = await fetch(INTEL+'/adspy', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ domain }),
+    });
+    const d = await r.json();
+
+    const metaCount = d.meta?.active_ads || 0;
+    const ttCount   = d.tiktok?.active_ads || 0;
+
+    showResult('adspy-result', `
+      <div style="font-size:20px;margin-bottom:16px">${d.verdict}</div>
+      <div class="margin-card">
+        <div class="margin-kpi">
+          <div class="val" style="color:${metaCount?'#22c55e':'#ef4444'}">${metaCount}</div>
+          <div class="lbl">📘 Pubs Meta actives</div>
+        </div>
+        <div class="margin-kpi">
+          <div class="val" style="color:${ttCount?'#22c55e':'#ef4444'}">${ttCount}</div>
+          <div class="lbl">🎵 Pubs TikTok actives</div>
+        </div>
+      </div>
+      ${d.meta?.pages?.length ? `<p style="font-size:12px;color:var(--muted)">Pages Facebook : ${d.meta.pages.map(p=>`<b>${p}</b>`).join(', ')}</p>` : ''}
+      ${d.meta?.oldest_ad ? `<p style="font-size:12px;color:var(--muted)">Première pub détectée : ${d.meta.oldest_ad}</p>` : ''}
+      ${(d.meta?.sample_copy||[]).map(c=>`<blockquote style="border-left:3px solid #6366f1;padding-left:12px;margin:8px 0;font-size:12px;color:var(--muted)">${c}</blockquote>`).join('')}
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <a href="https://www.facebook.com/ads/library/?active_status=active&ad_type=all&country=FR&q=${encodeURIComponent(domain)}" target="_blank" class="btn btn-sm">📘 Voir Meta Ads Library</a>
+        <a href="https://library.tiktok.com/ads/search?query=${encodeURIComponent(domain)}&region=FR" target="_blank" class="btn btn-sm">🎵 Voir TikTok Ad Library</a>
+      </div>
+    `);
+  } catch(e) {
+    showResult('adspy-result', `<p style="color:#ef4444">Erreur: ${e.message}</p>`);
+  } finally {
+    btn.disabled = false; btn.textContent = btn.dataset.orig;
+  }
+};
+
+// ── VALIDATION COMPLÈTE ───────────────────────────────────────────────────────
+window.doValidation = async function() {
+  const domain   = document.getElementById('v-domain').value.trim();
+  const kws      = document.getElementById('v-keywords').value.split(',').map(k=>k.trim()).filter(Boolean).slice(0,3);
+  if (!domain) return toast('Domaine requis', 'error');
+
+  const btn = document.getElementById('btn-validate');
+  btn.dataset.orig = '✅ Lancer la validation';
+  btn.disabled = true; btn.textContent = '⏳ Analyse en cours…';
+
+  try {
+    const r = await fetch(INTEL+'/validate', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ domain, keywords: kws }),
+    });
+    const d = await r.json();
+    const s = d.summary;
+
+    const recColor = s.recommendation?.startsWith('🟢') ? '#22c55e' : s.recommendation?.startsWith('🟡') ? '#eab308' : '#ef4444';
+
+    const trendsHtml = (d.trends||[]).map(t => `
+      <div style="margin-bottom:12px;padding:12px;background:var(--surface2);border-radius:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <b>${t.keyword}</b>
+          <span>${t.trend||'—'}</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted)">Intérêt moyen: ${t.avg_interest||0}/100 · Δ${t.delta_pct||0}%</div>
+      </div>
+    `).join('');
+
+    showResult('validate-result', `
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;padding:16px;background:var(--surface2);border-radius:10px">
+        <div style="font-size:40px">${s.recommendation?.split(' ')[0]||'—'}</div>
+        <div>
+          <div style="font-size:20px;font-weight:700;color:${recColor}">${s.recommendation}</div>
+          <div style="font-size:13px;color:var(--muted)">Intérêt moyen: ${s.avg_search_interest}/100</div>
+        </div>
+      </div>
+      <div style="margin-bottom:16px">
+        <h4 style="margin:0 0 8px;font-size:12px;text-transform:uppercase;color:var(--muted)">Publicités</h4>
+        <div>${d.ads?.verdict||'—'}</div>
+      </div>
+      <div>
+        <h4 style="margin:0 0 8px;font-size:12px;text-transform:uppercase;color:var(--muted)">Tendances</h4>
+        ${trendsHtml}
+      </div>
+    `);
+  } catch(e) {
+    showResult('validate-result', `<p style="color:#ef4444">Erreur: ${e.message}</p>`);
+  } finally {
+    btn.disabled = false; btn.textContent = btn.dataset.orig;
+  }
+};
+</script>
+</body>
+</html>
