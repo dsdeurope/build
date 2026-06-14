@@ -23,14 +23,31 @@ const CORS = {'Access-Control-Allow-Origin':'same-origin','Access-Control-Allow-
 const resp = (d,s=200) => new Response(JSON.stringify(d),{status:s,headers:{'Content-Type':'application/json',...CORS}});
 
 export default {
-  async scheduled(event, env) { await runChecks(env); },
+  async scheduled(event, env) {
+    await runChecks(env);
+    // Domain expiry check once per day (throttle via KV timestamp)
+    const lastDom = await env.KV.get('sentinelle:domains-last-check').catch(()=>null);
+    if(!lastDom || Date.now()-new Date(lastDom).getTime() > 82800000) {
+      await runDomainChecks(env);
+      await env.KV.put('sentinelle:domains-last-check', new Date().toISOString(), {expirationTtl:90000});
+    }
+  },
   async fetch(request, env) {
     if(request.method==='OPTIONS')return new Response(null,{status:204,headers:CORS});
     const path=new URL(request.url).pathname;
+    const m=request.method;
     if(path==='/report')return resp(await getReport(env));
     if(path==='/health')return resp(...await getHealth(env));
     if(path==='/alerts')return resp(await getAlerts(env));
-    return resp({status:'sentinelle',cron:'*/5 * * * *',workers:Object.keys(WORKERS)});
+    if(path==='/domains'&&m==='GET')return resp(await getDomains(env));
+    if(path==='/domains'&&m==='POST'){
+      const{domain}=await request.json().catch(()=>({}));
+      if(!domain)return resp({error:'domain requis'},400);
+      await addDomain(env,domain);
+      return resp({ok:true,domain});
+    }
+    if(path==='/domains/check'&&m==='POST')return resp(await runDomainChecks(env));
+    return resp({status:'sentinelle',crons:['*/5 * * * *','0 8 * * *'],workers:Object.keys(WORKERS)});
   },
 };
 
@@ -120,5 +137,64 @@ async function getAlerts(env) {
   const alerts = (await Promise.all(
     keys.map(k => env.KV.get(k).then(v=>v?JSON.parse(v):null).catch(()=>null))
   )).filter(Boolean);
-  return {ts: new Date().toISOString(), active_alerts: alerts.length, alerts};
+  // Also include domain expiry alerts
+  const domList = await env.KV.get('monitor:domains').then(v=>v?JSON.parse(v):[]).catch(()=>[]);
+  const dAlerts = (await Promise.all(
+    domList.map(d=>env.KV.get('alert:expiry:'+d).then(v=>v?JSON.parse(v):null).catch(()=>null))
+  )).filter(Boolean);
+  return {ts: new Date().toISOString(), active_alerts: alerts.length+dAlerts.length, alerts:[...alerts,...dAlerts]};
+}
+
+// ── Domain Expiry via RDAP (gratuit, sans clé) ────────────────────────────
+async function addDomain(env, domain) {
+  const list = await env.KV.get('monitor:domains').then(v=>v?JSON.parse(v):[]).catch(()=>[]);
+  if(!list.includes(domain)) {
+    list.push(domain);
+    await env.KV.put('monitor:domains', JSON.stringify(list));
+  }
+}
+
+async function checkDomainExpiry(domain) {
+  try {
+    const r = await fetch('https://rdap.org/domain/'+encodeURIComponent(domain), {
+      signal: AbortSignal.timeout(10000),
+      headers: {'Accept':'application/json','User-Agent':'Sentinelle/2.0'},
+    });
+    if(!r.ok) return {domain, error:'RDAP '+r.status, checked: new Date().toISOString()};
+    const data = await r.json();
+    const expEvent = (data.events||[]).find(e=>e.eventAction==='expiration');
+    if(!expEvent) return {domain, error:'no expiration event', checked: new Date().toISOString()};
+    const expiry = new Date(expEvent.eventDate);
+    const daysLeft = Math.ceil((expiry - Date.now()) / 86400000);
+    return {domain, expiry: expiry.toISOString(), daysLeft, status: daysLeft<7?'CRITICAL':daysLeft<30?'WARNING':'OK', checked: new Date().toISOString()};
+  } catch(e) {
+    return {domain, error: e.message, checked: new Date().toISOString()};
+  }
+}
+
+async function runDomainChecks(env) {
+  const list = await env.KV.get('monitor:domains').then(v=>v?JSON.parse(v):[]).catch(()=>[]);
+  if(!list.length) return {checked:0, results:[]};
+  const results = await Promise.all(list.map(d => checkDomainExpiry(d)));
+  for(const r of results) {
+    await env.KV.put('domain:expiry:'+r.domain, JSON.stringify(r), {expirationTtl: 86400*2});
+    if(r.daysLeft !== undefined && r.daysLeft < 30) {
+      await env.KV.put('alert:expiry:'+r.domain, JSON.stringify({
+        type:'expiry', domain:r.domain, daysLeft:r.daysLeft, expiry:r.expiry,
+        critical:r.daysLeft<7, ts:new Date().toISOString(),
+      }), {expirationTtl: 86400});
+    } else if(r.daysLeft >= 30) {
+      await env.KV.delete('alert:expiry:'+r.domain).catch(()=>{});
+    }
+  }
+  return {checked: results.length, ts: new Date().toISOString(), results};
+}
+
+async function getDomains(env) {
+  const list = await env.KV.get('monitor:domains').then(v=>v?JSON.parse(v):[]).catch(()=>[]);
+  const results = await Promise.all(
+    list.map(d => env.KV.get('domain:expiry:'+d).then(v=>v?JSON.parse(v):{domain:d,status:'unknown'}).catch(()=>({domain:d,status:'unknown'})))
+  );
+  const expiring = results.filter(r=>r.daysLeft!==undefined && r.daysLeft<30);
+  return {ts: new Date().toISOString(), total: list.length, expiring: expiring.length, domains: results};
 }

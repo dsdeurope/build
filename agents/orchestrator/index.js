@@ -143,6 +143,10 @@ async function advance(state,env){
     if(env.BACKUP){
       env.BACKUP.fetch(new Request('https://backup/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:state.slug})})).catch(()=>{});
     }
+    // Enregistrement domaine pour monitoring expiry (sentinelle)
+    env.KV.get('monitor:domains').then(v=>JSON.parse(v||'[]')).then(list=>{
+      if(!list.includes(state.domain)){list.push(state.domain);env.KV.put('monitor:domains',JSON.stringify(list)).catch(()=>{});}
+    }).catch(()=>{});
     return;
   }
   step.status='running';step.startedAt=new Date().toISOString();
